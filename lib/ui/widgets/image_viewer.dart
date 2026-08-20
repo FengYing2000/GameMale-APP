@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/http.dart';
+import 'image_actions.dart';
 
 /// 全螢幕看圖，支援雙指縮放與拖曳
 void showImageViewer(BuildContext context, String url) {
@@ -22,6 +23,7 @@ class _Viewer extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: GestureDetector(
         onTap: () => Navigator.of(context).pop(),
+        onLongPress: () => showImageActions(context, url),
         child: Stack(
           children: [
             Positioned.fill(
@@ -45,7 +47,7 @@ class _Viewer extends StatelessWidget {
               right: 0,
               bottom: MediaQuery.of(context).padding.bottom + 18,
               child: const Text(
-                '點一下關閉',
+                '點一下關閉 · 長按更多',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white54, fontSize: 13),
               ),

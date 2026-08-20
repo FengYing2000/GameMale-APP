@@ -36,6 +36,7 @@ void main() {
     expect(forums.every((f) => f.fid > 0 && f.name.isNotEmpty), isTrue);
     // ignore: avoid_print
     final s = d.sign;
+    // ignore: avoid_print
     print('  ${d.groups.length} 個分類、${forums.length} 個板塊'
         '${s == null ? '' : '；簽到 ${s.signed ? '已完成' : '未完成'}'
             '，經驗 ${s.maxed ? '${s.exp} (已滿級)' : '${s.exp}/${s.expMax}'}'

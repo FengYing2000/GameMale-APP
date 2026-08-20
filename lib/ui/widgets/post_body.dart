@@ -1,12 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/http.dart';
 import '../../api/parse.dart';
+import '../../store/settings.dart';
 import '../../theme.dart';
+import 'image_actions.dart';
 import 'image_viewer.dart';
 
 /// 渲染 Discuz 的帖子 HTML。
@@ -182,38 +185,83 @@ class _Spoiler extends StatelessWidget {
   }
 }
 
-class _PostImage extends StatelessWidget {
+class _PostImage extends StatefulWidget {
   const _PostImage({required this.src});
   final String src;
 
   @override
+  State<_PostImage> createState() => _PostImageState();
+}
+
+class _PostImageState extends State<_PostImage> {
+  /// 手動載入模式下，使用者點過就記住，換頁前不再問
+  bool _forced = false;
+
+  @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsStore>();
+    final show = _forced || settings.autoLoadImages;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: GestureDetector(
-        onTap: () => showImageViewer(context, src),
-        child: ClipRRect(
+      child: show ? _image(context) : _placeholder(context, settings),
+    );
+  }
+
+  Widget _placeholder(BuildContext context, SettingsStore settings) {
+    final reason = settings.imagePolicy == ImagePolicy.wifiOnly
+        ? '目前不是 Wi-Fi'
+        : '已設為手動載入';
+    return InkWell(
+      onTap: () => setState(() => _forced = true),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 96,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
-            imageUrl: src,
-            httpHeaders: Api.imageHeaders,
-            fit: BoxFit.contain,
-            placeholder: (c, _) => Container(
-              height: 150,
-              alignment: Alignment.center,
-              color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
-              child: const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+          border: Border.all(color: Theme.of(context).dividerColor),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.image_outlined, size: 24, color: faint(context)),
+            const SizedBox(height: 6),
+            Text('點一下載入圖片',
+                style: TextStyle(fontSize: 13, color: subtle(context))),
+            Text(reason, style: TextStyle(fontSize: 11, color: faint(context))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _image(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showImageViewer(context, widget.src),
+      onLongPress: () => showImageActions(context, widget.src),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CachedNetworkImage(
+          imageUrl: widget.src,
+          httpHeaders: Api.imageHeaders,
+          fit: BoxFit.contain,
+          placeholder: (c, _) => Container(
+            height: 150,
+            alignment: Alignment.center,
+            color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
+            child: const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            errorWidget: (c, _, _) => Container(
-              height: 90,
-              alignment: Alignment.center,
-              color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
-              child: Text('圖片載入失敗', style: TextStyle(fontSize: 12, color: faint(c))),
-            ),
+          ),
+          errorWidget: (c, _, _) => Container(
+            height: 90,
+            alignment: Alignment.center,
+            color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
+            child: Text('圖片載入失敗', style: TextStyle(fontSize: 12, color: faint(c))),
           ),
         ),
       ),

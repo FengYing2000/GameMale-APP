@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/store/session.dart';
+import 'package:gamemale/store/settings.dart';
 import 'package:gamemale/ui/pages/forum_page.dart';
 import 'package:gamemale/ui/pages/guide_page.dart';
 import 'package:gamemale/ui/pages/home_page.dart';
@@ -25,8 +26,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _host(Widget page) => ChangeNotifierProvider(
-      create: (_) => SessionStore(),
+Widget _host(Widget page) => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SessionStore()),
+        ChangeNotifierProvider(create: (_) => SettingsStore()),
+      ],
       child: MaterialApp(home: page),
     );
 

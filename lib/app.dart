@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'api/parse.dart' as parse;
+import 'i18n/s2t.dart';
 import 'store/session.dart';
+import 'store/settings.dart';
 import 'theme.dart';
 import 'ui/pages/forum_page.dart';
 import 'ui/pages/guide_page.dart';
@@ -30,33 +33,59 @@ class GameMaleApp extends StatefulWidget {
 
 class _GameMaleAppState extends State<GameMaleApp> {
   late final SessionStore _session;
+  late final SettingsStore _settings;
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
     _session = SessionStore();
+    _settings = SettingsStore();
     _router = _buildRouter(_session);
-    _session.restore();
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    await S2T.instance.load();
+    await _settings.load();
+    _applyLang();
+    _settings.addListener(_applyLang);
+    await _session.restore();
+  }
+
+  /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
+  void _applyLang() {
+    final want = _settings.toTraditional;
+    if (parse.convertToTraditional != want) {
+      parse.convertToTraditional = want;
+      if (mounted) setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _settings.removeListener(_applyLang);
     _session.dispose();
+    _settings.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _session,
-      child: MaterialApp.router(
-        title: 'GameMale',
-        debugShowCheckedModeBanner: false,
-        theme: lightTheme,
-        darkTheme: darkTheme,
-        themeMode: ThemeMode.system,
-        routerConfig: _router,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _session),
+        ChangeNotifierProvider.value(value: _settings),
+      ],
+      child: Consumer<SettingsStore>(
+        builder: (context, settings, _) => MaterialApp.router(
+          title: 'GameMale',
+          debugShowCheckedModeBanner: false,
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: settings.themeMode,
+          routerConfig: _router,
+        ),
       ),
     );
   }

@@ -1,8 +1,15 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
+import '../i18n/s2t.dart';
 import 'http.dart';
 import 'models.dart';
+
+/// 是否把論壇的簡體內容轉成繁體。由 SettingsStore 設定，
+/// 集中在解析層處理，UI 端就不必每個地方各自轉一次。
+bool convertToTraditional = false;
+
+String zh(String s) => convertToTraditional ? S2T.instance.convert(s) : s;
 
 dom.Document toDoc(String html) => html_parser.parse(html);
 
@@ -10,7 +17,7 @@ dom.Document toDoc(String html) => html_parser.parse(html);
 String txt(dom.Node? node) {
   if (node == null) return '';
   final s = node is dom.Element ? node.text : (node.text ?? '');
-  return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return zh(s.replaceAll(RegExp(r'\s+'), ' ').trim());
 }
 
 String attr(dom.Element? el, String name) => el?.attributes[name] ?? '';
@@ -125,7 +132,21 @@ String sanitizeContent(dom.Element? el) {
   // 反正伺服器沒回傳的內容本來就不在 HTML 裡，看得到的就該畫出來
   _unhide(node);
 
+  if (convertToTraditional) _convertTextNodes(node);
+
   return node.innerHtml.trim();
+}
+
+/// 只轉文字節點 —— 直接對整段 HTML 做字串替換會連標籤和網址一起改掉
+void _convertTextNodes(dom.Node node) {
+  for (final child in node.nodes) {
+    if (child is dom.Text) {
+      final t = child.text;
+      if (t.trim().isNotEmpty) child.text = S2T.instance.convert(t);
+    } else {
+      _convertTextNodes(child);
+    }
+  }
 }
 
 

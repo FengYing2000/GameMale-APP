@@ -11,6 +11,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>儲存帖子裡的圖片到你的相簿</string>
 	<key>CFBundleDisplayName</key>
 	<string>GameMale</string>
 	<key>CFBundleExecutable</key>

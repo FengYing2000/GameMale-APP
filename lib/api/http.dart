@@ -118,6 +118,24 @@ class Api {
     }
   }
 
+  /// 抓任意絕對網址的二進位內容（圖片可能來自外站圖床）
+  Future<Uint8List> getAbsoluteBytes(String url) async {
+    await init();
+    try {
+      final res = await _dio.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: imageHeaders,
+        ),
+      );
+      _guard(res.statusCode);
+      return Uint8List.fromList(res.data ?? const []);
+    } on DioException catch (e) {
+      throw DiscuzException('下載失敗：${_reason(e)}');
+    }
+  }
+
   /// 圖片走 Image.network / CachedNetworkImage 時要帶的標頭
   static Map<String, String> get imageHeaders => const {
         'User-Agent': _ua,
