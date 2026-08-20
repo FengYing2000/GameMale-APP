@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -49,19 +50,19 @@ class _DoingPageViewState extends State<DoingPageView> {
     final text = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('發布記錄'),
+        title: Text(tr('發布記錄')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           maxLines: 4,
           maxLength: 200,
-          decoration: const InputDecoration(hintText: '說說你在做什麼…'),
+          decoration: InputDecoration(hintText: tr('說說你在做什麼…')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(tr('取消'))),
           TextButton(
               onPressed: () => Navigator.pop(c, ctrl.text.trim()),
-              child: const Text('發布')),
+              child: Text(tr('發布'))),
         ],
       ),
     );
@@ -74,7 +75,7 @@ class _DoingPageViewState extends State<DoingPageView> {
       toast(context, r.message);
       if (r.ok) await _load();
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '發布失敗：${e.message}');
+      if (mounted) toast(context, tr('發布失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -85,10 +86,10 @@ class _DoingPageViewState extends State<DoingPageView> {
     final d = _data;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('記錄廣場')),
+      appBar: AppBar(title: Text(tr('記錄廣場'))),
       floatingActionButton: FloatingActionButton(
         onPressed: _busy ? null : _compose,
-        tooltip: '發布記錄',
+        tooltip: tr('發布記錄'),
         child: const Icon(Icons.edit_outlined),
       ),
       body: RefreshIndicator(
@@ -121,7 +122,7 @@ class _DoingPageViewState extends State<DoingPageView> {
               loading: _loading,
               error: _err,
               empty: !_loading && _err == null && (d?.items.isEmpty ?? false),
-              emptyText: '還沒有人留下記錄',
+              emptyText: tr('還沒有人留下記錄'),
               onRetry: _load,
             ),
             if (d != null && d.items.isNotEmpty)

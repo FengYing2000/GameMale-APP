@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -63,7 +64,7 @@ class _HomePageState extends State<HomePage> {
       if (mounted) toast(context, r.message);
       if (r.ok) await _load();
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '簽到失敗：${e.message}');
+      if (mounted) toast(context, tr('簽到失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _signing = false);
     }
@@ -84,7 +85,7 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),
-            tooltip: '通知',
+            tooltip: tr('通知'),
             onPressed: () => context.push('/notice'),
           ),
         ],
@@ -146,7 +147,7 @@ class _SignCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(sign.title.isEmpty ? '等級' : sign.title,
+                      Text(sign.title.isEmpty ? tr('等級') : sign.title,
                           style: TextStyle(fontSize: 12.5, color: subtle(context))),
                       Text(
                           sign.maxed
@@ -171,8 +172,8 @@ class _SignCard extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             sign.signed
-                ? OutlinedButton(onPressed: null, child: Text(busy ? '…' : '已簽到'))
-                : FilledButton(onPressed: busy ? null : onSign, child: Text(busy ? '…' : '簽到')),
+                ? OutlinedButton(onPressed: null, child: Text(busy ? '…' : tr('已簽到')))
+                : FilledButton(onPressed: busy ? null : onSign, child: Text(busy ? '…' : tr('簽到'))),
           ],
         ),
       ),
@@ -257,7 +258,7 @@ class _ForumRow extends StatelessWidget {
                 Text(item.threads,
                     style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w600, color: subtle(context))),
-                Text('主題', style: TextStyle(fontSize: 10.5, color: faint(context))),
+                Text(tr('主題'), style: TextStyle(fontSize: 10.5, color: faint(context))),
               ],
             ),
             Icon(Icons.chevron_right, size: 18, color: faint(context)),

@@ -30,8 +30,11 @@ Future<dom.Document> _page(String url) async {
   _captureCreditNames(html);
 
   // 登入狀態只在冷啟動問一次是不夠的：cookie 隨時可能過期，
-  // 不回報的話 UI 會一直停在「已登入」，但每個操作都被論壇擋下來
-  if (!_guestAllowed(url) && !isLoggedIn(doc)) {
+  // 不回報的話 UI 會一直停在「已登入」，但每個操作都被論壇擋下來。
+  //
+  // 但一定要用「看到登入入口」來判定，不能用「沒有登出連結」——
+  // inajax 浮層片段兩者都沒有，會害使用者一點評分就被踢出登入狀態
+  if (!_guestAllowed(url) && isGuestPage(doc)) {
     _formhash = null;
     onSessionLost?.call();
   }
@@ -240,6 +243,8 @@ ThreadData parseThread(dom.Document doc, int tid) {
     final link = tit?.querySelector('h4 a');
     final con = it.querySelector('.postListCon');
     final body = con?.querySelector('.postmessage') ?? con;
+    // 附件圖放在 .postListCon 之外的 ul.img_list，只取內文會整批漏掉
+    final withAttachments = _mergeAttachments(body, it);
     final av = attr(tit?.querySelector('.h_avatar img'), 'src');
     final avatar = av.isNotEmpty ? av : headAvatar;
     final time = txt(it.querySelector('.postListAttr'));
@@ -254,7 +259,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
       uid: paramInt(link != null ? attr(link, 'href') : avatar, 'uid'),
       avatar: avatar,
       time: time.isNotEmpty ? time : (spans.length > 1 ? txt(spans[1]) : ''),
-      html: sanitizeContent(body),
+      html: sanitizeContent(withAttachments),
       signature: sanitizeContent(it.querySelector('.sign')),
       quoteHref: attr(it.querySelector('.replybtn input'), 'href'),
       comments: _parseFloorComments(it),
@@ -336,6 +341,36 @@ Future<SubmitResult> votePoll(Poll poll, List<String> answers) async {
   final html = await Api.instance.postRaw(
       poll.action.replaceAll('&amp;', '&'), body.toString());
   return _submitResult(html, '投票');
+}
+
+
+/// 把內文和附件圖清單合成一個節點再淨化。
+///
+/// Discuz 手機版把附件圖放在 `<ul class="img_list">`，那是 .postListCon 的
+/// 兄弟節點而不是內文的一部分 —— 只讀內文的話用附件上傳的照片全都不會出現。
+dom.Element? _mergeAttachments(dom.Element? body, dom.Element post) {
+  final lists = post.querySelectorAll('.img_list');
+  if (lists.isEmpty) return body;
+
+  final wrap = dom.Element.tag('div');
+  if (body != null) {
+    for (final n in body.nodes.toList()) {
+      wrap.append(n.clone(true));
+    }
+  }
+  for (final ul in lists) {
+    final copy = ul.clone(true);
+    // 附件圖外面包著連到附件頁的 <a>，拆掉才不會蓋掉點圖放大的手勢
+    for (final a in copy.querySelectorAll('a').toList()) {
+      if (a.querySelector('img') == null) continue;
+      for (final child in a.nodes.toList()) {
+        a.parent?.insertBefore(child.clone(true), a);
+      }
+      a.remove();
+    }
+    wrap.append(copy);
+  }
+  return wrap;
 }
 
 /* ─────────────── 導讀 / 搜尋 ─────────────── */

@@ -17,8 +17,8 @@ enum ImagePolicy {
 /// 介面語言
 enum AppLang {
   auto('自動', '跟隨系統語言'),
-  hant('繁體中文', '把論壇的簡體內容轉成繁體'),
-  hans('简体中文', '維持論壇原本的簡體');
+  hant('繁體中文', '介面與論壇內容都顯示繁體'),
+  hans('简体中文', '介面转为简体，论坛内容维持原样');
 
   const AppLang(this.label, this.desc);
   final String label;

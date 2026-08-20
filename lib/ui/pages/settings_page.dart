@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -32,11 +33,11 @@ class _SettingsPageState extends State<SettingsPage> {
     final settings = context.watch<SettingsStore>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('設定')),
+      appBar: AppBar(title: Text(tr('設定'))),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          _section(context, '外觀'),
+          _section(context, tr('外觀')),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(
@@ -44,27 +45,27 @@ class _SettingsPageState extends State<SettingsPage> {
                 _choice<AppLang>(
                   context,
                   icon: Icons.translate,
-                  title: '語言',
+                  title: tr('語言'),
                   current: settings.lang,
                   values: AppLang.values,
                   labelOf: (v) => v.label,
                   descOf: (v) => v.desc,
                   onPick: settings.setLang,
                   trailingNote: settings.lang == AppLang.auto
-                      ? (settings.toTraditional ? '目前：繁體' : '目前：简体')
+                      ? (settings.toTraditional ? tr('目前：繁體') : tr('目前：简体'))
                       : null,
                 ),
                 const Divider(indent: 56, endIndent: 14),
                 _choice<ThemeMode>(
                   context,
                   icon: Icons.dark_mode_outlined,
-                  title: '主題',
+                  title: tr('主題'),
                   current: settings.themeMode,
                   values: ThemeMode.values,
                   labelOf: (v) => switch (v) {
-                    ThemeMode.system => '跟隨系統',
-                    ThemeMode.light => '淺色',
-                    ThemeMode.dark => '深色',
+                    ThemeMode.system => tr('跟隨系統'),
+                    ThemeMode.light => tr('淺色'),
+                    ThemeMode.dark => tr('深色'),
                   },
                   descOf: (_) => null,
                   onPick: settings.setThemeMode,
@@ -72,7 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          _section(context, '流量'),
+          _section(context, tr('流量')),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(
@@ -80,14 +81,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 _choice<ImagePolicy>(
                   context,
                   icon: Icons.image_outlined,
-                  title: '帖子圖片載入',
+                  title: tr('帖子圖片載入'),
                   current: settings.imagePolicy,
                   values: ImagePolicy.values,
                   labelOf: (v) => v.label,
                   descOf: (v) => v.desc,
                   onPick: settings.setImagePolicy,
                   trailingNote: settings.imagePolicy == ImagePolicy.wifiOnly
-                      ? (settings.onWifi ? '目前：Wi-Fi' : '目前：行動網路')
+                      ? (settings.onWifi ? tr('目前：Wi-Fi') : tr('目前：行動網路'))
                       : null,
                 ),
               ],
@@ -96,33 +97,33 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(26, 8, 26, 0),
             child: Text(
-              '設為手動時，帖子裡的圖片會先顯示佔位，點一下才載入。'
-              '長按任何圖片可以儲存、分享或複製原始連結。',
+              tr('設為手動時，帖子裡的圖片會先顯示佔位，點一下才載入。'
+                  '長按任何圖片可以儲存、分享或複製原始連結。'),
               style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
             ),
           ),
-          _section(context, '帳號'),
+          _section(context, tr('帳號')),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                _row(context, '使用者', session.name.isEmpty ? '—' : session.name),
+                _row(context, tr('使用者'), session.name.isEmpty ? '—' : session.name),
                 const Divider(indent: 14, endIndent: 14),
                 _row(context, 'UID', '${session.uid ?? '—'}'),
                 const Divider(indent: 14, endIndent: 14),
-                _row(context, '登入狀態', session.loggedIn ? '已登入' : '未登入'),
+                _row(context, tr('登入狀態'), session.loggedIn ? tr('已登入') : tr('未登入')),
               ],
             ),
           ),
-          _section(context, '關於'),
+          _section(context, tr('關於')),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                _row(context, '版本', _version),
+                _row(context, tr('版本'), _version),
                 const Divider(indent: 14, endIndent: 14),
                 ListTile(
-                  title: const Text('用瀏覽器開啟論壇'),
+                  title: Text(tr('用瀏覽器開啟論壇')),
                   trailing: Icon(Icons.open_in_new, size: 18, color: faint(context)),
                   onTap: () => launchUrl(
                     Uri.parse('$kOrigin/forum.php'),
@@ -135,8 +136,10 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(26, 20, 26, 0),
             child: Text(
-              '這個 App 直接讀論壇的手機版頁面，不經過任何第三方伺服器，'
-              '帳密只送往 ${kOrigin.replaceFirst('https://', '')}。',
+              tr('這個 App 直接讀論壇的手機版頁面，不經過任何第三方伺服器，'
+                  '帳密只送往 ') +
+                  kOrigin.replaceFirst('https://', '') +
+                  tr('。'),
               style: TextStyle(fontSize: 12.5, height: 1.7, color: faint(context)),
             ),
           ),

@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -80,7 +81,7 @@ class _PmChatPageState extends State<PmChatPage> {
         toast(context, r.message);
       }
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '傳送失敗：${e.message}');
+      if (mounted) toast(context, tr('傳送失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -92,7 +93,7 @@ class _PmChatPageState extends State<PmChatPage> {
     final msgs = chat?.messages ?? const <PmMessage>[];
 
     return Scaffold(
-      appBar: AppBar(title: Text(chat?.title.isNotEmpty == true ? chat!.title : '私人訊息')),
+      appBar: AppBar(title: Text(chat?.title.isNotEmpty == true ? chat!.title : tr('私人訊息'))),
       body: Column(
         children: [
           Expanded(
@@ -106,7 +107,7 @@ class _PmChatPageState extends State<PmChatPage> {
                     loading: _loading,
                     error: _err,
                     empty: !_loading && _err == null && msgs.isEmpty,
-                    emptyText: '還沒有訊息',
+                    emptyText: tr('還沒有訊息'),
                     onRetry: _load,
                   ),
                   for (final m in msgs) _Bubble(msg: m),
@@ -213,7 +214,7 @@ class _Composer extends StatelessWidget {
                 minLines: 1,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: '輸入訊息…',
+                  hintText: tr('輸入訊息…'),
                   filled: true,
                   fillColor:
                       Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),

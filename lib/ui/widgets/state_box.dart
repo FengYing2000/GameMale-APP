@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
@@ -55,7 +56,7 @@ class StateBox extends StatelessWidget {
             Text(error!, textAlign: TextAlign.center, style: TextStyle(color: subtle(context))),
             if (onRetry != null) ...[
               const SizedBox(height: 16),
-              OutlinedButton(onPressed: onRetry, child: const Text('重試')),
+              OutlinedButton(onPressed: onRetry, child: Text(tr('重試'))),
             ],
           ],
         ),
@@ -64,7 +65,7 @@ class StateBox extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 70),
       child: Center(
-        child: Text(emptyText, style: TextStyle(color: faint(context), fontSize: 14)),
+        child: Text(tr(emptyText), style: TextStyle(color: faint(context), fontSize: 14)),
       ),
     );
   }

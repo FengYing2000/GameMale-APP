@@ -50,6 +50,17 @@ bool isLoggedIn(dom.Document doc) =>
     doc.querySelector('a[href*="action=logout"]') != null ||
     doc.querySelector('a[href*="mycenter=1"]') != null;
 
+/// 明確判定「這是訪客頁」——必須看到登入入口，不能只憑「沒有登出連結」。
+///
+/// inajax=1 的浮層片段（評分表單、評分紀錄）兩種標記都沒有，
+/// 用缺少登出連結去推論會把使用者莫名其妙踢出登入狀態。
+bool isGuestPage(dom.Document doc) {
+  if (isLoggedIn(doc)) return false;
+  return doc.querySelector('#loginform') != null ||
+      doc.querySelector('a[href*="action=login"]') != null ||
+      doc.querySelector('a[href*="mod=logging"]') != null;
+}
+
 String? noticeMessage(dom.Document doc) {
   final el = doc.querySelector(
       '.alert_error, .alert_info, .alert_right, .del_tips, #messagetext p');

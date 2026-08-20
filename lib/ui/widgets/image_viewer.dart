@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -37,7 +38,7 @@ class _Viewer extends StatelessWidget {
                     fit: BoxFit.contain,
                     placeholder: (c, _) => const CircularProgressIndicator(strokeWidth: 2),
                     errorWidget: (c, _, _) =>
-                        const Text('圖片載入失敗', style: TextStyle(color: Colors.white70)),
+                        Text(tr('圖片載入失敗'), style: TextStyle(color: Colors.white70)),
                   ),
                 ),
               ),
@@ -46,8 +47,8 @@ class _Viewer extends StatelessWidget {
               left: 0,
               right: 0,
               bottom: MediaQuery.of(context).padding.bottom + 18,
-              child: const Text(
-                '點一下關閉 · 長按更多',
+              child: Text(
+                tr('點一下關閉 · 長按更多'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white54, fontSize: 13),
               ),

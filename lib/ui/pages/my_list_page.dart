@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -43,7 +44,7 @@ class _MyListPageState extends State<MyListPage> {
     if (uid == null) {
       setState(() {
         _loading = false;
-        _err = '尚未登入';
+        _err = tr('尚未登入');
       });
       return;
     }
@@ -82,7 +83,7 @@ class _MyListPageState extends State<MyListPage> {
         setState(() => _forums = _forums!.where((x) => x.favid != favid).toList());
       }
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '取消收藏失敗：${e.message}');
+      if (mounted) toast(context, tr('取消收藏失敗：${e.message}'));
     }
   }
 
@@ -93,11 +94,11 @@ class _MyListPageState extends State<MyListPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('取消收藏'),
+        title: Text(tr('取消收藏')),
         content: Text(t.title, maxLines: 3, overflow: TextOverflow.ellipsis),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('確定')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('確定'))),
         ],
       ),
     );
@@ -116,7 +117,7 @@ class _MyListPageState extends State<MyListPage> {
         });
       }
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '取消收藏失敗：${e.message}');
+      if (mounted) toast(context, tr('取消收藏失敗：${e.message}'));
     }
   }
 
@@ -126,7 +127,7 @@ class _MyListPageState extends State<MyListPage> {
     final isFav = widget.type == 'favorite';
 
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[widget.type] ?? '列表')),
+      appBar: AppBar(title: Text(tr(_titles[widget.type] ?? '列表'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -136,9 +137,9 @@ class _MyListPageState extends State<MyListPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
                 child: SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: false, label: Text('帖子')),
-                    ButtonSegment(value: true, label: Text('版塊')),
+                  segments: [
+                    ButtonSegment(value: false, label: Text(tr('帖子'))),
+                    ButtonSegment(value: true, label: Text(tr('版塊'))),
                   ],
                   selected: {_favForums},
                   showSelectedIcon: false,
@@ -159,7 +160,7 @@ class _MyListPageState extends State<MyListPage> {
                   (isFav && _favForums
                       ? (_forums?.isEmpty ?? false)
                       : (d?.list.isEmpty ?? false)),
-              emptyText: '這裡還是空的',
+              emptyText: tr('這裡還是空的'),
               onRetry: _load,
             ),
             if (isFav && _favForums && (_forums?.isNotEmpty ?? false))
@@ -177,7 +178,7 @@ class _MyListPageState extends State<MyListPage> {
                                 style: const TextStyle(fontSize: 12)),
                         trailing: IconButton(
                           icon: const Icon(Icons.star, size: 20),
-                          tooltip: '取消收藏',
+                          tooltip: tr('取消收藏'),
                           onPressed: () => _removeForum(_forums![i]),
                         ),
                         onTap: () => context.push('/f/${_forums![i].fid}'),

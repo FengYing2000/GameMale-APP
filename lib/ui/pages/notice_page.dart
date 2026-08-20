@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -61,7 +62,7 @@ class _NoticePageState extends State<NoticePage> {
     final subTabs = api.noticeTypes[_view];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('通知')),
+      appBar: AppBar(title: Text(tr('通知'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -83,7 +84,7 @@ class _NoticePageState extends State<NoticePage> {
               loading: _loading,
               error: _err,
               empty: !_loading && _err == null && (d?.items.isEmpty ?? false),
-              emptyText: d?.message ?? '目前沒有新通知',
+              emptyText: d?.message ?? tr('目前沒有新通知'),
               onRetry: _load,
             ),
             if (d != null && d.items.isNotEmpty)

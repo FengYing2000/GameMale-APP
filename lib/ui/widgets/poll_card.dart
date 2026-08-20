@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -19,7 +20,7 @@ class _PollCardState extends State<PollCard> {
   bool _busy = false;
 
   Future<void> _vote() async {
-    if (_picked.isEmpty) return toast(context, '請先選擇選項');
+    if (_picked.isEmpty) return toast(context, tr('請先選擇選項'));
     setState(() => _busy = true);
     try {
       final r = await api.votePoll(widget.poll, _picked.toList());
@@ -27,7 +28,7 @@ class _PollCardState extends State<PollCard> {
       toast(context, r.message);
       if (r.ok) widget.onVoted();
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '投票失敗：${e.message}');
+      if (mounted) toast(context, tr('投票失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -47,7 +48,7 @@ class _PollCardState extends State<PollCard> {
               children: [
                 Icon(Icons.poll_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 6),
-                Text(p.title.isEmpty ? '投票' : p.title,
+                Text(p.title.isEmpty ? tr('投票') : p.title,
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ],
             ),
@@ -61,7 +62,7 @@ class _PollCardState extends State<PollCard> {
             if (!p.votable)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('這個投票目前不開放作答',
+                child: Text(tr('這個投票目前不開放作答'),
                     style: TextStyle(fontSize: 13, color: subtle(context))),
               )
             else if (p.multiple)
@@ -108,7 +109,7 @@ class _PollCardState extends State<PollCard> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _busy ? null : _vote,
-                  child: Text(_busy ? '送出中…' : '投票'),
+                  child: Text(_busy ? tr('送出中…') : tr('投票')),
                 ),
               ),
             ],

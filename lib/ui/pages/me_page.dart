@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -49,17 +50,17 @@ class _MePageState extends State<MePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('登出'),
-        content: const Text('確定要登出嗎？'),
+        title: Text(tr('登出')),
+        content: Text(tr('確定要登出嗎？')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('登出')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('登出'))),
         ],
       ),
     );
     if (ok != true || !mounted) return;
     await context.read<SessionStore>().signOut();
-    if (mounted) toast(context, '已登出');
+    if (mounted) toast(context, tr('已登出'));
   }
 
   @override
@@ -69,11 +70,11 @@ class _MePageState extends State<MePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('我的'),
+        title: Text(tr('我的')),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            tooltip: '設定',
+            tooltip: tr('設定'),
             onPressed: () => context.push('/settings'),
           ),
         ],
@@ -100,7 +101,7 @@ class _MePageState extends State<MePage> {
                             Text(
                               me?.name.isNotEmpty == true
                                   ? me!.name
-                                  : (session.name.isEmpty ? '未登入' : session.name),
+                                  : (session.name.isEmpty ? tr('未登入') : session.name),
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.w700),
                             ),
@@ -123,6 +124,7 @@ class _MePageState extends State<MePage> {
                 ),
               ),
             ),
+            if (session.loggedIn)
             Card(
               clipBehavior: Clip.antiAlias,
               child: Column(
@@ -130,7 +132,7 @@ class _MePageState extends State<MePage> {
                   for (var i = 0; i < _entries.length; i++) ...[
                     ListTile(
                       leading: Icon(_entries[i].$1, size: 22),
-                      title: Text(_entries[i].$2),
+                      title: Text(tr(_entries[i].$2)),
                       trailing: Icon(Icons.chevron_right, size: 18, color: faint(context)),
                       onTap: () => context.push(_entries[i].$3),
                     ),
@@ -141,13 +143,23 @@ class _MePageState extends State<MePage> {
             ),
             Card(
               clipBehavior: Clip.antiAlias,
-              child: ListTile(
-                title: Center(
-                  child: Text('登出',
-                      style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-                onTap: _signOut,
-              ),
+              child: session.loggedIn
+                  ? ListTile(
+                      title: Center(
+                        child: Text(tr('登出'),
+                            style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      ),
+                      onTap: _signOut,
+                    )
+                  : ListTile(
+                      title: Center(
+                        child: Text(tr('登入'),
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      onTap: () => context.push('/login'),
+                    ),
             ),
           ],
         ),

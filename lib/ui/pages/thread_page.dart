@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -62,7 +63,7 @@ class _ThreadPageState extends State<ThreadPage> {
       final r = await api.favoriteThread(widget.tid);
       if (mounted) toast(context, r.message);
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '收藏失敗：${e.message}');
+      if (mounted) toast(context, tr('收藏失敗：${e.message}'));
     }
   }
 
@@ -82,15 +83,15 @@ class _ThreadPageState extends State<ThreadPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(d?.forumName ?? '主題'),
+        title: Text(d?.forumName ?? tr('主題')),
         actions: [
           IconButton(
-              icon: const Icon(Icons.star_border), tooltip: '收藏', onPressed: _fav),
+              icon: const Icon(Icons.star_border), tooltip: tr('收藏'), onPressed: _fav),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _reply(),
-        tooltip: '回覆',
+        tooltip: tr('回覆'),
         child: const Icon(Icons.reply),
       ),
       body: RefreshIndicator(
@@ -236,7 +237,7 @@ class _PostCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onShowRatings,
                   icon: const Icon(Icons.workspace_premium_outlined, size: 16),
-                  label: const Text('評分紀錄'),
+                  label: Text(tr('評分紀錄')),
                   style: TextButton.styleFrom(
                     foregroundColor: faint(context),
                     visualDensity: VisualDensity.compact,
@@ -246,7 +247,7 @@ class _PostCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onRate,
                   icon: const Icon(Icons.thumb_up_outlined, size: 16),
-                  label: const Text('評分'),
+                  label: Text(tr('評分')),
                   style: TextButton.styleFrom(
                     foregroundColor: subtle(context),
                     visualDensity: VisualDensity.compact,
@@ -255,7 +256,7 @@ class _PostCard extends StatelessWidget {
               TextButton.icon(
                 onPressed: onReply,
                 icon: const Icon(Icons.reply, size: 16),
-                label: const Text('回覆'),
+                label: Text(tr('回覆')),
                 style: TextButton.styleFrom(
                   foregroundColor: subtle(context),
                   visualDensity: VisualDensity.compact,

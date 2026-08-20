@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -47,7 +48,7 @@ class _SignPageState extends State<SignPage> {
       if (mounted) toast(context, r.message);
       await _load();
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '簽到失敗：${e.message}');
+      if (mounted) toast(context, tr('簽到失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -58,7 +59,7 @@ class _SignPageState extends State<SignPage> {
     final d = _data;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('每日簽到')),
+      appBar: AppBar(title: Text(tr('每日簽到'))),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
@@ -70,7 +71,7 @@ class _SignPageState extends State<SignPage> {
                 height: 46,
                 child: FilledButton(
                   onPressed: (_busy || d.signed) ? null : _sign,
-                  child: Text(_busy ? '簽到中…' : (d.signed ? '今天已經簽到了' : '立即簽到')),
+                  child: Text(_busy ? tr('簽到中…') : (d.signed ? tr('今天已經簽到了') : tr('立即簽到'))),
                 ),
               ),
             ),

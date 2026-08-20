@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/models.dart';
@@ -19,7 +20,7 @@ class PagerBar extends StatelessWidget {
         children: [
           OutlinedButton(
             onPressed: pager.page > 1 ? () => onGo(pager.page - 1) : null,
-            child: const Text('上一頁'),
+            child: Text(tr('上一頁')),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -28,7 +29,7 @@ class PagerBar extends StatelessWidget {
           ),
           OutlinedButton(
             onPressed: pager.page < pager.total ? () => onGo(pager.page + 1) : null,
-            child: const Text('下一頁'),
+            child: Text(tr('下一頁')),
           ),
         ],
       ),

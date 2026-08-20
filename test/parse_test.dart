@@ -7,6 +7,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
 import 'package:gamemale/api/parse.dart';
+import 'package:gamemale/i18n/s2t.dart';
 
 File _f(String name) => File('test/fixtures/$name');
 
@@ -17,6 +18,9 @@ dom.Document? _load(String name) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async => S2T.instance.load());
+
   group('首頁 板塊列表', () {
     final doc = _load('index.html');
     if (doc == null) return;
@@ -344,6 +348,78 @@ void main() {
         }
       });
     }
+  });
+
+
+  group('登入狀態判定', () {
+    // 只憑「沒有登出連結」判定訪客，會把 inajax 浮層片段誤判成登出，
+    // 使用者一點評分紀錄就被踢出登入狀態
+    test('已登入的首頁：不是訪客頁', () {
+      final doc = _load('index.html');
+      if (doc == null) return;
+      expect(isLoggedIn(doc), isTrue);
+      expect(isGuestPage(doc), isFalse);
+    });
+
+    test('登入頁：是訪客頁', () {
+      final doc = _load('login.html');
+      if (doc == null) return;
+      expect(isLoggedIn(doc), isFalse);
+      expect(isGuestPage(doc), isTrue);
+    });
+
+    test('評分表單（inajax 片段）不可被判成訪客', () {
+      final doc = _load('rateform.html');
+      if (doc == null) return;
+      expect(isGuestPage(doc), isFalse,
+          reason: '浮層片段沒有登入入口，不該觸發登出');
+    });
+
+    test('評分紀錄（inajax 片段）不可被判成訪客', () {
+      final doc = _load('viewratings.html');
+      if (doc == null) return;
+      expect(isGuestPage(doc), isFalse,
+          reason: '浮層片段沒有登入入口，不該觸發登出');
+    });
+  });
+
+  group('簡繁轉換的單位字', () {
+    test('里程的「里」不可轉成「裡」', () {
+      // OpenCC 的第一候選是「裏」，會讓「旅程 295 里」變成「295 裡」
+      expect(S2T.instance.convert('旅程 295 里'), contains('295 里'));
+      expect(S2T.instance.convert('公里'), '公里');
+    });
+
+    test('裡面的「里」仍要轉成「裡」', () {
+      expect(S2T.instance.convert('这里'), '這裡');
+      expect(S2T.instance.convert('心里'), '心裡');
+      expect(S2T.instance.convert('家里'), '家裡');
+    });
+  });
+
+
+  group('附件圖片', () {
+    final doc = _load('t65.html');
+    if (doc == null) return;
+    final t = api.parseThread(doc, 194065);
+
+    // Discuz 手機版把附件圖放在 ul.img_list，那是 .postListCon 的兄弟節點，
+    // 只讀內文的話用附件上傳的照片會整批不見
+    test('樓主的附件圖有被收進內容', () {
+      final imgs = RegExp('<img[^>]*>').allMatches(t.posts.first.html);
+      expect(imgs.length, greaterThan(1), reason: '附件圖應該出現在內容裡');
+    });
+
+    test('附件圖網址已絕對化', () {
+      expect(t.posts.first.html, contains('https://www.gamemale.com/forum.php?mod=image'));
+    });
+
+    test('附件圖外層的連結已拆掉（避免蓋掉點圖放大）', () {
+      final head = t.posts.first.html;
+      final i = head.indexOf('img_list');
+      if (i < 0) return;
+      expect(head.substring(i), isNot(contains('<a ')));
+    });
   });
 
   group('工具函式', () {

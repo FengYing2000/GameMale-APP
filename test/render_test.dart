@@ -97,7 +97,7 @@ void main() {
 
   group('狀態元件', () {
     testWidgets('載入中顯示轉圈', (tester) async {
-      await tester.pumpWidget(_wrap(const StateBox(loading: true)));
+      await tester.pumpWidget(_wrap(StateBox(loading: true)));
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
@@ -112,7 +112,7 @@ void main() {
     });
 
     testWidgets('空清單顯示自訂文字', (tester) async {
-      await tester.pumpWidget(_wrap(const StateBox(empty: true, emptyText: '沒有私訊')));
+      await tester.pumpWidget(_wrap(StateBox(empty: true, emptyText: '沒有私訊')));
       expect(find.text('沒有私訊'), findsOneWidget);
     });
 

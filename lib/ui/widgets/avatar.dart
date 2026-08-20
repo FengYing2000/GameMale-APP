@@ -19,27 +19,26 @@ class Avatar extends StatelessWidget {
       child: Icon(Icons.person, size: size * 0.6, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25)),
     );
 
-    // 外層一定要鎖成正方形再裁圓，否則放進 AppBar 的 leading 這類
-    // 高窄版面時，ClipOval 會依版面框裁切而變成直橢圓
+    // 用 SizedBox 鎖成正方形再裁圓，否則放進 AppBar 的 leading 這類
+    // 高窄版面時 ClipOval 會依版面框裁切而變成直橢圓。
+    // 不要包 Center —— 它會撐滿可用寬度，在 Row/ListTile 裡把旁邊的文字擠爆
     return GestureDetector(
       onTap: onTap,
-      child: Center(
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: ClipOval(
-            child: url.isEmpty
-                ? ph
-                : CachedNetworkImage(
-                    imageUrl: url,
-                    httpHeaders: Api.imageHeaders,
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                    placeholder: (c, _) => ph,
-                    errorWidget: (c, _, _) => ph,
-                  ),
-          ),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: ClipOval(
+          child: url.isEmpty
+              ? ph
+              : CachedNetworkImage(
+                  imageUrl: url,
+                  httpHeaders: Api.imageHeaders,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  placeholder: (c, _) => ph,
+                  errorWidget: (c, _, _) => ph,
+                ),
         ),
       ),
     );

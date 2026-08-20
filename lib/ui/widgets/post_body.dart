@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -210,8 +211,8 @@ class _PostImageState extends State<_PostImage> {
 
   Widget _placeholder(BuildContext context, SettingsStore settings) {
     final reason = settings.imagePolicy == ImagePolicy.wifiOnly
-        ? '目前不是 Wi-Fi'
-        : '已設為手動載入';
+        ? tr('目前不是 Wi-Fi')
+        : tr('已設為手動載入');
     return InkWell(
       onTap: () => setState(() => _forced = true),
       borderRadius: BorderRadius.circular(8),
@@ -228,7 +229,7 @@ class _PostImageState extends State<_PostImage> {
           children: [
             Icon(Icons.image_outlined, size: 24, color: faint(context)),
             const SizedBox(height: 6),
-            Text('點一下載入圖片',
+            Text(tr('點一下載入圖片'),
                 style: TextStyle(fontSize: 13, color: subtle(context))),
             Text(reason, style: TextStyle(fontSize: 11, color: faint(context))),
           ],
@@ -261,7 +262,7 @@ class _PostImageState extends State<_PostImage> {
             height: 90,
             alignment: Alignment.center,
             color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
-            child: Text('圖片載入失敗', style: TextStyle(fontSize: 12, color: faint(c))),
+            child: Text(tr('圖片載入失敗'), style: TextStyle(fontSize: 12, color: faint(c))),
           ),
         ),
       ),

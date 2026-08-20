@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -87,7 +88,7 @@ class ThreadTile extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       visualDensity: VisualDensity.compact,
                     ),
-                    child: Text('取消收藏', style: TextStyle(fontSize: 12, color: subtle(context))),
+                    child: Text(tr('取消收藏'), style: TextStyle(fontSize: 12, color: subtle(context))),
                   ),
                 if (item.replies > 0) ...[
                   Icon(Icons.mode_comment_outlined, size: 13, color: faint(context)),

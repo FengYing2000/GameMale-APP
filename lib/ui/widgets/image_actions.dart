@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
@@ -30,7 +31,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
           ),
           ListTile(
             leading: const Icon(Icons.download_outlined),
-            title: const Text('儲存到相簿'),
+            title: Text(tr('儲存到相簿')),
             onTap: () {
               Navigator.pop(sheet);
               _save(context, url);
@@ -38,7 +39,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
           ),
           ListTile(
             leading: const Icon(Icons.ios_share),
-            title: const Text('分享'),
+            title: Text(tr('分享')),
             onTap: () {
               Navigator.pop(sheet);
               SharePlus.instance.share(ShareParams(uri: Uri.parse(url)));
@@ -46,16 +47,16 @@ Future<void> showImageActions(BuildContext context, String url) async {
           ),
           ListTile(
             leading: const Icon(Icons.link),
-            title: const Text('複製原始連結'),
+            title: Text(tr('複製原始連結')),
             onTap: () async {
               Navigator.pop(sheet);
               await Clipboard.setData(ClipboardData(text: url));
-              if (context.mounted) toast(context, '已複製連結');
+              if (context.mounted) toast(context, tr('已複製連結'));
             },
           ),
           ListTile(
             leading: const Icon(Icons.open_in_browser),
-            title: const Text('用瀏覽器開啟'),
+            title: Text(tr('用瀏覽器開啟')),
             onTap: () {
               Navigator.pop(sheet);
               launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -71,7 +72,7 @@ Future<void> _save(BuildContext context, String url) async {
   try {
     if (!await Gal.hasAccess(toAlbum: true)) {
       if (!await Gal.requestAccess(toAlbum: true)) {
-        if (context.mounted) toast(context, '沒有相簿權限，請到系統設定開啟');
+        if (context.mounted) toast(context, tr('沒有相簿權限，請到系統設定開啟'));
         return;
       }
     }
@@ -80,10 +81,10 @@ Future<void> _save(BuildContext context, String url) async {
       await Api.instance.getAbsoluteBytes(url),
       album: 'GameMale',
     );
-    if (context.mounted) toast(context, '已儲存到相簿');
+    if (context.mounted) toast(context, tr('已儲存到相簿'));
   } on GalException catch (e) {
-    if (context.mounted) toast(context, '儲存失敗：${e.type.message}');
+    if (context.mounted) toast(context, tr('儲存失敗：${e.type.message}'));
   } catch (e) {
-    if (context.mounted) toast(context, '儲存失敗：$e');
+    if (context.mounted) toast(context, tr('儲存失敗：$e'));
   }
 }

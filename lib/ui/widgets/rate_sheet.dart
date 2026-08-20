@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -104,7 +105,7 @@ class _RateSheetState extends State<_RateSheet> {
       toast(context, r.message);
       if (r.ok) Navigator.pop(context, true);
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '評分失敗：${e.message}');
+      if (mounted) toast(context, tr('評分失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -129,7 +130,7 @@ class _RateSheetState extends State<_RateSheet> {
             Icon(Icons.info_outline, size: 32, color: faint(context)),
             const SizedBox(height: 10),
             Text(
-              _err ?? f?.message ?? '目前不能評分',
+              _err ?? f?.message ?? tr('目前不能評分'),
               textAlign: TextAlign.center,
               style: TextStyle(color: subtle(context)),
             ),
@@ -144,7 +145,7 @@ class _RateSheetState extends State<_RateSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('評分', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Text(tr('評分'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
 
           Wrap(
@@ -153,7 +154,7 @@ class _RateSheetState extends State<_RateSheet> {
               for (final p in _presets)
                 ActionChip(
                   avatar: const Icon(Icons.bolt, size: 15),
-                  label: Text(p.label),
+                  label: Text(tr(p.label)),
                   onPressed: () => _applyPreset(p),
                 ),
             ],
@@ -164,7 +165,7 @@ class _RateSheetState extends State<_RateSheet> {
 
           const SizedBox(height: 10),
           if (f.reasons.isNotEmpty) ...[
-            Text('可選理由', style: TextStyle(fontSize: 12, color: faint(context))),
+            Text(tr('可選理由'), style: TextStyle(fontSize: 12, color: faint(context))),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
@@ -182,8 +183,8 @@ class _RateSheetState extends State<_RateSheet> {
           ],
           TextField(
             controller: _reason,
-            decoration: const InputDecoration(
-              labelText: '評分理由',
+            decoration: InputDecoration(
+              labelText: tr('評分理由'),
               isDense: true,
               border: OutlineInputBorder(),
             ),
@@ -193,14 +194,14 @@ class _RateSheetState extends State<_RateSheet> {
             dense: true,
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('通知作者', style: TextStyle(fontSize: 14)),
+            title: Text(tr('通知作者'), style: TextStyle(fontSize: 14)),
             onChanged: (v) => setState(() => _notify = v ?? false),
           ),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _busy ? null : _submit,
-              child: Text(_busy ? '送出中…' : '確定'),
+              child: Text(_busy ? tr('送出中…') : tr('確定')),
             ),
           ),
         ],
@@ -268,7 +269,7 @@ Future<void> showRatings(BuildContext context, {required int tid, required int p
           return SizedBox(
             height: 160,
             child: Center(
-              child: Text('這一樓還沒有評分', style: TextStyle(color: faint(c))),
+              child: Text(tr('這一樓還沒有評分'), style: TextStyle(color: faint(c))),
             ),
           );
         }

@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -31,7 +32,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _run(int page) async {
     final kw = _ctrl.text.trim();
-    if (kw.characters.length < 2) return toast(context, '關鍵字至少 2 個字');
+    if (kw.characters.length < 2) return toast(context, tr('關鍵字至少 2 個字'));
 
     setState(() {
       _page = page;
@@ -58,7 +59,7 @@ class _SearchPageState extends State<SearchPage> {
     final d = _data;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('搜尋')),
+      appBar: AppBar(title: Text(tr('搜尋'))),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
@@ -72,15 +73,15 @@ class _SearchPageState extends State<SearchPage> {
                       controller: _ctrl,
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _run(1),
-                      decoration: const InputDecoration(
-                        hintText: '搜尋主題關鍵字',
+                      decoration: InputDecoration(
+                        hintText: tr('搜尋主題關鍵字'),
                         border: InputBorder.none,
                         isDense: true,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton(onPressed: () => _run(1), child: const Text('搜尋')),
+                  FilledButton(onPressed: () => _run(1), child: Text(tr('搜尋'))),
                 ],
               ),
             ),
@@ -89,7 +90,7 @@ class _SearchPageState extends State<SearchPage> {
             loading: _loading,
             error: _err,
             empty: _done && !_loading && _err == null && (d?.list.isEmpty ?? false),
-            emptyText: '找不到符合的主題',
+            emptyText: tr('找不到符合的主題'),
             onRetry: () => _run(_page),
           ),
           if (d != null && d.list.isNotEmpty) ...[
@@ -100,7 +101,7 @@ class _SearchPageState extends State<SearchPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(30, 60, 30, 0),
               child: Text(
-                '論壇搜尋有頻率限制，短時間內連續搜尋會被暫時擋下。',
+                tr('論壇搜尋有頻率限制，短時間內連續搜尋會被暫時擋下。'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, height: 1.6, color: faint(context)),
               ),

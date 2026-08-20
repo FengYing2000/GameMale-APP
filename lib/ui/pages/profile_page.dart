@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -51,7 +52,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final r = await run();
       if (mounted) toast(context, r.message);
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '$what失敗：${e.message}');
+      if (mounted) toast(context, tr('$what失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -63,7 +64,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final isMe = context.watch<SessionStore>().uid == widget.uid;
 
     return Scaffold(
-      appBar: AppBar(title: Text(d?.name.isNotEmpty == true ? d!.name : '個人資料')),
+      appBar: AppBar(title: Text(d?.name.isNotEmpty == true ? d!.name : tr('個人資料'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -99,21 +100,21 @@ class _ProfilePageState extends State<ProfilePage> {
                             FilledButton.icon(
                               onPressed: () => context.push('/pm/${widget.uid}'),
                               icon: const Icon(Icons.mail_outline, size: 18),
-                              label: const Text('傳送私訊'),
+                              label: Text(tr('傳送私訊')),
                             ),
                             OutlinedButton.icon(
                               onPressed: _busy
                                   ? null
-                                  : () => _act(() => api.addFriend(widget.uid), '加好友'),
+                                  : () => _act(() => api.addFriend(widget.uid), tr('加好友')),
                               icon: const Icon(Icons.person_add_alt, size: 18),
-                              label: const Text('加好友'),
+                              label: Text(tr('加好友')),
                             ),
                             OutlinedButton.icon(
                               onPressed: _busy
                                   ? null
-                                  : () => _act(() => api.poke(widget.uid), '打招呼'),
+                                  : () => _act(() => api.poke(widget.uid), tr('打招呼')),
                               icon: const Icon(Icons.waving_hand_outlined, size: 18),
-                              label: const Text('打招呼'),
+                              label: Text(tr('打招呼')),
                             ),
                           ],
                         ),
@@ -125,7 +126,7 @@ class _ProfilePageState extends State<ProfilePage> {
               if (d.credits.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(22, 14, 22, 8),
-                  child: Text('積分',
+                  child: Text(tr('積分'),
                       style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,

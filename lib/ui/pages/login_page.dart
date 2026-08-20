@@ -1,4 +1,6 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
@@ -74,7 +76,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _submit() async {
     if (_user.text.trim().isEmpty || _pass.text.isEmpty) {
-      return toast(context, '請輸入帳號與密碼');
+      return toast(context, tr('請輸入帳號與密碼'));
     }
     final meta = _meta;
     if (meta == null) return;
@@ -100,7 +102,8 @@ class _LoginPageState extends State<LoginPage> {
       final user = await api.checkSession();
       if (!mounted) return;
       if (user != null) context.read<SessionStore>().applyUser(user);
-      toast(context, '登入成功');
+      toast(context, tr('登入成功'));
+      if (context.mounted) context.go('/');
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
@@ -113,7 +116,16 @@ class _LoginPageState extends State<LoginPage> {
     final meta = _meta;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('登入 GameMale')),
+      appBar: AppBar(
+        title: Text(tr('登入 GameMale')),
+        leading: Navigator.of(context).canPop()
+            ? const BackButton()
+            : IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: '關閉',
+                onPressed: () => context.go('/'),
+              ),
+      ),
       body: _loadingMeta
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.4))
           : ListView(
@@ -122,28 +134,28 @@ class _LoginPageState extends State<LoginPage> {
                   child: Column(
                     children: [
                       _field(
-                        label: '使用者名稱 / Email',
+                        label: tr('使用者名稱 / Email'),
                         child: TextField(
                           controller: _user,
                           autocorrect: false,
                           textCapitalization: TextCapitalization.none,
-                          decoration: _dec('請輸入帳號'),
+                          decoration: _dec(tr('請輸入帳號')),
                         ),
                       ),
                       const Divider(indent: 14, endIndent: 14),
                       _field(
-                        label: '密碼',
+                        label: tr('密碼'),
                         child: TextField(
                           controller: _pass,
                           obscureText: true,
-                          decoration: _dec('請輸入密碼'),
+                          decoration: _dec(tr('請輸入密碼')),
                           onSubmitted: (_) => _submit(),
                         ),
                       ),
                       if ((meta?.questions.length ?? 0) > 1) ...[
                         const Divider(indent: 14, endIndent: 14),
                         _field(
-                          label: '安全提問',
+                          label: tr('安全提問'),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: _questionid,
@@ -159,21 +171,21 @@ class _LoginPageState extends State<LoginPage> {
                       if (_questionid != '0') ...[
                         const Divider(indent: 14, endIndent: 14),
                         _field(
-                          label: '提問答案',
-                          child: TextField(controller: _answer, decoration: _dec('安全提問的答案')),
+                          label: tr('提問答案'),
+                          child: TextField(controller: _answer, decoration: _dec(tr('安全提問的答案'))),
                         ),
                       ],
                       if (meta?.needSeccode ?? false) ...[
                         const Divider(indent: 14, endIndent: 14),
                         _field(
-                          label: '驗證碼（點圖片可換一張）',
+                          label: tr('驗證碼（點圖片可換一張）'),
                           child: Row(
                             children: [
                               Expanded(
                                 child: TextField(
                                   controller: _seccode,
                                   autocorrect: false,
-                                  decoration: _dec('輸入圖中字元'),
+                                  decoration: _dec(tr('輸入圖中字元')),
                                   onSubmitted: (_) => _submit(),
                                 ),
                               ),
@@ -213,15 +225,15 @@ class _LoginPageState extends State<LoginPage> {
                     height: 48,
                     child: FilledButton(
                       onPressed: _busy ? null : _submit,
-                      child: Text(_busy ? '登入中…' : '登入'),
+                      child: Text(_busy ? tr('登入中…') : tr('登入')),
                     ),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(26, 12, 26, 30),
                   child: Text(
-                    '帳號密碼只會送到 www.gamemale.com。登入後 Cookie 會保存在本機，'
-                    '通常可維持 30 天，過期後會自動回到這一頁。',
+                    tr('帳號密碼只會送到 www.gamemale.com。登入後 Cookie 會保存在本機，'
+                        '通常可維持 30 天，過期後會自動回到這一頁。'),
                     style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
                   ),
                 ),

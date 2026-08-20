@@ -1,3 +1,4 @@
+import 'i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -48,6 +49,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
 
   Future<void> _boot() async {
     await S2T.instance.load();
+    await UiLang.instance.load();
     await _settings.load();
     _applyLang();
     _settings.addListener(_applyLang);
@@ -57,10 +59,11 @@ class _GameMaleAppState extends State<GameMaleApp> {
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
   void _applyLang() {
     final want = _settings.toTraditional;
-    if (parse.convertToTraditional != want) {
-      parse.convertToTraditional = want;
-      if (mounted) setState(() {});
-    }
+    final changed = parse.convertToTraditional != want ||
+        UiLang.instance.simplified == want;
+    parse.convertToTraditional = want;       // 論壇內容
+    UiLang.instance.simplified = !want;      // 介面文字
+    if (changed && mounted) setState(() {});
   }
 
   @override
@@ -97,11 +100,11 @@ GoRouter _buildRouter(SessionStore session) {
     initialLocation: '/',
     refreshListenable: session,
     redirect: (context, state) {
-      // 還沒問過伺服器前不要跳轉，否則會閃一下登入頁
+      // 論壇本身允許訪客瀏覽，所以不強制導向登入頁 ——
+      // 之前只要 session 一失效就被鎖在登入頁，連返回都沒有，只能關掉 App。
+      // 需要登入的操作由論壇自己擋，App 再提示即可。
       if (!session.ready) return null;
-      final atLogin = state.matchedLocation == '/login';
-      if (!session.loggedIn) return atLogin ? null : '/login';
-      if (atLogin) return '/';
+      if (session.loggedIn && state.matchedLocation == '/login') return '/';
       return null;
     },
     routes: [
@@ -149,12 +152,13 @@ class _Scaffold extends StatelessWidget {
   const _Scaffold({required this.shell});
   final StatefulNavigationShell shell;
 
-  static const _dest = [
-    NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: '首頁'),
-    NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: '導讀'),
-    NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: '搜尋'),
-    NavigationDestination(icon: Icon(Icons.mail_outline), selectedIcon: Icon(Icons.mail), label: '訊息'),
-    NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '我的'),
+  // 標籤存原文，每次 build 才轉換 —— 存成 const/final 會讓語言切換後不更新
+  static const _tabs = [
+    (Icons.forum_outlined, Icons.forum, '首頁'),
+    (Icons.explore_outlined, Icons.explore, '導讀'),
+    (Icons.search_outlined, Icons.search, '搜尋'),
+    (Icons.mail_outline, Icons.mail, '訊息'),
+    (Icons.person_outline, Icons.person, '我的'),
   ];
 
   @override
@@ -163,7 +167,14 @@ class _Scaffold extends StatelessWidget {
       body: shell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
-        destinations: _dest,
+        destinations: [
+          for (final t in _tabs)
+            NavigationDestination(
+              icon: Icon(t.$1),
+              selectedIcon: Icon(t.$2),
+              label: tr(t.$3),
+            ),
+        ],
         // 再點一次目前分頁 = 回到該分頁的最上層
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
       ),

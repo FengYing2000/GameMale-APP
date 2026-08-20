@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -42,7 +43,7 @@ class _NewThreadPageState extends State<NewThreadPage> {
       if (!mounted) return;
       setState(() {
         _meta = m;
-        if (!m.canPost) _err = m.message ?? '這個板塊不允許你發表主題';
+        if (!m.canPost) _err = m.message ?? tr('這個板塊不允許你發表主題');
       });
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
@@ -52,10 +53,10 @@ class _NewThreadPageState extends State<NewThreadPage> {
   }
 
   Future<void> _submit() async {
-    if (_subject.text.trim().isEmpty) return toast(context, '請填標題');
-    if (_message.text.trim().isEmpty) return toast(context, '請填內容');
+    if (_subject.text.trim().isEmpty) return toast(context, tr('請填標題'));
+    if (_message.text.trim().isEmpty) return toast(context, tr('請填內容'));
     if ((_meta?.types.isNotEmpty ?? false) && _typeid == null) {
-      return toast(context, '請選擇主題分類');
+      return toast(context, tr('請選擇主題分類'));
     }
 
     setState(() => _busy = true);
@@ -77,7 +78,7 @@ class _NewThreadPageState extends State<NewThreadPage> {
           credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '發表失敗：${e.message}');
+      if (mounted) toast(context, tr('發表失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -89,11 +90,11 @@ class _NewThreadPageState extends State<NewThreadPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('發表新主題'),
+        title: Text(tr('發表新主題')),
         actions: [
           TextButton(
             onPressed: (_busy || _loading || _err != null) ? null : _submit,
-            child: Text(_busy ? '送出中' : '發表'),
+            child: Text(_busy ? tr('送出中') : tr('發表')),
           ),
         ],
       ),
@@ -110,13 +111,13 @@ class _NewThreadPageState extends State<NewThreadPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('主題分類',
+                              Text(tr('主題分類'),
                                   style: TextStyle(fontSize: 12, color: faint(context))),
                               DropdownButtonHideUnderline(
                                 child: DropdownButton<int>(
                                   value: _typeid,
                                   isExpanded: true,
-                                  hint: const Text('請選擇'),
+                                  hint: Text(tr('請選擇')),
                                   items: meta.types
                                       .map((t) => DropdownMenuItem(
                                           value: t.typeid, child: Text(t.name)))
@@ -134,8 +135,8 @@ class _NewThreadPageState extends State<NewThreadPage> {
                         child: TextField(
                           controller: _subject,
                           maxLength: 80,
-                          decoration: const InputDecoration(
-                            labelText: '標題',
+                          decoration: InputDecoration(
+                            labelText: tr('標題'),
                             border: InputBorder.none,
                             isDense: true,
                           ),
@@ -148,9 +149,9 @@ class _NewThreadPageState extends State<NewThreadPage> {
                           controller: _message,
                           maxLines: 12,
                           minLines: 8,
-                          decoration: const InputDecoration(
-                            labelText: '內容',
-                            hintText: '支援 Discuz BBCode',
+                          decoration: InputDecoration(
+                            labelText: tr('內容'),
+                            hintText: tr('支援 Discuz BBCode'),
                             border: InputBorder.none,
                             isDense: true,
                           ),

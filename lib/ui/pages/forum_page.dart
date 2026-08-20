@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,7 +23,7 @@ class _ForumPageState extends State<ForumPage> {
   String? _err;
   int _page = 1;
   int _typeid = 0;
-  ForumTab _tab = const ForumTab(name: '全部');
+  ForumTab _tab = ForumTab(name: tr('全部'));
   final _scroll = ScrollController();
 
   @override
@@ -74,7 +75,7 @@ class _ForumPageState extends State<ForumPage> {
   void _pickType(ThreadType t) {
     setState(() {
       _typeid = t.typeid;
-      _tab = const ForumTab(name: '全部');
+      _tab = ForumTab(name: tr('全部'));
       _page = 1;
     });
     Navigator.of(context).pop();
@@ -94,7 +95,7 @@ class _ForumPageState extends State<ForumPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (d.subforums.isNotEmpty) ...[
-                Text('子版塊', style: TextStyle(fontSize: 12, color: faint(c))),
+                Text(tr('子版塊'), style: TextStyle(fontSize: 12, color: faint(c))),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -113,7 +114,7 @@ class _ForumPageState extends State<ForumPage> {
                 const SizedBox(height: 18),
               ],
               if (d.types.isNotEmpty) ...[
-                Text('主題分類', style: TextStyle(fontSize: 12, color: faint(c))),
+                Text(tr('主題分類'), style: TextStyle(fontSize: 12, color: faint(c))),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -141,15 +142,15 @@ class _ForumPageState extends State<ForumPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(d?.name ?? '板塊'),
+        title: Text(d?.name ?? tr('板塊')),
         actions: [
           if (d != null && (d.subforums.isNotEmpty || d.types.isNotEmpty))
-            IconButton(icon: const Icon(Icons.tune), tooltip: '分類', onPressed: _openMenu),
+            IconButton(icon: const Icon(Icons.tune), tooltip: tr('分類'), onPressed: _openMenu),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/f/${widget.fid}/post'),
-        tooltip: '發表新主題',
+        tooltip: tr('發表新主題'),
         child: const Icon(Icons.edit_outlined),
       ),
       body: RefreshIndicator(
@@ -214,7 +215,7 @@ class _ForumPageState extends State<ForumPage> {
               loading: _loading,
               error: _err,
               empty: !_loading && _err == null && (d?.list.isEmpty ?? false),
-              emptyText: '這個板塊沒有主題',
+              emptyText: tr('這個板塊沒有主題'),
               onRetry: _load,
             ),
             if (d != null && d.list.isNotEmpty) ThreadListCard(list: d.list),

@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -73,7 +74,7 @@ class _ReplyPageState extends State<ReplyPage> {
 
   Future<void> _submit() async {
     final text = _ctrl.text.trim();
-    if (text.isEmpty) return toast(context, '內容不能空白');
+    if (text.isEmpty) return toast(context, tr('內容不能空白'));
 
     setState(() => _busy = true);
     try {
@@ -98,7 +99,7 @@ class _ReplyPageState extends State<ReplyPage> {
           credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, '回覆失敗：${e.message}');
+      if (mounted) toast(context, tr('回覆失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -108,11 +109,11 @@ class _ReplyPageState extends State<ReplyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.to.isEmpty ? '回覆主題' : '回覆 ${widget.to}'),
+        title: Text(widget.to.isEmpty ? tr('回覆主題') : tr('回覆 ${widget.to}')),
         actions: [
           TextButton(
             onPressed: _busy ? null : _submit,
-            child: Text(_busy ? '送出中' : '送出'),
+            child: Text(_busy ? tr('送出中') : tr('送出')),
           ),
         ],
       ),
@@ -128,8 +129,8 @@ class _ReplyPageState extends State<ReplyPage> {
                   maxLines: null,
                   expands: true,
                   textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(
-                    hintText: '說點什麼…',
+                  decoration: InputDecoration(
+                    hintText: tr('說點什麼…'),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
@@ -148,7 +149,7 @@ class _ReplyPageState extends State<ReplyPage> {
                   Padding(
                     padding: const EdgeInsets.only(right: 8, top: 5, bottom: 5),
                     child: ActionChip(
-                      label: Text(t.$1),
+                      label: Text(tr(t.$1)),
                       onPressed: () => _wrap(t.$2, t.$3),
                     ),
                   ),
@@ -160,7 +161,7 @@ class _ReplyPageState extends State<ReplyPage> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
               child: Text(
-                '支援 Discuz BBCode。[hide] 需要板塊開放回覆可見權限才有效。',
+                tr('支援 Discuz BBCode。[hide] 需要板塊開放回覆可見權限才有效。'),
                 style: TextStyle(fontSize: 12, color: faint(context)),
               ),
             ),

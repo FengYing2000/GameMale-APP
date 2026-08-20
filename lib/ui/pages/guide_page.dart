@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -63,7 +64,7 @@ class _GuidePageState extends State<GuidePage> {
     final d = _data;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('導讀')),
+      appBar: AppBar(title: Text(tr('導讀'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -80,7 +81,7 @@ class _GuidePageState extends State<GuidePage> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
-                        label: Text(v.$2),
+                        label: Text(tr(v.$2)),
                         selected: _view == v.$1,
                         onSelected: (_) {
                           setState(() {

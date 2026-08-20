@@ -1,3 +1,4 @@
+import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -45,7 +46,7 @@ class _MessagesPageState extends State<MessagesPage> {
     final d = _data;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('訊息')),
+      appBar: AppBar(title: Text(tr('訊息'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -60,8 +61,8 @@ class _MessagesPageState extends State<MessagesPage> {
                   child: Icon(Icons.notifications_none,
                       color: Theme.of(context).colorScheme.primary),
                 ),
-                title: const Text('系統通知', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text('回覆、@我、積分等提醒',
+                title: Text(tr('系統通知'), style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(tr('回覆、@我、積分等提醒'),
                     style: TextStyle(fontSize: 12.5, color: faint(context))),
                 trailing: Icon(Icons.chevron_right, color: faint(context)),
                 onTap: () => context.push('/notice'),
@@ -69,7 +70,7 @@ class _MessagesPageState extends State<MessagesPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
-              child: Text('私人訊息',
+              child: Text(tr('私人訊息'),
                   style: TextStyle(
                       fontSize: 12.5, fontWeight: FontWeight.w600, color: faint(context))),
             ),
@@ -77,7 +78,7 @@ class _MessagesPageState extends State<MessagesPage> {
               loading: _loading,
               error: _err,
               empty: !_loading && _err == null && (d?.items.isEmpty ?? false),
-              emptyText: d?.message ?? '沒有私訊',
+              emptyText: d?.message ?? tr('沒有私訊'),
               onRetry: _load,
             ),
             if (d != null && d.items.isNotEmpty)
