@@ -8,6 +8,7 @@ import '../widgets/avatar.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/poll_card.dart';
 import '../widgets/post_body.dart';
+import '../widgets/rate_sheet.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -130,7 +131,21 @@ class _ThreadPageState extends State<ThreadPage> {
                 ),
               if (d.poll case final poll?)
                 PollCard(poll: poll, onVoted: _load),
-              for (final p in d.posts) _PostCard(post: p, onReply: () => _reply(p)),
+              for (final p in d.posts)
+                _PostCard(
+                  post: p,
+                  onReply: () => _reply(p),
+                  onRate: (p.pid == null || d.fid == null)
+                      ? null
+                      : () async {
+                          final ok = await showRateSheet(context,
+                              fid: d.fid!, tid: widget.tid, pid: p.pid!);
+                          if (ok) _load();
+                        },
+                  onShowRatings: p.pid == null
+                      ? null
+                      : () => showRatings(context, tid: widget.tid, pid: p.pid!),
+                ),
               PagerBar(
                 pager: d.pager,
                 onGo: (page) {
@@ -147,9 +162,16 @@ class _ThreadPageState extends State<ThreadPage> {
 }
 
 class _PostCard extends StatelessWidget {
-  const _PostCard({required this.post, required this.onReply});
+  const _PostCard({
+    required this.post,
+    required this.onReply,
+    this.onRate,
+    this.onShowRatings,
+  });
   final PostItem post;
   final VoidCallback onReply;
+  final VoidCallback? onRate;
+  final VoidCallback? onShowRatings;
 
   @override
   Widget build(BuildContext context) {
@@ -207,17 +229,39 @@ class _PostCard extends StatelessWidget {
             ),
           ],
           if (post.comments.isNotEmpty) _FloorComments(comments: post.comments),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: onReply,
-              icon: const Icon(Icons.reply, size: 16),
-              label: const Text('回覆'),
-              style: TextButton.styleFrom(
-                foregroundColor: subtle(context),
-                visualDensity: VisualDensity.compact,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (onShowRatings != null)
+                TextButton.icon(
+                  onPressed: onShowRatings,
+                  icon: const Icon(Icons.workspace_premium_outlined, size: 16),
+                  label: const Text('評分紀錄'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: faint(context),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              if (onRate != null)
+                TextButton.icon(
+                  onPressed: onRate,
+                  icon: const Icon(Icons.thumb_up_outlined, size: 16),
+                  label: const Text('評分'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: subtle(context),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: onReply,
+                icon: const Icon(Icons.reply, size: 16),
+                label: const Text('回覆'),
+                style: TextButton.styleFrom(
+                  foregroundColor: subtle(context),
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

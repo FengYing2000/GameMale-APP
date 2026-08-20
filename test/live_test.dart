@@ -112,19 +112,6 @@ void main() {
     }
   }, timeout: const Timeout(Duration(seconds: 40)));
 
-  test('登出後能重新取得登入表單與驗證碼', () async {
-    await Api.instance.clearCookies();
-    final m = await api.loginMeta();
-    expect(m.formhash, isNotEmpty, reason: '登出狀態應該要有 formhash');
-    expect(m.loginhash, isNotEmpty, reason: '登出狀態應該要有 loginhash');
-    expect(m.needSeccode, isTrue);
-    expect(m.seccodeImage, isNotNull, reason: '驗證碼圖必須帶 session cookie 才抓得到');
-    expect(m.seccodeImage!.length, greaterThan(200));
-    // ignore: avoid_print
-    print('  loginhash=${m.loginhash}  驗證碼圖 ${m.seccodeImage!.length} bytes');
-  }, timeout: const Timeout(Duration(seconds: 40)));
-
-
   test('個人資料抓得到暱稱與積分，且不混進自己的資料', () async {
     final me = await api.checkSession();
     final other = await api.fetchProfile(738943);
@@ -152,5 +139,51 @@ void main() {
     print('  目前 cookie 帶的積分變化：'
         '${changes.isEmpty ? '(無)' : changes.join('、')}');
   }, timeout: const Timeout(Duration(seconds: 40)));
+
+
+  test('評分表單抓得到可用項目與理由', () async {
+    final f = await api.fetchRateForm(fid: 150, tid: 194078, pid: 7282915);
+    // ignore: avoid_print
+    print('  可評項目：${f.options.map((o) => '${o.name}(${o.range}, 剩${o.remaining})').join('、')}');
+    // ignore: avoid_print
+    print('  可選理由：${f.reasons.take(4).join('、')}');
+    if (f.canRate) {
+      expect(f.formhash, isNotEmpty);
+      expect(f.tid, '194078');
+      expect(f.pid, '7282915');
+      for (final o in f.options) {
+        expect(o.field.startsWith('score'), isTrue);
+        expect(o.name, isNotEmpty);
+        expect(o.choices, isNotEmpty, reason: '每項都該有可選的加分值');
+      }
+    } else {
+      // ignore: avoid_print
+      print('  → 目前不能評分：${f.message}');
+    }
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('評分紀錄讀得出來', () async {
+    final list = await api.fetchRatings(tid: 194078, pid: 7282915);
+    expect(list, isNotEmpty);
+    expect(list.every((r) => r.credit.isNotEmpty && r.name.isNotEmpty), isTrue);
+    // ignore: avoid_print
+    print('  ${list.length} 筆，例如：${list.first.credit} — ${list.first.name}'
+        '${list.first.reason.isEmpty ? '' : '（${list.first.reason}）'}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
+  // 拿到的是登入頁而不是內容
+  test('登出後能重新取得登入表單與驗證碼', () async {
+    await Api.instance.clearCookies();
+    final m = await api.loginMeta();
+    expect(m.formhash, isNotEmpty, reason: '登出狀態應該要有 formhash');
+    expect(m.loginhash, isNotEmpty, reason: '登出狀態應該要有 loginhash');
+    expect(m.needSeccode, isTrue);
+    expect(m.seccodeImage, isNotNull, reason: '驗證碼圖必須帶 session cookie 才抓得到');
+    expect(m.seccodeImage!.length, greaterThan(200));
+    // ignore: avoid_print
+    print('  loginhash=${m.loginhash}  驗證碼圖 ${m.seccodeImage!.length} bytes');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
 
 }

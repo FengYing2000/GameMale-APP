@@ -305,6 +305,47 @@ void main() {
     });
   });
 
+
+  group('評分', () {
+    final form = _load('rateform.html');
+    if (form != null) {
+      // 論壇依等級決定給哪些項目，低等級帳號可能只有其中一兩項
+      final inputs = form.querySelectorAll('input[name^="score"]');
+      test('解析出可評分項目', () => expect(inputs.length, greaterThan(0)));
+      test('每項都有欄位名與可選加分值', () {
+        for (final i in inputs) {
+          expect(attr(i, 'name').startsWith('score'), isTrue);
+        }
+        expect(form.querySelectorAll('ul[id^="scoreoption"] li'), isNotEmpty);
+      });
+      test('取得 formhash / tid / pid', () {
+        expect(attr(form.querySelector('input[name="formhash"]'), 'value'), isNotEmpty);
+        expect(attr(form.querySelector('input[name="tid"]'), 'value'), isNotEmpty);
+        expect(attr(form.querySelector('input[name="pid"]'), 'value'), isNotEmpty);
+      });
+      test('取得可選理由', () {
+        expect(form.querySelectorAll('#reasonselect li'), isNotEmpty);
+      });
+    }
+
+    final view = _load('viewratings.html');
+    if (view != null) {
+      final rows = view
+          .querySelectorAll('table.list tr')
+          .where((tr) => tr.querySelectorAll('td').length >= 4)
+          .where((tr) => txt(tr.querySelectorAll('td')[0]) != '积分')
+          .toList();
+      test('解析出評分紀錄', () => expect(rows.length, greaterThan(3)));
+      test('每筆都有積分與評分者', () {
+        for (final tr in rows) {
+          final tds = tr.querySelectorAll('td');
+          expect(txt(tds[0]), isNotEmpty);
+          expect(txt(tds[1]), isNotEmpty);
+        }
+      });
+    }
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

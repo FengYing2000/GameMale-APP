@@ -707,7 +707,9 @@ Future<ProfileData> fetchProfile(int uid) async {
         : avatarUrl(uid, size: 'big'),
     level: level,
     credits: credits,
-    isSelf: doc.querySelector('a[href*="action=logout"]') != null,
+    // 要限定在 .userProfile 內 —— 頁尾本來就有登出連結，
+    // 用整頁找會把每個人的資料都判成自己的
+    isSelf: doc.querySelector('.userProfile a[href*="action=logout"]') != null,
   );
 }
 
@@ -893,6 +895,127 @@ Future<SubmitResult> postDoing(String message, {String formhash = ''}) async {
     'refer': 'home.php?mod=space&do=doing&view=all',
   });
   return _submitResult(html, '發布');
+}
+
+
+/* ─────────────── 評分 ─────────────── */
+
+/// Discuz 的浮層端點回的是 `<root><![CDATA[ …HTML… ]]></root>`
+String _unwrapAjax(String xml) {
+  final m = RegExp(r'<!\[CDATA\[([\s\S]*?)\]\]>').firstMatch(xml);
+  return m?.group(1) ?? xml;
+}
+
+Future<RateForm> fetchRateForm({required int fid, required int tid, required int pid}) async {
+  final xml = await Api.instance.get(
+      'forum.php?mod=misc&action=rate&fid=$fid&tid=$tid&pid=$pid'
+      '&infloat=yes&handlekey=rate&inajax=1&ajaxtarget=fwin_content_rate');
+  final doc = toDoc(_unwrapAjax(xml));
+
+  final options = <RateOption>[];
+  for (final input in doc.querySelectorAll('input[name^="score"]')) {
+    final field = attr(input, 'name');
+    final row = _closestTag(input, 'tr');
+    if (row == null) continue;
+    final tds = row.querySelectorAll('td');
+    if (tds.isEmpty) continue;
+
+    final choices = <int>[];
+    for (final li in row.querySelectorAll('ul li')) {
+      final v = int.tryParse(txt(li).replaceAll(RegExp(r'[^0-9-]'), ''));
+      if (v != null && v != 0) choices.add(v);
+    }
+    choices.sort();
+
+    options.add(RateOption(
+      field: field,
+      name: txt(tds[0]),
+      choices: choices,
+      range: tds.length > 2 ? txt(tds[2]) : '',
+      remaining: tds.length > 3 ? txt(tds[3]) : '',
+    ));
+  }
+
+  return RateForm(
+    options: options,
+    reasons: doc.querySelectorAll('#reasonselect li').map(txt).where((r) => r.isNotEmpty).toList(),
+    formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
+    tid: attr(doc.querySelector('input[name="tid"]'), 'value'),
+    pid: attr(doc.querySelector('input[name="pid"]'), 'value'),
+    referer: attr(doc.querySelector('input[name="referer"]'), 'value'),
+    message: options.isEmpty ? (noticeMessage(doc) ?? txt(doc.body)) : null,
+  );
+}
+
+dom.Element? _closestTag(dom.Element el, String tag) {
+  dom.Element? cur = el.parent;
+  while (cur != null) {
+    if (cur.localName == tag) return cur;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+/// scores 只帶實際存在的欄位；低等級帳號缺項時硬塞會被論壇擋下
+Future<SubmitResult> submitRate({
+  required RateForm form,
+  required Map<String, int> scores,
+  String reason = '',
+  bool notifyAuthor = false,
+}) async {
+  final body = <String, dynamic>{
+    'formhash': form.formhash,
+    'tid': form.tid,
+    'pid': form.pid,
+    'referer': form.referer,
+    'handlekey': 'rate',
+    'reason': reason,
+    'ratesubmit': 'yes',
+  };
+  if (notifyAuthor) body['sendreasonpm'] = 'on';
+
+  var any = false;
+  for (final o in form.options) {
+    final v = scores[o.field] ?? 0;
+    body[o.field] = '$v';
+    if (v != 0) any = true;
+  }
+  if (!any) return const SubmitResult(ok: false, message: '請先給一項分數');
+
+  final html = await Api.instance
+      .post('forum.php?mod=misc&action=rate&ratesubmit=yes&infloat=yes&inajax=1', body);
+  final text = txt(toDoc(_unwrapAjax(html)).body);
+  final ok = !RegExp('权限|不能|无法|失败|错误|超过|已经评分').hasMatch(text);
+  return SubmitResult(ok: ok, message: text.isEmpty ? '評分完成' : text);
+}
+
+/// 已有的評分紀錄。手機版模板完全不顯示評分，桌面整頁又要 600KB 以上，
+/// 所以用這個獨立端點按需載入。
+Future<List<RateRecord>> fetchRatings({required int tid, required int pid}) async {
+  // inajax=1 只回浮層內容（約 3.5KB），比 forcemobile 的 22KB、桌面整頁的 44KB 都輕
+  final xml = await Api.instance
+      .get('forum.php?mod=misc&action=viewratings&tid=$tid&pid=$pid&inajax=1');
+  final doc = toDoc(_unwrapAjax(xml));
+
+  final out = <RateRecord>[];
+  for (final tr in doc.querySelectorAll('table.list tr')) {
+    final tds = tr.querySelectorAll('td');
+    if (tds.length < 4) continue;
+    final credit = txt(tds[0]);
+    if (credit.isEmpty || credit == '积分') continue;
+    final link = tds[1].querySelector('a');
+    out.add(RateRecord(
+      credit: credit,
+      name: txt(tds[1]),
+      uid: int.tryParse(
+          RegExp(r'space-uid-(\d+)').firstMatch(attr(link, 'href'))?.group(1) ?? ''),
+      time: attr(tds[2].querySelector('span'), 'title').isNotEmpty
+          ? attr(tds[2].querySelector('span'), 'title')
+          : txt(tds[2]),
+      reason: txt(tds[3]),
+    ));
+  }
+  return out;
 }
 
 /* ─────────────── 登入 / 登出 ─────────────── */

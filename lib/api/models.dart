@@ -470,3 +470,59 @@ class FloorComment {
   final String text;
   const FloorComment({this.uid, this.name = '', this.avatar = '', this.text = ''});
 }
+
+/// 評分表單裡的一個積分項。
+///
+/// 論壇會依使用者等級決定給哪些項目 —— 低等級帳號可能只有「追随」，
+/// 所以送出時只能帶回實際存在的項目，硬塞不存在的會卡住。
+class RateOption {
+  final String field;        // score3 / score4 / score8
+  final String name;         // 血液 / 追随 / 堕落
+  final List<int> choices;   // 論壇允許的加分值
+  final String range;        // 0 ~ 3
+  final String remaining;    // 今日剩餘
+  const RateOption({
+    required this.field,
+    required this.name,
+    this.choices = const [],
+    this.range = '',
+    this.remaining = '',
+  });
+}
+
+class RateForm {
+  final List<RateOption> options;
+  final List<String> reasons;
+  final String formhash;
+  final String tid;
+  final String pid;
+  final String referer;
+  final String? message;    // 不能評分時論壇給的說明
+
+  bool get canRate => options.isNotEmpty;
+
+  const RateForm({
+    this.options = const [],
+    this.reasons = const [],
+    this.formhash = '',
+    this.tid = '',
+    this.pid = '',
+    this.referer = '',
+    this.message,
+  });
+}
+
+class RateRecord {
+  final String credit;   // 血液 +2 滴
+  final String name;
+  final int? uid;
+  final String time;
+  final String reason;
+  const RateRecord({
+    this.credit = '',
+    this.name = '',
+    this.uid,
+    this.time = '',
+    this.reason = '',
+  });
+}
