@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
+import '../../theme.dart';
+import '../widgets/avatar.dart';
 import '../widgets/post_body.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -16,7 +18,8 @@ class PmChatPage extends StatefulWidget {
 
 class _PmChatPageState extends State<PmChatPage> {
   final _ctrl = TextEditingController();
-  List<PmMessage>? _msgs;
+  final _scroll = ScrollController();
+  PmChat? _chat;
   bool _loading = true;
   bool _busy = false;
   String? _err;
@@ -30,17 +33,26 @@ class _PmChatPageState extends State<PmChatPage> {
   @override
   void dispose() {
     _ctrl.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool toBottom = true}) async {
     setState(() {
       _loading = true;
       _err = null;
     });
     try {
-      final m = await api.fetchPmChat(widget.touid);
-      if (mounted) setState(() => _msgs = m);
+      final c = await api.fetchPmChat(widget.touid);
+      if (!mounted) return;
+      setState(() => _chat = c);
+      if (toBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scroll.hasClients) {
+            _scroll.jumpTo(_scroll.position.maxScrollExtent);
+          }
+        });
+      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
@@ -50,16 +62,22 @@ class _PmChatPageState extends State<PmChatPage> {
 
   Future<void> _send() async {
     final text = _ctrl.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _busy) return;
 
     setState(() => _busy = true);
     try {
-      final r = await api.sendPm(widget.touid, text);
+      final r = await api.sendPm(
+        widget.touid,
+        text,
+        pmid: _chat?.pmid ?? '',
+        formhash: _chat?.formhash ?? '',
+      );
       if (!mounted) return;
-      toast(context, r.message);
       if (r.ok) {
         _ctrl.clear();
         await _load();
+      } else {
+        toast(context, r.message);
       }
     } on DiscuzException catch (e) {
       if (mounted) toast(context, '傳送失敗：${e.message}');
@@ -70,87 +88,156 @@ class _PmChatPageState extends State<PmChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final msgs = _msgs;
+    final chat = _chat;
+    final msgs = chat?.messages ?? const <PmMessage>[];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('私人訊息')),
+      appBar: AppBar(title: Text(chat?.title.isNotEmpty == true ? chat!.title : '私人訊息')),
       body: Column(
         children: [
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _load,
+              onRefresh: () => _load(toBottom: false),
               child: ListView(
-                padding: const EdgeInsets.only(bottom: 12),
+                controller: _scroll,
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 children: [
                   ?StateBox.maybe(
                     loading: _loading,
                     error: _err,
-                    empty: !_loading && _err == null && (msgs?.isEmpty ?? false),
+                    empty: !_loading && _err == null && msgs.isEmpty,
                     emptyText: '還沒有訊息',
                     onRetry: _load,
                   ),
-                  if (msgs != null && msgs.isNotEmpty)
-                    Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        children: [
-                          for (var i = 0; i < msgs.length; i++) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-                              child: PostBody(
-                                msgs[i].html,
-                                textStyle: const TextStyle(fontSize: 14, height: 1.6),
-                              ),
-                            ),
-                            if (i != msgs.length - 1) const Divider(indent: 14, endIndent: 14),
-                          ],
-                        ],
-                      ),
-                    ),
+                  for (final m in msgs) _Bubble(msg: m),
                 ],
               ),
             ),
           ),
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(),
-                      decoration: InputDecoration(
-                        hintText: '輸入訊息…',
-                        filled: true,
-                        fillColor:
-                            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                        isDense: true,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _busy ? null : _send,
-                    child: Text(_busy ? '…' : '送出'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _Composer(ctrl: _ctrl, busy: _busy, onSend: _send),
         ],
+      ),
+    );
+  }
+}
+
+class _Bubble extends StatelessWidget {
+  const _Bubble({required this.msg});
+  final PmMessage msg;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bg = msg.mine
+        ? brand.withValues(alpha: 0.18)
+        : scheme.onSurface.withValues(alpha: 0.06);
+
+    final bubble = Flexible(
+      child: Column(
+        crossAxisAlignment:
+            msg.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(14),
+                topRight: const Radius.circular(14),
+                bottomLeft: Radius.circular(msg.mine ? 14 : 3),
+                bottomRight: Radius.circular(msg.mine ? 3 : 14),
+              ),
+            ),
+            child: PostBody(
+              msg.html,
+              textStyle: const TextStyle(fontSize: 14.5, height: 1.55),
+            ),
+          ),
+          if (msg.time.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
+              child: Text(msg.time,
+                  style: TextStyle(fontSize: 11, color: faint(context))),
+            ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
+      child: Row(
+        mainAxisAlignment:
+            msg.mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: msg.mine
+            ? [
+                const SizedBox(width: 48),
+                bubble,
+                const SizedBox(width: 8),
+                Avatar(msg.avatar, size: 32),
+              ]
+            : [
+                Avatar(msg.avatar, size: 32),
+                const SizedBox(width: 8),
+                bubble,
+                const SizedBox(width: 48),
+              ],
+      ),
+    );
+  }
+}
+
+class _Composer extends StatelessWidget {
+  const _Composer({required this.ctrl, required this.busy, required this.onSend});
+  final TextEditingController ctrl;
+  final bool busy;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: ctrl,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => onSend(),
+                minLines: 1,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: '輸入訊息…',
+                  filled: true,
+                  fillColor:
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: busy ? null : onSend,
+              icon: busy
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.send, size: 18),
+            ),
+          ],
+        ),
       ),
     );
   }

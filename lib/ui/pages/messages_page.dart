@@ -114,9 +114,26 @@ class _PmRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12.5, color: faint(context))),
-      trailing: item.time.isEmpty
-          ? null
-          : Text(item.time, style: TextStyle(fontSize: 11.5, color: faint(context))),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (item.time.isNotEmpty)
+            Text(item.time, style: TextStyle(fontSize: 11.5, color: faint(context))),
+          if (item.unread > 0) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: const BoxDecoration(
+                color: Color(0xFFD93025),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text('${item.unread}',
+                  style: const TextStyle(fontSize: 11, color: Colors.white)),
+            ),
+          ],
+        ],
+      ),
       onTap: item.touid == null ? null : () => context.push('/pm/${item.touid}'),
     );
   }

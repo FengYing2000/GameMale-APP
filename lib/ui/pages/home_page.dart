@@ -148,7 +148,10 @@ class _SignCard extends StatelessWidget {
                     children: [
                       Text(sign.title.isEmpty ? '等級' : sign.title,
                           style: TextStyle(fontSize: 12.5, color: subtle(context))),
-                      Text('${sign.exp} / ${sign.expMax}',
+                      Text(
+                          sign.maxed
+                              ? '${sign.exp} · 已滿級'
+                              : '${sign.exp} / ${sign.expMax}',
                           style: TextStyle(fontSize: 12.5, color: faint(context))),
                     ],
                   ),

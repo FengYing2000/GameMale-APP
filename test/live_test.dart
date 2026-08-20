@@ -35,9 +35,12 @@ void main() {
     expect(forums.length, greaterThan(5));
     expect(forums.every((f) => f.fid > 0 && f.name.isNotEmpty), isTrue);
     // ignore: avoid_print
+    final s = d.sign;
     print('  ${d.groups.length} 個分類、${forums.length} 個板塊'
-        '${d.sign == null ? '' : '；簽到 ${d.sign!.signed ? '已完成' : '未完成'}'
-            ' ${d.sign!.exp}/${d.sign!.expMax}'}');
+        '${s == null ? '' : '；簽到 ${s.signed ? '已完成' : '未完成'}'
+            '，經驗 ${s.maxed ? '${s.exp} (已滿級)' : '${s.exp}/${s.expMax}'}'
+            '，進度 ${s.percent.toStringAsFixed(0)}%'}');
+    if (s != null && !s.maxed) expect(s.expMax, greaterThan(0));
   }, timeout: const Timeout(Duration(seconds: 40)));
 
   test('板塊列表抓得到主題', () async {

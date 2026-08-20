@@ -28,6 +28,9 @@ class SignInfo {
   final int expMax;
   final double percent;
 
+  /// 滿級：論壇會把上限留空、進度條寫成 width:INF%
+  final bool maxed;
+
   const SignInfo({
     required this.signed,
     required this.label,
@@ -35,6 +38,7 @@ class SignInfo {
     required this.exp,
     required this.expMax,
     required this.percent,
+    this.maxed = false,
   });
 }
 
@@ -223,14 +227,52 @@ class PmItem {
   final String last;
   final String time;
   final String avatar;
+  final int unread;
 
-  const PmItem({this.touid, this.name = '', this.last = '', this.time = '', this.avatar = ''});
+  const PmItem({
+    this.touid,
+    this.name = '',
+    this.last = '',
+    this.time = '',
+    this.avatar = '',
+    this.unread = 0,
+  });
 }
 
 class PmMessage {
   final String html;
   final String text;
-  const PmMessage({this.html = '', this.text = ''});
+  final String avatar;
+  final String time;
+
+  /// true = 自己發的，畫面上靠右
+  final bool mine;
+
+  const PmMessage({
+    this.html = '',
+    this.text = '',
+    this.avatar = '',
+    this.time = '',
+    this.mine = false,
+  });
+}
+
+class PmChat {
+  final int touid;
+  final String title;
+  final List<PmMessage> messages;
+
+  /// 送出時要帶回去的對話 id，沒有就用一般端點
+  final String pmid;
+  final String formhash;
+
+  const PmChat({
+    required this.touid,
+    this.title = '',
+    this.messages = const [],
+    this.pmid = '',
+    this.formhash = '',
+  });
 }
 
 class ProfileData {

@@ -101,13 +101,22 @@ SignInfo? parseSignWidget(dom.Document doc) {
   final nums = txt(doc.getElementById('fb_exp')).split('/');
   final width = attr(doc.getElementById('fb_current_progress'), 'style');
   final pct = RegExp(r'width\s*:\s*([\d.]+)%').firstMatch(width);
+
+  final exp = nums.isNotEmpty ? digits(nums[0]) : 0;
+  final expMax = nums.length > 1 ? digits(nums[1]) : 0;
+
+  // 滿級時論壇把上限留空、進度條寫成 width:INF%（它自己除以零），
+  // 照著解析會變成「1890 / 0」加上空的進度條
+  final maxed = expMax == 0 && (exp > 0 || width.contains('INF'));
+
   return SignInfo(
     signed: btn.classes.contains('signed'),
     label: txt(btn),
     title: attr(btn, 'title').trim(),
-    exp: nums.isNotEmpty ? digits(nums[0]) : 0,
-    expMax: nums.length > 1 ? digits(nums[1]) : 0,
-    percent: pct == null ? 0 : (double.tryParse(pct.group(1)!) ?? 0),
+    exp: exp,
+    expMax: expMax,
+    percent: maxed ? 100 : (pct == null ? 0 : (double.tryParse(pct.group(1)!) ?? 0)),
+    maxed: maxed,
   );
 }
 
@@ -485,45 +494,75 @@ Future<NoticeResult> fetchNotice({String view = 'mypost'}) async {
   );
 }
 
+/// 私訊列表：li > a 內是 .avatar_img / .time / .num / .name / .grey，
+/// 不是一般的 h4+p 版型
 Future<PmListResult> fetchPmList() async {
   final doc = await _page('home.php?mod=space&do=pm');
   final items = <PmItem>[];
   for (final li in doc.querySelectorAll('.pmbox li')) {
-    final href = attr(li.querySelector('a'), 'href');
-    final name = txt(li.querySelector('h4') ?? li.querySelector('a'));
-    if (name.isEmpty) continue;
+    final a = li.querySelector('a');
+    if (a == null) continue;
+    final href = attr(a, 'href');
+    final touid = paramInt(href, 'touid');
+    if (touid == null) continue;
     items.add(PmItem(
-      touid: paramInt(href, 'touid') ?? paramInt(href, 'uid'),
-      name: name,
-      last: txt(li.querySelector('p')),
-      time: txt(li.querySelector('.time') ?? li.querySelector('em')),
-      avatar: attr(li.querySelector('img'), 'src'),
+      touid: touid,
+      name: txt(li.querySelector('.name')),
+      last: txt(li.querySelector('.grey')),
+      time: txt(li.querySelector('.time')),
+      avatar: attr(li.querySelector('.avatar_img img'), 'src'),
+      unread: digits(txt(li.querySelector('.num'))),
     ));
   }
   return PmListResult(items: items, message: items.isEmpty ? '目前沒有私訊' : null);
 }
 
-Future<List<PmMessage>> fetchPmChat(int touid) async {
+/// 對話內容：.self_msg（自己）與 .friend_msg（對方），內文在 .dialog_t
+Future<PmChat> fetchPmChat(int touid) async {
   final doc = await _page('home.php?mod=space&do=pm&subop=view&touid=$touid');
-  final out = <PmMessage>[];
-  for (final li in doc.querySelectorAll('.pmlist li, .pm_list li, .pmbox li')) {
-    final t = txt(li);
-    if (t.isNotEmpty) out.add(PmMessage(html: sanitizeContent(li), text: t));
+  final msgs = <PmMessage>[];
+
+  for (final box in doc.querySelectorAll('.msgbox > div')) {
+    final mine = box.classes.contains('self_msg');
+    if (!mine && !box.classes.contains('friend_msg')) continue;
+    final body = box.querySelector('.dialog_t');
+    if (body == null) continue;
+    final t = txt(body);
+    if (t.isEmpty && body.querySelector('img') == null) continue;
+    msgs.add(PmMessage(
+      html: sanitizeContent(body),
+      text: t,
+      avatar: attr(box.querySelector('.avat img'), 'src'),
+      time: txt(box.querySelector('.date')),
+      mine: mine,
+    ));
   }
-  return out;
+
+  final form = doc.querySelector('#pmform');
+  return PmChat(
+    touid: touid,
+    title: txt(doc.querySelector('header h1')),
+    messages: msgs,
+    pmid: param(attr(form, 'action'), 'pmid') ?? '',
+    formhash: attr(doc.querySelector('#pmform input[name="formhash"]'), 'value'),
+  );
 }
 
-Future<SubmitResult> sendPm(int touid, String message) async {
-  await _ensureFormhash();
-  final html = await Api.instance.post(
-    'home.php?mod=spacecp&ac=pm&op=send&pmsubmit=yes&infloat=yes',
-    {
-      'formhash': _formhash ?? '',
-      'message': message,
-      'pmsubmit': 'true',
-      'touid': '$touid',
-    },
-  );
+/// 有 pmid 就沿用該對話的端點，語意跟網頁版一致
+Future<SubmitResult> sendPm(int touid, String message,
+    {String pmid = '', String formhash = ''}) async {
+  if (formhash.isEmpty) await _ensureFormhash();
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final url = pmid.isNotEmpty
+      ? 'home.php?mod=spacecp&ac=pm&op=send&pmid=$pmid&daterange=0&pmsubmit=yes'
+      : 'home.php?mod=spacecp&ac=pm&op=send&pmsubmit=yes&infloat=yes';
+
+  final html = await Api.instance.post(url, {
+    'formhash': hash,
+    'message': message,
+    'pmsubmit': 'true',
+    'touid': '$touid',
+  });
   return _submitResult(html, '傳送');
 }
 

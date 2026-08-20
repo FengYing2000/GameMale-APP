@@ -3,13 +3,14 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
 import 'package:gamemale/api/parse.dart';
 
 File _f(String name) => File('test/fixtures/$name');
 
-dynamic _load(String name) {
+dom.Document? _load(String name) {
   final f = _f(name);
   if (!f.existsSync()) return null;
   return toDoc(f.readAsStringSync());
@@ -192,6 +193,61 @@ void main() {
         () => expect(txt(doc.querySelector('.user_avatar h2')).contains('Lvl'), isTrue));
     test('解析個人中心選單',
         () => expect(doc.querySelectorAll('.myinfo_list li a').length, greaterThanOrEqualTo(3)));
+  });
+
+
+  group('私訊', () {
+    final list = _load('pm.html');
+    if (list != null) {
+      // li > a 內是 .avatar_img / .time / .num / .name / .grey，不是 h4+p
+      final items = list.querySelectorAll('.pmbox li');
+      test('解析出對話', () => expect(items.length, greaterThan(0)));
+      test('每筆都有 touid', () {
+        for (final li in items) {
+          expect(paramInt(attr(li.querySelector('a'), 'href'), 'touid'), isNotNull);
+        }
+      });
+      test('每筆都有對象名稱', () {
+        for (final li in items) {
+          expect(txt(li.querySelector('.name')), isNotEmpty);
+        }
+      });
+      test('每筆都有最後訊息', () {
+        for (final li in items) {
+          expect(txt(li.querySelector('.grey')), isNotEmpty);
+        }
+      });
+      test('每筆都有時間', () {
+        for (final li in items) {
+          expect(txt(li.querySelector('.time')), isNotEmpty);
+        }
+      });
+    }
+
+    final chat = _load('pmchat.html');
+    if (chat != null) {
+      final boxes = chat.querySelectorAll('.msgbox > div');
+      test('解析出訊息氣泡', () => expect(boxes.length, greaterThan(2)));
+      test('分得出自己與對方', () {
+        expect(boxes.any((b) => b.classes.contains('self_msg')), isTrue);
+        expect(boxes.any((b) => b.classes.contains('friend_msg')), isTrue);
+      });
+      test('每則都有內文與時間', () {
+        for (final b in boxes) {
+          if (!b.classes.contains('self_msg') && !b.classes.contains('friend_msg')) {
+            continue;
+          }
+          expect(b.querySelector('.dialog_t'), isNotNull);
+          expect(txt(b.querySelector('.date')), isNotEmpty);
+        }
+      });
+      test('取得送出用的 pmid 與 formhash', () {
+        final form = chat.querySelector('#pmform');
+        expect(param(attr(form, 'action'), 'pmid'), isNotNull);
+        expect(attr(chat.querySelector('#pmform input[name="formhash"]'), 'value'),
+            isNotEmpty);
+      });
+    }
   });
 
   group('工具函式', () {
