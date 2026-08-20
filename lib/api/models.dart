@@ -1,0 +1,330 @@
+import 'dart:typed_data';
+
+class SessionUser {
+  final int? uid;
+  final String name;
+  final String avatar;
+  final bool loggedIn;
+
+  const SessionUser({this.uid, this.name = '', this.avatar = '', this.loggedIn = false});
+
+  Map<String, dynamic> toJson() =>
+      {'uid': uid, 'name': name, 'avatar': avatar, 'loggedIn': loggedIn};
+
+  factory SessionUser.fromJson(Map<String, dynamic> j) => SessionUser(
+        uid: j['uid'] as int?,
+        name: (j['name'] ?? '') as String,
+        avatar: (j['avatar'] ?? '') as String,
+        loggedIn: (j['loggedIn'] ?? false) as bool,
+      );
+}
+
+/// 首頁 k_misign 簽到條
+class SignInfo {
+  final bool signed;
+  final String label;
+  final String title;
+  final int exp;
+  final int expMax;
+  final double percent;
+
+  const SignInfo({
+    required this.signed,
+    required this.label,
+    required this.title,
+    required this.exp,
+    required this.expMax,
+    required this.percent,
+  });
+}
+
+class ForumItem {
+  final int fid;
+  final String name;
+  final String icon;
+  final String threads;
+  final String posts;
+  final String desc;
+
+  const ForumItem({
+    required this.fid,
+    required this.name,
+    this.icon = '',
+    this.threads = '',
+    this.posts = '',
+    this.desc = '',
+  });
+}
+
+class ForumGroup {
+  final String name;
+  final List<ForumItem> forums;
+  const ForumGroup({required this.name, required this.forums});
+}
+
+class IndexData {
+  final List<ForumGroup> groups;
+  final SessionUser user;
+  final SignInfo? sign;
+  const IndexData({required this.groups, required this.user, this.sign});
+}
+
+class ThreadItem {
+  final int tid;
+  final String title;
+  final String type;
+  final String author;
+  final int? uid;
+  final String avatar;
+  final String date;
+  final int views;
+  final int replies;
+  final String digest;
+
+  /// 只有收藏列表才有，用來取消收藏
+  final int? favid;
+
+  const ThreadItem({
+    required this.tid,
+    required this.title,
+    this.type = '',
+    this.author = '',
+    this.uid,
+    this.avatar = '',
+    this.date = '',
+    this.views = 0,
+    this.replies = 0,
+    this.digest = '',
+    this.favid,
+  });
+}
+
+class PageInfo {
+  final int page;
+  final int total;
+  const PageInfo({this.page = 1, this.total = 1});
+}
+
+class ThreadType {
+  final int typeid;
+  final String name;
+  final String count;
+  const ThreadType({required this.typeid, required this.name, this.count = ''});
+}
+
+class ForumTab {
+  final String name;
+  final bool cur;
+  final String filter;
+  final String orderby;
+  final bool digest;
+  const ForumTab({
+    required this.name,
+    this.cur = false,
+    this.filter = '',
+    this.orderby = '',
+    this.digest = false,
+  });
+}
+
+class SubForum {
+  final int fid;
+  final String name;
+  const SubForum({required this.fid, required this.name});
+}
+
+class ForumData {
+  final int fid;
+  final String name;
+  final List<String> meta;
+  final List<SubForum> subforums;
+  final List<ThreadType> types;
+  final List<ForumTab> tabs;
+  final List<ThreadItem> list;
+  final PageInfo pager;
+
+  const ForumData({
+    required this.fid,
+    required this.name,
+    this.meta = const [],
+    this.subforums = const [],
+    this.types = const [],
+    this.tabs = const [],
+    this.list = const [],
+    this.pager = const PageInfo(),
+  });
+}
+
+class PostItem {
+  final int? pid;
+  final String floor;
+  final String author;
+  final int? uid;
+  final String avatar;
+  final String time;
+  final String html;
+  final String signature;
+  final String quoteHref;
+
+  const PostItem({
+    this.pid,
+    this.floor = '',
+    this.author = '',
+    this.uid,
+    this.avatar = '',
+    this.time = '',
+    this.html = '',
+    this.signature = '',
+    this.quoteHref = '',
+  });
+}
+
+class ThreadData {
+  final int tid;
+  final int? fid;
+  final String forumName;
+  final String title;
+  final String type;
+  final List<PostItem> posts;
+  final PageInfo pager;
+
+  const ThreadData({
+    required this.tid,
+    this.fid,
+    this.forumName = '',
+    this.title = '',
+    this.type = '',
+    this.posts = const [],
+    this.pager = const PageInfo(),
+  });
+}
+
+class NoticeItem {
+  final String id;
+  final String avatar;
+  final int? uid;
+  final String time;
+  final String text;
+  final int? tid;
+
+  const NoticeItem({
+    this.id = '',
+    this.avatar = '',
+    this.uid,
+    this.time = '',
+    this.text = '',
+    this.tid,
+  });
+}
+
+class PmItem {
+  final int? touid;
+  final String name;
+  final String last;
+  final String time;
+  final String avatar;
+
+  const PmItem({this.touid, this.name = '', this.last = '', this.time = '', this.avatar = ''});
+}
+
+class PmMessage {
+  final String html;
+  final String text;
+  const PmMessage({this.html = '', this.text = ''});
+}
+
+class ProfileData {
+  final int uid;
+  final String name;
+  final String avatar;
+  final String html;
+  const ProfileData({required this.uid, this.name = '', this.avatar = '', this.html = ''});
+}
+
+class MeData {
+  final int uid;
+  final String name;
+  final String level;
+  final String avatar;
+  const MeData({required this.uid, this.name = '', this.level = '', this.avatar = ''});
+}
+
+class SubmitResult {
+  final bool ok;
+  final String message;
+  const SubmitResult({required this.ok, required this.message});
+}
+
+class SecurityQuestion {
+  final String id;
+  final String name;
+  const SecurityQuestion({required this.id, required this.name});
+}
+
+class LoginMeta {
+  final String formhash;
+  final String loginhash;
+  final String seccodehash;
+  final bool needSeccode;
+  final List<SecurityQuestion> questions;
+  final Uint8List? seccodeImage;
+
+  const LoginMeta({
+    this.formhash = '',
+    this.loginhash = '',
+    this.seccodehash = '',
+    this.needSeccode = false,
+    this.questions = const [],
+    this.seccodeImage,
+  });
+
+  LoginMeta withImage(Uint8List? img) => LoginMeta(
+        formhash: formhash,
+        loginhash: loginhash,
+        seccodehash: seccodehash,
+        needSeccode: needSeccode,
+        questions: questions,
+        seccodeImage: img,
+      );
+}
+
+class ListPage {
+  final List<ThreadItem> list;
+  final PageInfo pager;
+  final String? message;
+  const ListPage({this.list = const [], this.pager = const PageInfo(), this.message});
+}
+
+class NewThreadMeta {
+  final List<ThreadType> types;
+  final bool canPost;
+  final String? message;
+  const NewThreadMeta({this.types = const [], this.canPost = false, this.message});
+}
+
+class SignResult {
+  final String html;
+  final bool signed;
+  const SignResult({this.html = '', this.signed = false});
+}
+
+class NoticeResult {
+  final List<NoticeItem> items;
+  final String? message;
+  const NoticeResult({this.items = const [], this.message});
+}
+
+class PmListResult {
+  final List<PmItem> items;
+  final String? message;
+  const PmListResult({this.items = const [], this.message});
+}
+
+/// 論壇回應 4xx/5xx 或連不上時丟這個，UI 直接顯示 message
+class DiscuzException implements Exception {
+  final String message;
+  final int status;
+  const DiscuzException(this.message, [this.status = 0]);
+  @override
+  String toString() => message;
+}

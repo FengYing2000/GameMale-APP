@@ -1,0 +1,50 @@
+name: 建置 iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.1
+          channel: stable
+          cache: true
+
+      - name: 安裝相依套件
+        run: flutter pub get
+
+      - name: 靜態分析
+        run: flutter analyze
+
+      - name: 測試
+        # fixtures 不進版控，沒有樣本時解析測試會自己略過
+        run: flutter test
+
+      - name: 建置未簽名 IPA
+        run: |
+          flutter build ios --release --no-codesign
+          APP="build/ios/iphoneos/Runner.app"
+          test -d "$APP" || { echo "找不到 Runner.app"; exit 1; }
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          # 未簽名 App 殘留的簽章資料會讓部分側載工具重簽失敗
+          rm -rf Payload/Runner.app/_CodeSignature
+          zip -qry GameMale.ipa Payload
+          ls -lh GameMale.ipa
+
+      - name: 上傳 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameMale-unsigned-ipa
+          path: GameMale.ipa
+          retention-days: 30
+          if-no-files-found: error

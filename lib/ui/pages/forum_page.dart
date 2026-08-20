@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../api/discuz.dart' as api;
+import '../../api/models.dart';
+import '../../theme.dart';
+import '../widgets/pager_bar.dart';
+import '../widgets/state_box.dart';
+import '../widgets/thread_tile.dart';
+
+class ForumPage extends StatefulWidget {
+  const ForumPage({super.key, required this.fid});
+  final int fid;
+
+  @override
+  State<ForumPage> createState() => _ForumPageState();
+}
+
+class _ForumPageState extends State<ForumPage> {
+  ForumData? _data;
+  bool _loading = true;
+  String? _err;
+  int _page = 1;
+  int _typeid = 0;
+  ForumTab _tab = const ForumTab(name: '全部');
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _err = null;
+    });
+    try {
+      final d = await api.fetchForum(
+        widget.fid,
+        page: _page,
+        filter: _tab.filter,
+        orderby: _tab.orderby,
+        digest: _tab.digest,
+        typeid: _typeid,
+      );
+      if (mounted) setState(() => _data = d);
+    } on DiscuzException catch (e) {
+      if (mounted) setState(() => _err = e.message);
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      }
+    }
+  }
+
+  void _pickTab(ForumTab t) {
+    setState(() {
+      _tab = t;
+      _typeid = 0;
+      _page = 1;
+    });
+    _load();
+  }
+
+  void _pickType(ThreadType t) {
+    setState(() {
+      _typeid = t.typeid;
+      _tab = const ForumTab(name: '全部');
+      _page = 1;
+    });
+    Navigator.of(context).pop();
+    _load();
+  }
+
+  void _openMenu() {
+    final d = _data;
+    if (d == null) return;
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (d.subforums.isNotEmpty) ...[
+                Text('子版塊', style: TextStyle(fontSize: 12, color: faint(c))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final s in d.subforums)
+                      ActionChip(
+                        label: Text(s.name),
+                        onPressed: () {
+                          Navigator.of(c).pop();
+                          context.push('/f/${s.fid}');
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+              ],
+              if (d.types.isNotEmpty) ...[
+                Text('主題分類', style: TextStyle(fontSize: 12, color: faint(c))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final t in d.types)
+                      FilterChip(
+                        label: Text(t.count.isEmpty ? t.name : '${t.name} ${t.count}'),
+                        selected: _typeid == t.typeid,
+                        onSelected: (_) => _pickType(t),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _data;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(d?.name ?? '板塊'),
+        actions: [
+          if (d != null && (d.subforums.isNotEmpty || d.types.isNotEmpty))
+            IconButton(icon: const Icon(Icons.tune), tooltip: '分類', onPressed: _openMenu),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/f/${widget.fid}/post'),
+        tooltip: '發表新主題',
+        child: const Icon(Icons.edit_outlined),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          controller: _scroll,
+          padding: const EdgeInsets.only(bottom: 90),
+          children: [
+            if (d != null && d.meta.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
+                child: Row(
+                  children: [
+                    for (final m in d.meta)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 14),
+                        child: Text(m, style: TextStyle(fontSize: 12, color: faint(context))),
+                      ),
+                  ],
+                ),
+              ),
+            if (d != null && d.tabs.isNotEmpty)
+              SizedBox(
+                height: 50,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+                  children: [
+                    for (final t in d.tabs)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(t.name),
+                          selected: _typeid == 0 &&
+                              _tab.filter == t.filter &&
+                              _tab.orderby == t.orderby,
+                          onSelected: (_) => _pickTab(t),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ?StateBox.maybe(
+              loading: _loading,
+              error: _err,
+              empty: !_loading && _err == null && (d?.list.isEmpty ?? false),
+              emptyText: '這個板塊沒有主題',
+              onRetry: _load,
+            ),
+            if (d != null && d.list.isNotEmpty) ThreadListCard(list: d.list),
+            if (d != null)
+              PagerBar(
+                pager: d.pager,
+                onGo: (p) {
+                  setState(() => _page = p);
+                  _load();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
