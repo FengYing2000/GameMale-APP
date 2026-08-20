@@ -45,11 +45,29 @@ class PostBody extends StatelessWidget {
         if (element.classes.contains('smiley')) {
           return {'width': '22px', 'height': '22px'};
         }
-        // 論壇很愛用 <font size=5> 之類的，交給 App 自己的排版比較一致
+
+        final styles = <String, String>{};
+
+        // <font size=5> 之類的交給 App 自己的排版，比較一致
         if (element.localName == 'font' && element.attributes.containsKey('size')) {
-          return {'font-size': '1em'};
+          styles['font-size'] = '1em';
         }
-        return null;
+
+        // 深／淺色底都要讀得到帖子裡指定的文字顏色
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        var raw = element.attributes['color'];
+        if (raw == null) {
+          final inline = element.attributes['style'];
+          if (inline != null) {
+            raw = RegExp(r'(?:^|;)\s*color\s*:\s*([^;]+)')
+                .firstMatch(inline)
+                ?.group(1);
+          }
+        }
+        final fixed = _readable(raw, isDark);
+        if (fixed != null) styles['color'] = fixed;
+
+        return styles.isEmpty ? null : styles;
       },
     );
   }
@@ -81,6 +99,55 @@ class PostBody extends StatelessWidget {
     }
     return true;
   }
+}
+
+
+/// 論壇很愛用 `<font color="#8b0000">` 這種深色標重點，配深色底幾乎看不見。
+/// 直接拿掉顏色會失去語意，所以保留色相、只把亮度拉進可讀區間。
+String? _readable(String? raw, bool isDark) {
+  if (raw == null) return null;
+  final c = _parseColor(raw.trim());
+  if (c == null) return null;
+
+  final hsl = HSLColor.fromColor(c);
+  // 深色底要夠亮、淺色底要夠暗，門檻留一點餘裕避免過度校正
+  final l = isDark ? (hsl.lightness < 0.55 ? 0.68 : hsl.lightness)
+                   : (hsl.lightness > 0.72 ? 0.42 : hsl.lightness);
+  if (l == hsl.lightness) return null;   // 本來就夠讀就不要動
+
+  // 灰階（低飽和）直接交還給主題預設色，硬拉亮度只會變成髒灰
+  if (hsl.saturation < 0.12) return null;
+
+  final out = hsl.withLightness(l).toColor();
+  return '#${(out.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+}
+
+const _named = {
+  'red': 0xFFFF0000, 'darkred': 0xFF8B0000, 'blue': 0xFF0000FF,
+  'darkblue': 0xFF00008B, 'green': 0xFF008000, 'darkgreen': 0xFF006400,
+  'purple': 0xFF800080, 'orange': 0xFFFFA500, 'brown': 0xFFA52A2A,
+  'sienna': 0xFFA0522D, 'teal': 0xFF008080, 'navy': 0xFF000080,
+  'maroon': 0xFF800000, 'olive': 0xFF808000, 'gray': 0xFF808080,
+  'grey': 0xFF808080, 'black': 0xFF000000, 'white': 0xFFFFFFFF,
+  'dimgray': 0xFF696969, 'darkslategray': 0xFF2F4F4F,
+};
+
+Color? _parseColor(String raw) {
+  var v = raw.toLowerCase();
+  if (_named.containsKey(v)) return Color(_named[v]!);
+
+  final rgb = RegExp(r'rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)').firstMatch(v);
+  if (rgb != null) {
+    return Color.fromARGB(255, int.parse(rgb.group(1)!),
+        int.parse(rgb.group(2)!), int.parse(rgb.group(3)!));
+  }
+
+  if (!v.startsWith('#')) return null;
+  v = v.substring(1);
+  if (v.length == 3) v = v.split('').map((ch) => '$ch$ch').join();
+  if (v.length != 6) return null;
+  final n = int.tryParse(v, radix: 16);
+  return n == null ? null : Color(0xFF000000 | n);
 }
 
 class _Spoiler extends StatelessWidget {

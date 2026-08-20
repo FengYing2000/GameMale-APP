@@ -16,10 +16,24 @@ String? _capture(dom.Document doc, [String? html]) {
   return f;
 }
 
+/// 任何一頁被偵測到是訪客狀態時呼叫（session 過期）。由 SessionStore 掛上。
+void Function()? onSessionLost;
+
+/// 這些頁面本來就可能以訪客身分出現，不該觸發 session 失效
+bool _guestAllowed(String url) =>
+    url.contains('mod=logging') || url.contains('mod=seccode');
+
 Future<dom.Document> _page(String url) async {
   final html = await Api.instance.get(url);
   final doc = toDoc(html);
   _capture(doc, html);
+
+  // 登入狀態只在冷啟動問一次是不夠的：cookie 隨時可能過期，
+  // 不回報的話 UI 會一直停在「已登入」，但每個操作都被論壇擋下來
+  if (!_guestAllowed(url) && !isLoggedIn(doc)) {
+    _formhash = null;
+    onSessionLost?.call();
+  }
   return doc;
 }
 
@@ -288,14 +302,44 @@ Future<ListPage> search(String keyword, {int page = 1}) async {
 
 /* ─────────────── 發文 / 回覆 ─────────────── */
 
+/// Discuz 發文成功時會 302 轉到帖子頁，dio 跟隨轉址後拿到的是帖子內容，
+/// 裡面不會有任何「成功」字樣 —— 靠正面關鍵字判斷會把成功誤判成失敗。
+///
+/// 而且 `.alert_error` 也不能當失敗依據：連「欢迎您回来」這種成功訊息
+/// Discuz 都包在 alert_error 裡。
+///
+/// 所以改成：落在帖子頁＝成功；否則看訊息文字比對已知的失敗樣態。
+final _failurePatterns = RegExp(
+    '权限|權限|间隔|間隔|太快|过快|禁止|不能|无权|無權|失败|失敗|错误|錯誤|'
+    '请先登录|請先登錄|需要先登入|尚未登录|抱歉|不存在|已关闭|已關閉');
+
 SubmitResult _submitResult(String html, String what) {
   final doc = toDoc(html);
+
+  // 轉址後落在帖子頁 → 一定是成功
+  if (doc.querySelector('.postListItem') != null ||
+      doc.querySelector('.postlist') != null) {
+    return SubmitResult(ok: true, message: '$what成功');
+  }
+
   final msg = noticeMessage(doc);
+  if (msg != null && _failurePatterns.hasMatch(msg)) {
+    return SubmitResult(ok: false, message: msg);
+  }
+
   final jump = attr(doc.querySelector('.jump_c a'), 'href');
-  final ok = RegExp('succeed|非常感谢|发布成功|操作成功|成功').hasMatch(html) ||
-      jump.contains('mod=viewthread');
-  if (ok) return SubmitResult(ok: true, message: msg ?? '$what成功');
-  return SubmitResult(ok: false, message: msg ?? '$what失敗，可能是權限不足或發文間隔限制');
+  if (jump.contains('mod=viewthread') ||
+      jump.contains('mod=redirect') ||
+      jump.contains('goto=findpost')) {
+    return SubmitResult(ok: true, message: msg ?? '$what成功');
+  }
+
+  if (RegExp('succeed|非常感谢|发布成功|操作成功|成功').hasMatch(html)) {
+    return SubmitResult(ok: true, message: msg ?? '$what成功');
+  }
+
+  // 沒有明確的失敗跡象就不要嚇使用者 —— 之前正是這裡把成功報成失敗
+  return SubmitResult(ok: true, message: msg ?? '$what已送出');
 }
 
 Future<SubmitResult> replyThread({

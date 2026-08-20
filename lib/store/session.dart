@@ -33,6 +33,9 @@ class SessionStore extends ChangeNotifier {
       // 首次啟動沒有存檔，忽略
     }
 
+    // 任何一頁發現變回訪客就立刻反映到 UI，不要等下次冷啟動
+    api.onSessionLost = markLoggedOut;
+
     try {
       final user = await api.checkSession();
       if (user != null) {
@@ -41,10 +44,19 @@ class SessionStore extends ChangeNotifier {
         loggedIn = false;
       }
     } on DiscuzException catch (e) {
+      // 連不上論壇時無從判斷，保留快取狀態並把錯誤帶給畫面
       error = e.message;
     }
 
     ready = true;
+    notifyListeners();
+  }
+
+  /// session 過期：清掉本機狀態但不打登出 API（cookie 早就沒用了）
+  void markLoggedOut() {
+    if (!loggedIn) return;
+    loggedIn = false;
+    sign = null;
     notifyListeners();
   }
 
