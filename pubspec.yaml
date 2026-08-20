@@ -48,7 +48,10 @@ dependencies:
   package_info_plus: ^10.2.1
   gal: ^2.3.3
   share_plus: ^13.3.0
-  connectivity_plus: ^7.3.1
+  # 鎖在 6.x：7.3.x 的 iOS 程式碼用了 NWPath.isUltraConstrained，
+  # 那需要 iOS 26 SDK（#available 只是執行期檢查，編譯期仍要有該 API），
+  # CI runner 的 Xcode 沒有就編不過。我們只用它判斷 Wi-Fi/行動網路。
+  connectivity_plus: 6.1.0
 
 dev_dependencies:
   flutter_test:
