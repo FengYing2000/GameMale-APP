@@ -67,7 +67,7 @@ APP="build/ios/iphoneos/Runner.app"
 rm -rf Payload GameMale.ipa
 mkdir -p Payload
 cp -R "$APP" Payload/
-# 未簽名 App 殘留的簽章資料會讓部分側載工具重簽失敗
+# 只清 app 層簽章；framework 層的 _CodeSignature 是預簽的正常狀態，側載工具會自己重簽
 rm -rf Payload/Runner.app/_CodeSignature
 zip -qry GameMale.ipa Payload
 rm -rf Payload
