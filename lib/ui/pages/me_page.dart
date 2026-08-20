@@ -24,6 +24,7 @@ class _MePageState extends State<MePage> {
     (Icons.edit_note, '我的主題', '/my/thread'),
     (Icons.reply_outlined, '我的回覆', '/my/reply'),
     (Icons.event_available_outlined, '每日簽到', '/sign'),
+    (Icons.chat_bubble_outline, '記錄廣場', '/doing'),
     (Icons.notifications_none, '系統通知', '/notice'),
   ];
 

@@ -103,6 +103,25 @@ class Api {
     }
   }
 
+  /// 已經編碼好的表單字串（投票的 pollanswers[] 是陣列，用 Map 帶不過去）
+  Future<String> postRaw(String path, String body) async {
+    await init();
+    try {
+      final res = await _dio.post<String>(
+        mobileUrl(path),
+        data: body,
+        options: Options(
+          responseType: ResponseType.plain,
+          contentType: Headers.formUrlEncodedContentType,
+        ),
+      );
+      _guard(res.statusCode);
+      return res.data ?? '';
+    } on DioException catch (e) {
+      throw DiscuzException('送出失敗：${_reason(e)}');
+    }
+  }
+
   /// 驗證碼圖片必須帶著 session cookie 抓，所以走這裡而不是直接給 Image.network
   Future<Uint8List> getBytes(String path) async {
     await init();
@@ -141,6 +160,16 @@ class Api {
         'User-Agent': _ua,
         'Referer': '$kOrigin/forum.php?mobile=2',
       };
+
+  /// 讀出名稱以某段字尾結束的 cookie（Discuz 的 cookie 都有站台專屬前綴）
+  Future<String?> cookieEndingWith(String suffix) async {
+    await init();
+    final cookies = await _jar.loadForRequest(Uri.parse(kOrigin));
+    for (final c in cookies) {
+      if (c.name.endsWith(suffix)) return c.value;
+    }
+    return null;
+  }
 
   Future<void> clearCookies() async {
     await init();

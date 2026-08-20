@@ -67,8 +67,15 @@ class _NewThreadPageState extends State<NewThreadPage> {
         typeid: _typeid?.toString() ?? '',
       );
       if (!mounted) return;
-      toast(context, r.message);
-      if (r.ok) Navigator.of(context).pop(true);
+      if (!r.ok) {
+        toast(context, r.message);
+        return;
+      }
+      final credits = await api.consumeCreditNotice();
+      if (!mounted) return;
+      toast(context,
+          credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');
+      Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
       if (mounted) toast(context, '發表失敗：${e.message}');
     } finally {

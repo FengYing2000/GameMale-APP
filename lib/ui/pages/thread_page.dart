@@ -6,6 +6,7 @@ import '../../api/models.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/pager_bar.dart';
+import '../widgets/poll_card.dart';
 import '../widgets/post_body.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -127,6 +128,8 @@ class _ThreadPageState extends State<ThreadPage> {
                         fontSize: 19, fontWeight: FontWeight.w700, height: 1.4),
                   ),
                 ),
+              if (d.poll case final poll?)
+                PollCard(poll: poll, onVoted: _load),
               for (final p in d.posts) _PostCard(post: p, onReply: () => _reply(p)),
               PagerBar(
                 pager: d.pager,
@@ -203,6 +206,7 @@ class _PostCard extends StatelessWidget {
               ),
             ),
           ],
+          if (post.comments.isNotEmpty) _FloorComments(comments: post.comments),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
@@ -215,6 +219,56 @@ class _PostCard extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 樓中樓（dxksst 外掛）
+class _FloorComments extends StatelessWidget {
+  const _FloorComments({required this.comments});
+  final List<FloorComment> comments;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final c in comments)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Avatar(c.avatar,
+                      size: 20,
+                      onTap: c.uid == null ? null : () => context.push('/u/${c.uid}')),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(
+                          text: '${c.name}：',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600),
+                        ),
+                        TextSpan(text: c.text),
+                      ]),
+                      style: const TextStyle(fontSize: 13, height: 1.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

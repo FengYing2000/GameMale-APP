@@ -267,6 +267,44 @@ void main() {
     }
   });
 
+
+  group('投票與樓中樓', () {
+    final doc = _load('poll.html');
+    if (doc == null) return;
+    final t = api.parseThread(doc, 129896);
+
+    test('解析出投票', () => expect(t.poll, isNotNull));
+    test('投票有標題與選項', () {
+      expect(t.poll!.title, isNotEmpty);
+      expect(t.poll!.options.length, greaterThan(2));
+    });
+    test('選項有 id 與去掉序號的文字', () {
+      for (final o in t.poll!.options) {
+        expect(o.id, isNotEmpty);
+        expect(o.text, isNotEmpty);
+        expect(RegExp(r'^\d+\.').hasMatch(o.text), isFalse, reason: '序號應該去掉');
+      }
+    });
+    test('投票有 formhash 與送出網址', () {
+      expect(t.poll!.formhash, isNotEmpty);
+      expect(t.poll!.action, contains('votepoll'));
+    });
+
+    test('解析出樓中樓', () {
+      final withComments = t.posts.where((p) => p.comments.isNotEmpty);
+      expect(withComments, isNotEmpty, reason: '這帖應該有樓中樓');
+    });
+    test('樓中樓有作者與內容', () {
+      for (final p in t.posts) {
+        for (final c in p.comments) {
+          expect(c.name, isNotEmpty);
+          expect(c.text, isNotEmpty);
+          expect(c.text.startsWith(':'), isFalse, reason: '冒號應該去掉');
+        }
+      }
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

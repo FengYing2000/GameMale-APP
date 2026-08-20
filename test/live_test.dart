@@ -124,4 +124,33 @@ void main() {
     print('  loginhash=${m.loginhash}  驗證碼圖 ${m.seccodeImage!.length} bytes');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
+
+  test('個人資料抓得到暱稱與積分，且不混進自己的資料', () async {
+    final me = await api.checkSession();
+    final other = await api.fetchProfile(738943);
+    expect(other.name, isNotEmpty);
+    expect(other.credits, isNotEmpty);
+    expect(other.isSelf, isFalse, reason: '別人的頁面不該被判成自己的');
+    expect(other.name, isNot(equals(me!.name)), reason: '抓到的是自己的資料就代表解析錯了');
+    // ignore: avoid_print
+    print('  ${other.name} (${other.level})：'
+        '${other.credits.take(3).map((c) => '${c.name} ${c.value}').join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('記錄廣場抓得到記錄', () async {
+    final d = await api.fetchDoing();
+    expect(d.items, isNotEmpty);
+    expect(d.items.every((x) => x.doid > 0 && x.message.isNotEmpty), isTrue);
+    // ignore: avoid_print
+    print('  ${d.items.length} 則，最新：${d.items.first.name} — ${d.items.first.message}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('抓得到積分名稱對照（勳章顯示要用）', () async {
+    await api.fetchIndex();
+    final changes = await api.consumeCreditNotice();
+    // ignore: avoid_print
+    print('  目前 cookie 帶的積分變化：'
+        '${changes.isEmpty ? '(無)' : changes.join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
 }

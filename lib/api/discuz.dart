@@ -27,6 +27,7 @@ Future<dom.Document> _page(String url) async {
   final html = await Api.instance.get(url);
   final doc = toDoc(html);
   _capture(doc, html);
+  _captureCreditNames(html);
 
   // 登入狀態只在冷啟動問一次是不夠的：cookie 隨時可能過期，
   // 不回報的話 UI 會一直停在「已登入」，但每個操作都被論壇擋下來
@@ -256,6 +257,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
       html: sanitizeContent(body),
       signature: sanitizeContent(it.querySelector('.sign')),
       quoteHref: attr(it.querySelector('.replybtn input'), 'href'),
+      comments: _parseFloorComments(it),
     ));
   }
 
@@ -267,7 +269,73 @@ ThreadData parseThread(dom.Document doc, int tid) {
     type: RegExp(r'^\[([^\]]*)\]').firstMatch(headTitle)?.group(1) ?? '',
     posts: posts,
     pager: parsePager(doc),
+    poll: _parsePoll(doc),
   );
+}
+
+/// 樓中樓（dxksst 外掛）：每個 li 的結構是
+/// `<a href=...uid=X><em><img class=dxksst_avatar><font>暱稱</font></em></a><em>:內容</em>`
+List<FloorComment> _parseFloorComments(dom.Element post) {
+  final box = post.querySelector('.dxksst_floor');
+  if (box == null) return const [];
+
+  final out = <FloorComment>[];
+  for (final li in box.querySelectorAll('li')) {
+    final link = li.querySelector('a');
+    final name = txt(li.querySelector('font'));
+    // 第二個 em 才是內容，第一個包在 <a> 裡是作者
+    final ems = li.querySelectorAll('em');
+    final body = ems.length > 1 ? txt(ems.last) : '';
+    final text = body.replaceFirst(RegExp(r'^[:：]\s*'), '');
+    if (name.isEmpty && text.isEmpty) continue;
+    out.add(FloorComment(
+      uid: paramInt(attr(link, 'href'), 'uid'),
+      name: name,
+      avatar: attr(li.querySelector('.dxksst_avatar'), 'src'),
+      text: text,
+    ));
+  }
+  return out;
+}
+
+Poll? _parsePoll(dom.Document doc) {
+  final box = doc.querySelector('.pollBox');
+  if (box == null) return null;
+
+  final form = box.querySelector('#poll') ?? box.querySelector('form');
+  final options = <PollOption>[];
+  var multiple = false;
+  for (final input in box.querySelectorAll('input[name="pollanswers[]"]')) {
+    if (attr(input, 'type') == 'checkbox') multiple = true;
+    final label = input.parent;
+    options.add(PollOption(
+      attr(input, 'value'),
+      txt(label).replaceFirst(RegExp(r'^\d+[.、]\s*'), ''),
+    ));
+  }
+
+  return Poll(
+    title: txt(box.querySelector('.pollTit h3')),
+    info: txt(box.querySelector('.pollUser')),
+    deadline: txt(box.querySelector('.pollTime')),
+    options: options,
+    multiple: multiple,
+    formhash: attr(box.querySelector('input[name="formhash"]'), 'value'),
+    action: attr(form, 'action'),
+  );
+}
+
+Future<SubmitResult> votePoll(Poll poll, List<String> answers) async {
+  if (poll.action.isEmpty || answers.isEmpty) {
+    return const SubmitResult(ok: false, message: '請先選擇選項');
+  }
+  final body = StringBuffer('formhash=${Uri.encodeQueryComponent(poll.formhash)}');
+  for (final a in answers) {
+    body.write('&pollanswers%5B%5D=${Uri.encodeQueryComponent(a)}');
+  }
+  final html = await Api.instance.postRaw(
+      poll.action.replaceAll('&amp;', '&'), body.toString());
+  return _submitResult(html, '投票');
 }
 
 /* ─────────────── 導讀 / 搜尋 ─────────────── */
@@ -610,14 +678,55 @@ Future<MeData> fetchMe(int uid) async {
   );
 }
 
+/// 個人資料：改用手機版的結構化欄位。
+///
+/// 之前是把整頁 sanitize 後丟出來，連頁尾（自己的暱稱、登出連結）都被帶進去，
+/// 所以看別人的資料時最下面會冒出自己的資訊。
 Future<ProfileData> fetchProfile(int uid) async {
-  final doc = await _page('home.php?mod=space&uid=$uid');
+  final doc = await _page('home.php?mod=space&uid=$uid&do=profile');
+
+  final head = doc.querySelector('.user_avatar h2');
+  final title = txt(head);
+  final levelEl = head?.querySelector('span');
+  final level = txt(levelEl);
+
+  final credits = <CreditItem>[];
+  for (final li in doc.querySelectorAll('.myinfo_list li')) {
+    final v = li.querySelector('span');
+    if (v == null) continue;
+    final value = txt(v);
+    final name = txt(li).replaceFirst(value, '').trim();
+    if (name.isNotEmpty) credits.add(CreditItem(name, value));
+  }
+
   return ProfileData(
     uid: uid,
-    name: txt(doc.querySelector('header h1') ?? doc.querySelector('.user_avatar h2')),
-    avatar: avatarUrl(uid, size: 'big'),
-    html: sanitizeContent(doc.querySelector('.container') ?? doc.body),
+    name: level.isEmpty ? title : title.replaceFirst(level, '').trim(),
+    avatar: attr(doc.querySelector('.avatar_m img'), 'src').isNotEmpty
+        ? absolute(attr(doc.querySelector('.avatar_m img'), 'src'))
+        : avatarUrl(uid, size: 'big'),
+    level: level,
+    credits: credits,
+    isSelf: doc.querySelector('a[href*="action=logout"]') != null,
   );
+}
+
+/// 加好友（論壇會回一個確認表單頁，成功與否看回應訊息）
+Future<SubmitResult> addFriend(int uid) async {
+  await _ensureFormhash();
+  final html = await Api.instance.get(
+      'home.php?mod=spacecp&ac=friend&op=add&uid=$uid&handlekey=a_friend_$uid&formhash=$_formhash');
+  return _submitResult(html, '加好友');
+}
+
+/// 打招呼
+Future<SubmitResult> poke(int uid) async {
+  await _ensureFormhash();
+  final html = await Api.instance.post(
+    'home.php?mod=spacecp&ac=poke&op=send&uid=$uid&pokesubmit=true&infloat=yes',
+    {'formhash': _formhash ?? '', 'note': '', 'pokesubmit': 'true'},
+  );
+  return _submitResult(html, '打招呼');
 }
 
 /// 收藏頁用的是 .fav_list，和主題列表不同版型
@@ -696,6 +805,94 @@ Future<SubmitResult> unfavorite(int favid) async {
   final html = await Api.instance
       .get('home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid&formhash=$_formhash');
   return _submitResult(html, '取消收藏');
+}
+
+
+/* ─────────────── 積分變化（勳章觸發） ─────────────── */
+
+/// 論壇會在頁面裡輸出權威對照，例如
+/// creditnotice = '1|旅程|里,2|金币|枚,3|血液|滴,...'
+/// 注意順序和積分頁上的排列不同，照畫面順序猜會標錯名稱。
+List<({String name, String unit})> _creditNames = const [];
+
+void _captureCreditNames(String html) {
+  final m = RegExp(r"creditnotice\s*=\s*'([^']+)'").firstMatch(html);
+  if (m == null) return;
+  final out = <({String name, String unit})>[];
+  for (final part in m.group(1)!.split(',')) {
+    final f = part.split('|');
+    if (f.length >= 3) out.add((name: f[1], unit: f[2]));
+  }
+  if (out.isNotEmpty) _creditNames = out;
+}
+
+/// 讀 `<cookiepre>_creditnotice`，解出這次操作得到的積分。
+///
+/// cookie 是「每項變化量」以 D 相連，最後接 uid。前 N 項對應上面那份名稱表，
+/// 多出來的一項是總積分，論壇自己的 JS 也不顯示它。
+Future<List<CreditChange>> consumeCreditNotice() async {
+  final raw = await Api.instance.cookieEndingWith('_creditnotice');
+  if (raw == null || raw.isEmpty || _creditNames.isEmpty) return const [];
+
+  final parts = raw.split('D');
+  if (parts.length < 2) return const [];
+  final values = parts.sublist(0, parts.length - 1);   // 去掉結尾的 uid
+
+  final out = <CreditChange>[];
+  for (var i = 0; i < _creditNames.length && i < values.length; i++) {
+    final v = int.tryParse(values[i]) ?? 0;
+    if (v != 0) out.add(CreditChange(_creditNames[i].name, v, _creditNames[i].unit));
+  }
+  return out;
+}
+
+/* ─────────────── 記錄廣場 ─────────────── */
+
+const doingViews = <MapEntry<String, String>>[
+  MapEntry('all', '隨便看看'),
+  MapEntry('we', '我和好友'),
+  MapEntry('me', '我的記錄'),
+];
+
+/// 記錄沒有手機版，帶 forcemobile=1 拿桌面模板來解析
+Future<DoingPage> fetchDoing({String view = 'all'}) async {
+  final doc = await _page('home.php?mod=space&do=doing&view=$view&forcemobile=1');
+  final items = <DoingItem>[];
+
+  for (final dl in doc.querySelectorAll('.xld dl')) {
+    final id = attr(dl, 'id');
+    final doid = int.tryParse(RegExp(r'dl(\d+)$').firstMatch(id)?.group(1) ?? '');
+    if (doid == null) continue;
+
+    final body = dl.querySelector('.ptm');
+    final link = body?.querySelector('a');
+    final href = attr(link, 'href');
+    items.add(DoingItem(
+      doid: doid,
+      uid: int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(href)?.group(1) ?? '') ??
+          paramInt(href, 'uid'),
+      name: txt(link),
+      avatar: attr(dl.querySelector('.avt img'), 'src'),
+      message: txt(body?.querySelector('span')),
+      time: txt(dl.querySelector('.ptn .y')),
+    ));
+  }
+
+  return DoingPage(
+    items: items,
+    formhash: attr(doc.querySelector('#mood_addform input[name="formhash"]'), 'value'),
+  );
+}
+
+Future<SubmitResult> postDoing(String message, {String formhash = ''}) async {
+  if (formhash.isEmpty) await _ensureFormhash();
+  final html = await Api.instance.post('home.php?mod=spacecp&ac=doing&view=all', {
+    'message': message,
+    'addsubmit': 'true',
+    'formhash': formhash.isNotEmpty ? formhash : (_formhash ?? ''),
+    'refer': 'home.php?mod=space&do=doing&view=all',
+  });
+  return _submitResult(html, '發布');
 }
 
 /* ─────────────── 登入 / 登出 ─────────────── */

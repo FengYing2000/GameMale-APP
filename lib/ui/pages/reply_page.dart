@@ -85,8 +85,18 @@ class _ReplyPageState extends State<ReplyPage> {
         page: widget.page,
       );
       if (!mounted) return;
-      toast(context, r.message);
-      if (r.ok) Navigator.of(context).pop(true);
+      if (!r.ok) {
+        toast(context, r.message);
+        return;
+      }
+
+      // 發文成功後論壇會把積分變化寫進 cookie（勳章觸發也走這套），
+      // 網頁版是用彈窗顯示，這裡也顯示出來，才看得出到底有沒有加到分
+      final credits = await api.consumeCreditNotice();
+      if (!mounted) return;
+      toast(context,
+          credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');
+      Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
       if (mounted) toast(context, '回覆失敗：${e.message}');
     } finally {

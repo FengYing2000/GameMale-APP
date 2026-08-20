@@ -7,8 +7,8 @@ import '../../api/models.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
-import '../widgets/post_body.dart';
 import '../widgets/state_box.dart';
+import '../widgets/toast.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.uid});
@@ -21,6 +21,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   ProfileData? _data;
   bool _loading = true;
+  bool _busy = false;
   String? _err;
 
   @override
@@ -44,6 +45,18 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _act(Future<SubmitResult> Function() run, String what) async {
+    setState(() => _busy = true);
+    try {
+      final r = await run();
+      if (mounted) toast(context, r.message);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '$what失敗：${e.message}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -60,38 +73,85 @@ class _ProfilePageState extends State<ProfilePage> {
             if (d != null) ...[
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 22),
+                  padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
                   child: Column(
                     children: [
-                      Avatar(d.avatar, size: 64),
+                      Avatar(d.avatar, size: 68),
                       const SizedBox(height: 10),
                       Text(d.name,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 3),
-                      Text('UID ${d.uid}',
-                          style: TextStyle(fontSize: 12.5, color: faint(context))),
+                      Text(
+                        [
+                          'UID ${d.uid}',
+                          if (d.level.isNotEmpty) d.level,
+                        ].join(' · '),
+                        style: TextStyle(fontSize: 12.5, color: faint(context)),
+                      ),
                       if (!isMe) ...[
-                        const SizedBox(height: 14),
-                        FilledButton.icon(
-                          onPressed: () => context.push('/pm/${widget.uid}'),
-                          icon: const Icon(Icons.mail_outline, size: 18),
-                          label: const Text('傳送私訊'),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: () => context.push('/pm/${widget.uid}'),
+                              icon: const Icon(Icons.mail_outline, size: 18),
+                              label: const Text('傳送私訊'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _act(() => api.addFriend(widget.uid), '加好友'),
+                              icon: const Icon(Icons.person_add_alt, size: 18),
+                              label: const Text('加好友'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _act(() => api.poke(widget.uid), '打招呼'),
+                              icon: const Icon(Icons.waving_hand_outlined, size: 18),
+                              label: const Text('打招呼'),
+                            ),
+                          ],
                         ),
                       ],
                     ],
                   ),
                 ),
               ),
-              if (d.html.isNotEmpty)
+              if (d.credits.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 8),
+                  child: Text('積分',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: faint(context))),
+                ),
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: PostBody(
-                      d.html,
-                      textStyle: const TextStyle(fontSize: 14, height: 1.6),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      children: [
+                        for (final c in d.credits)
+                          ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            title: Text(c.name, style: const TextStyle(fontSize: 14)),
+                            trailing: Text(c.value,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: subtle(context))),
+                          ),
+                      ],
                     ),
                   ),
                 ),
+              ],
             ],
           ],
         ),

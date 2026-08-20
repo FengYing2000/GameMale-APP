@@ -174,6 +174,7 @@ class PostItem {
   final String html;
   final String signature;
   final String quoteHref;
+  final List<FloorComment> comments;
 
   const PostItem({
     this.pid,
@@ -185,6 +186,7 @@ class PostItem {
     this.html = '',
     this.signature = '',
     this.quoteHref = '',
+    this.comments = const [],
   });
 }
 
@@ -196,6 +198,7 @@ class ThreadData {
   final String type;
   final List<PostItem> posts;
   final PageInfo pager;
+  final Poll? poll;
 
   const ThreadData({
     required this.tid,
@@ -205,6 +208,7 @@ class ThreadData {
     this.type = '',
     this.posts = const [],
     this.pager = const PageInfo(),
+    this.poll,
   });
 }
 
@@ -280,12 +284,30 @@ class PmChat {
   });
 }
 
+class CreditItem {
+  final String name;
+  final String value;
+  const CreditItem(this.name, this.value);
+}
+
 class ProfileData {
   final int uid;
   final String name;
   final String avatar;
-  final String html;
-  const ProfileData({required this.uid, this.name = '', this.avatar = '', this.html = ''});
+  final String level;
+  final List<CreditItem> credits;
+
+  /// 是不是自己的頁面（論壇只在自己的頁面放登出鈕）
+  final bool isSelf;
+
+  const ProfileData({
+    required this.uid,
+    this.name = '',
+    this.avatar = '',
+    this.level = '',
+    this.credits = const [],
+    this.isSelf = false,
+  });
 }
 
 class MeData {
@@ -374,4 +396,77 @@ class DiscuzException implements Exception {
   const DiscuzException(this.message, [this.status = 0]);
   @override
   String toString() => message;
+}
+
+/// 發文後論壇給的積分變化（勳章觸發也走同一套）
+class CreditChange {
+  final String name;
+  final int delta;
+  final String unit;
+  const CreditChange(this.name, this.delta, this.unit);
+
+  @override
+  String toString() => '$name ${delta > 0 ? '+' : ''}$delta$unit';
+}
+
+class DoingItem {
+  final int doid;
+  final int? uid;
+  final String name;
+  final String avatar;
+  final String message;
+  final String time;
+
+  const DoingItem({
+    required this.doid,
+    this.uid,
+    this.name = '',
+    this.avatar = '',
+    this.message = '',
+    this.time = '',
+  });
+}
+
+class DoingPage {
+  final List<DoingItem> items;
+  final String formhash;
+  const DoingPage({this.items = const [], this.formhash = ''});
+}
+
+class PollOption {
+  final String id;
+  final String text;
+  const PollOption(this.id, this.text);
+}
+
+class Poll {
+  final String title;      // 单选投票 / 多选投票
+  final String info;       // 共有 N 人参与投票…
+  final String deadline;
+  final List<PollOption> options;
+  final bool multiple;
+  final String formhash;
+  final String action;
+
+  /// 已經投過或結果已公開時，論壇不再給選項
+  bool get votable => options.isNotEmpty;
+
+  const Poll({
+    this.title = '',
+    this.info = '',
+    this.deadline = '',
+    this.options = const [],
+    this.multiple = false,
+    this.formhash = '',
+    this.action = '',
+  });
+}
+
+/// 樓中樓（dxksst 外掛）
+class FloorComment {
+  final int? uid;
+  final String name;
+  final String avatar;
+  final String text;
+  const FloorComment({this.uid, this.name = '', this.avatar = '', this.text = ''});
 }

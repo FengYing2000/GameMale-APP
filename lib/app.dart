@@ -7,6 +7,7 @@ import 'i18n/s2t.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
+import 'ui/pages/doing_page.dart';
 import 'ui/pages/forum_page.dart';
 import 'ui/pages/guide_page.dart';
 import 'ui/pages/home_page.dart';
@@ -126,6 +127,7 @@ GoRouter _buildRouter(SessionStore session) {
         builder: (c, s) => MyListPage(type: s.pathParameters['type'] ?? 'thread'),
       ),
       GoRoute(path: '/sign', builder: (c, s) => const SignPage()),
+      GoRoute(path: '/doing', builder: (c, s) => const DoingPageView()),
       GoRoute(path: '/settings', builder: (c, s) => const SettingsPage()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => _Scaffold(shell: shell),
