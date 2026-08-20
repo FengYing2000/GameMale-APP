@@ -451,17 +451,48 @@ Future<SignResult> fetchSignPage() async {
 
 /* ─────────────── 通知 / 私訊 ─────────────── */
 
-const noticeViews = <MapEntry<String, String>>[
-  MapEntry('mypost', '我的帖子'),
-  MapEntry('interactive', '坛友互动'),
-  MapEntry('system', '系统通知'),
-  MapEntry('manage', '管理'),
+/// 通知的兩層分類，取自論壇實際提供的連結
+class NoticeTab {
+  final String view;
+  final String type;
+  final String name;
+  const NoticeTab(this.view, this.type, this.name);
+}
+
+const noticeViews = <NoticeTab>[
+  NoticeTab('mypost', '', '我的帖子'),
+  NoticeTab('interactive', '', '坛友互动'),
+  NoticeTab('system', '', '系统提醒'),
+  NoticeTab('app', '', '应用提醒'),
 ];
+
+const noticeTypes = <String, List<NoticeTab>>{
+  'mypost': [
+    NoticeTab('mypost', '', '全部'),
+    NoticeTab('mypost', 'post', '帖子'),
+    NoticeTab('mypost', 'pcomment', '点评'),
+    NoticeTab('mypost', 'activity', '活动'),
+    NoticeTab('mypost', 'reward', '悬赏'),
+    NoticeTab('mypost', 'goods', '商品'),
+    NoticeTab('mypost', 'at', '提到我的'),
+  ],
+  'interactive': [
+    NoticeTab('interactive', '', '全部'),
+    NoticeTab('interactive', 'poke', '打招呼'),
+    NoticeTab('interactive', 'friend', '好友'),
+    NoticeTab('interactive', 'wall', '留言'),
+    NoticeTab('interactive', 'comment', '评论'),
+    NoticeTab('interactive', 'click', '挺你'),
+    NoticeTab('interactive', 'sharenotice', '分享'),
+  ],
+};
 
 /// 通知頁沒有手機版，Discuz 會回桌面模板，結構是 .nts > dl 而不是 li。
 /// 內文連結指向 mod=redirect，主題 id 放在 ptid。
-Future<NoticeResult> fetchNotice({String view = 'mypost'}) async {
-  final doc = await _page('home.php?mod=space&do=notice&view=$view&forcemobile=1');
+Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) async {
+  final q = 'home.php?mod=space&do=notice&view=$view'
+      '${type.isEmpty ? '' : '&type=$type'}&forcemobile=1';
+  final doc = await _page(q);
   final items = <NoticeItem>[];
 
   for (final dl in doc.querySelectorAll('.nts dl')) {
@@ -627,6 +658,26 @@ Future<ListPage> _myList(int uid, String doType, int page) async {
     }
   }
   return ListPage(list: seen.values.toList(), pager: parsePager(doc));
+}
+
+/// 收藏的版塊：和收藏帖子同一種 .fav_list 版型，只是連結指向 forumdisplay
+Future<List<SubForum>> fetchFavoriteForums(int uid, {int page = 1}) async {
+  final q = 'home.php?mod=space&uid=$uid&do=favorite&view=me&type=forum'
+      '${page > 1 ? '&page=$page' : ''}';
+  final doc = await _page(q);
+  final out = <SubForum>[];
+  for (final li in doc.querySelectorAll('.fav_list li')) {
+    final a = li.querySelector('a.favTit');
+    final fid = paramInt(attr(a, 'href'), 'fid');
+    if (a == null || fid == null) continue;
+    out.add(SubForum(
+      fid: fid,
+      name: txt(a),
+      favid: paramInt(attr(li.querySelector('a[href*="op=delete"]'), 'href'), 'favid'),
+      favTime: txt(li.querySelector('p')).replaceFirst(RegExp(r'^删除\s*'), ''),
+    ));
+  }
+  return out;
 }
 
 Future<ListPage> fetchFavorites(int uid, {int page = 1}) => _myList(uid, 'favorite', page);

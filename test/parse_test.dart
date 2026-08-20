@@ -97,6 +97,23 @@ void main() {
         () => expect(t.posts.any((p) => p.html.contains('data-inapp')), isTrue));
     test('spoiler 轉成 data-spoiler',
         () => expect(t.posts.any((p) => p.html.contains('data-spoiler')), isTrue));
+    test('spoiler 內容不再帶 display:none', () {
+      // 論壇的 .spoilerbody 有 style="display:none"，照搬過去會讓展開後一片空白
+      final withSpoiler = t.posts.firstWhere((p) => p.html.contains('data-spoiler'));
+      final spoilerPart = withSpoiler.html
+          .substring(withSpoiler.html.indexOf('data-spoiler'));
+      expect(RegExp(r'display\s*:\s*none', caseSensitive: false).hasMatch(spoilerPart),
+          isFalse,
+          reason: '展開後內容會被渲染引擎隱藏，圖片與文字都看不到');
+    });
+
+    test('整篇內容都沒有 display:none', () {
+      for (final p in t.posts) {
+        expect(RegExp(r'display\s*:\s*none', caseSensitive: false).hasMatch(p.html),
+            isFalse);
+      }
+    });
+
     test('引用回覆連結',
         () => expect(t.posts.any((p) => p.quoteHref.contains('repquote')), isTrue));
     test('分頁解析', () => expect(t.pager.total, greaterThan(1)));

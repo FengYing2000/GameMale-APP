@@ -103,18 +103,48 @@ String sanitizeContent(dom.Element? el) {
     v.attributes.remove('autoplay');
   }
 
-  // spoiler：把標題與內容抽出來，交給 Flutter 端畫成可展開區塊
+  // spoiler：把標題與內容抽出來，交給 Flutter 端畫成可展開區塊。
+  //
+  // 論壇的 .spoilerbody 帶著 style="display:none"（網頁版靠 JS 切換），
+  // 照搬過來的話展開後渲染引擎會照著隱藏，變成點開一片空白 —— 圖片也不見。
   for (final sp in node.querySelectorAll('.spoiler').toList()) {
     final btn = sp.querySelector('.spoilerheader input');
     final label = attr(btn, 'value').trim();
     final body = sp.querySelector('.spoilerbody') ?? _lastElementChild(sp);
     final box = dom.Element.tag('div');
     box.attributes['data-spoiler'] = label.isEmpty ? '展開內容' : label;
-    if (body != null) box.append(body.clone(true));
+    if (body != null) {
+      final copy = body.clone(true);
+      _unhide(copy);
+      box.append(copy);
+    }
     sp.replaceWith(box);
   }
 
+  // 其他被 display:none 藏起來的區塊（購買後可見等）也一併還原，
+  // 反正伺服器沒回傳的內容本來就不在 HTML 裡，看得到的就該畫出來
+  _unhide(node);
+
   return node.innerHtml.trim();
+}
+
+
+/// 移除 display:none，並往下套用到所有子節點
+void _unhide(dom.Element el) {
+  for (final n in [el, ...el.querySelectorAll('*')]) {
+    final style = n.attributes['style'];
+    if (style == null || !style.contains('display')) continue;
+    final cleaned = style
+        .split(';')
+        .where((d) => !RegExp(r'^\s*display\s*:\s*none\s*$', caseSensitive: false)
+            .hasMatch(d))
+        .join(';');
+    if (cleaned.trim().isEmpty) {
+      n.attributes.remove('style');
+    } else {
+      n.attributes['style'] = cleaned;
+    }
+  }
 }
 
 /// package:html 不支援 :last-child，只好自己走

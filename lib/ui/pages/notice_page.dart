@@ -16,6 +16,7 @@ class NoticePage extends StatefulWidget {
 
 class _NoticePageState extends State<NoticePage> {
   String _view = 'mypost';
+  String _type = '';
   NoticeResult? _data;
   bool _loading = true;
   String? _err;
@@ -32,7 +33,7 @@ class _NoticePageState extends State<NoticePage> {
       _err = null;
     });
     try {
-      final d = await api.fetchNotice(view: _view);
+      final d = await api.fetchNotice(view: _view, type: _type);
       if (mounted) setState(() => _data = d);
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
@@ -41,9 +42,23 @@ class _NoticePageState extends State<NoticePage> {
     }
   }
 
+  void _pickView(String view) {
+    setState(() {
+      _view = view;
+      _type = '';
+    });
+    _load();
+  }
+
+  void _pickType(String type) {
+    setState(() => _type = type);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
+    final subTabs = api.noticeTypes[_view];
 
     return Scaffold(
       appBar: AppBar(title: const Text('通知')),
@@ -52,27 +67,18 @@ class _NoticePageState extends State<NoticePage> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            SizedBox(
-              height: 50,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-                children: [
-                  for (final v in api.noticeViews)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(v.value),
-                        selected: _view == v.key,
-                        onSelected: (_) {
-                          setState(() => _view = v.key);
-                          _load();
-                        },
-                      ),
-                    ),
-                ],
-              ),
+            _ChipRow(
+              items: [for (final v in api.noticeViews) (v.view, v.name)],
+              selected: _view,
+              onPick: _pickView,
             ),
+            if (subTabs != null)
+              _ChipRow(
+                items: [for (final t in subTabs) (t.type, t.name)],
+                selected: _type,
+                onPick: _pickType,
+                small: true,
+              ),
             ?StateBox.maybe(
               loading: _loading,
               error: _err,
@@ -87,13 +93,51 @@ class _NoticePageState extends State<NoticePage> {
                   children: [
                     for (var i = 0; i < d.items.length; i++) ...[
                       _NoticeRow(item: d.items[i]),
-                      if (i != d.items.length - 1) const Divider(indent: 60, endIndent: 14),
+                      if (i != d.items.length - 1)
+                        const Divider(indent: 60, endIndent: 14),
                     ],
                   ],
                 ),
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ChipRow extends StatelessWidget {
+  const _ChipRow({
+    required this.items,
+    required this.selected,
+    required this.onPick,
+    this.small = false,
+  });
+
+  final List<(String, String)> items;
+  final String selected;
+  final ValueChanged<String> onPick;
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: small ? 42 : 50,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.fromLTRB(12, small ? 4 : 10, 12, 2),
+        children: [
+          for (final it in items)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(it.$2, style: TextStyle(fontSize: small ? 12.5 : 14)),
+                selected: selected == it.$1,
+                visualDensity: small ? VisualDensity.compact : null,
+                onSelected: (_) => onPick(it.$1),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -122,7 +166,8 @@ class _NoticeRow extends StatelessWidget {
                 children: [
                   Text(item.text, style: const TextStyle(fontSize: 14, height: 1.55)),
                   const SizedBox(height: 4),
-                  Text(item.time, style: TextStyle(fontSize: 11.5, color: faint(context))),
+                  Text(item.time,
+                      style: TextStyle(fontSize: 11.5, color: faint(context))),
                 ],
               ),
             ),

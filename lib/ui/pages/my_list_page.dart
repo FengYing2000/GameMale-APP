@@ -8,6 +8,7 @@ import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';
 import '../widgets/toast.dart';
+import 'package:go_router/go_router.dart';
 
 class MyListPage extends StatefulWidget {
   const MyListPage({super.key, required this.type});
@@ -25,6 +26,8 @@ class _MyListPageState extends State<MyListPage> {
   };
 
   ListPage? _data;
+  List<SubForum>? _forums;
+  bool _favForums = false;   // 收藏頁的「版塊」分頁
   bool _loading = true;
   String? _err;
   int _page = 1;
@@ -50,16 +53,36 @@ class _MyListPageState extends State<MyListPage> {
       _err = null;
     });
     try {
-      final d = switch (widget.type) {
-        'favorite' => await api.fetchFavorites(uid, page: _page),
-        'reply' => await api.fetchMyReplies(uid, page: _page),
-        _ => await api.fetchMyThreads(uid, page: _page),
-      };
-      if (mounted) setState(() => _data = d);
+      if (widget.type == 'favorite' && _favForums) {
+        final f = await api.fetchFavoriteForums(uid, page: _page);
+        if (mounted) setState(() => _forums = f);
+      } else {
+        final d = switch (widget.type) {
+          'favorite' => await api.fetchFavorites(uid, page: _page),
+          'reply' => await api.fetchMyReplies(uid, page: _page),
+          _ => await api.fetchMyThreads(uid, page: _page),
+        };
+        if (mounted) setState(() => _data = d);
+      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _removeForum(SubForum f) async {
+    final favid = f.favid;
+    if (favid == null) return;
+    try {
+      final r = await api.unfavorite(favid);
+      if (!mounted) return;
+      toast(context, r.message);
+      if (r.ok) {
+        setState(() => _forums = _forums!.where((x) => x.favid != favid).toList());
+      }
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '取消收藏失敗：${e.message}');
     }
   }
 
@@ -109,16 +132,65 @@ class _MyListPageState extends State<MyListPage> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
+            if (isFav)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('帖子')),
+                    ButtonSegment(value: true, label: Text('版塊')),
+                  ],
+                  selected: {_favForums},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (v) {
+                    setState(() {
+                      _favForums = v.first;
+                      _page = 1;
+                    });
+                    _load();
+                  },
+                ),
+              ),
             ?StateBox.maybe(
               loading: _loading,
               error: _err,
-              empty: !_loading && _err == null && (d?.list.isEmpty ?? false),
+              empty: !_loading &&
+                  _err == null &&
+                  (isFav && _favForums
+                      ? (_forums?.isEmpty ?? false)
+                      : (d?.list.isEmpty ?? false)),
               emptyText: '這裡還是空的',
               onRetry: _load,
             ),
-            if (d != null && d.list.isNotEmpty)
+            if (isFav && _favForums && (_forums?.isNotEmpty ?? false))
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < _forums!.length; i++) ...[
+                      ListTile(
+                        leading: const Icon(Icons.folder_outlined),
+                        title: Text(_forums![i].name),
+                        subtitle: _forums![i].favTime.isEmpty
+                            ? null
+                            : Text(_forums![i].favTime,
+                                style: const TextStyle(fontSize: 12)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.star, size: 20),
+                          tooltip: '取消收藏',
+                          onPressed: () => _removeForum(_forums![i]),
+                        ),
+                        onTap: () => context.push('/f/${_forums![i].fid}'),
+                      ),
+                      if (i != _forums!.length - 1)
+                        const Divider(indent: 56, endIndent: 14),
+                    ],
+                  ],
+                ),
+              ),
+            if (!(isFav && _favForums) && d != null && d.list.isNotEmpty)
               ThreadListCard(list: d.list, onRemove: isFav ? _remove : null),
-            if (d != null)
+            if (!(isFav && _favForums) && d != null)
               PagerBar(
                 pager: d.pager,
                 onGo: (p) {

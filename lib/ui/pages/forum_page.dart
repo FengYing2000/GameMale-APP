@@ -171,6 +171,24 @@ class _ForumPageState extends State<ForumPage> {
                   ],
                 ),
               ),
+            // 子板塊直接列出來 —— 原本只藏在右上角選單裡，很難發現
+            if (d != null && d.subforums.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    for (final sub in d.subforums)
+                      ActionChip(
+                        avatar: const Icon(Icons.folder_outlined, size: 15),
+                        label: Text(sub.name, style: const TextStyle(fontSize: 13)),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => context.push('/f/${sub.fid}'),
+                      ),
+                  ],
+                ),
+              ),
             if (d != null && d.tabs.isNotEmpty)
               SizedBox(
                 height: 50,

@@ -134,7 +134,12 @@ class ForumTab {
 class SubForum {
   final int fid;
   final String name;
-  const SubForum({required this.fid, required this.name});
+
+  /// 只有「收藏的版塊」才有，用來取消收藏
+  final int? favid;
+  final String favTime;
+
+  const SubForum({required this.fid, required this.name, this.favid, this.favTime = ''});
 }
 
 class ForumData {
