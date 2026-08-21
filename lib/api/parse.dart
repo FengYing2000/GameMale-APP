@@ -56,6 +56,12 @@ bool isLoggedIn(dom.Document doc) =>
 ///
 /// inajax=1 的浮層片段（評分表單、評分紀錄）兩種標記都沒有，
 /// 用缺少登出連結去推論會把使用者莫名其妙踢出登入狀態。
+/// 這一頁是不是「論壇把我們轉到登入表單」。
+///
+/// 不能用 isGuestPage —— 訪客瀏覽公開板塊時頁尾一樣有登入連結，
+/// 那樣會把每個公開板塊都擋成「需要登入」。
+bool isLoginWall(dom.Document doc) => doc.querySelector('#loginform') != null;
+
 bool isGuestPage(dom.Document doc) {
   if (isLoggedIn(doc)) return false;
   return doc.querySelector('#loginform') != null ||

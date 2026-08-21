@@ -538,3 +538,30 @@ class RateRecord {
     this.reason = '',
   });
 }
+
+/// 編輯自己的帖子／回覆
+class EditForm {
+  final String subject;   // 只有樓主那層有標題
+  final String message;   // 原始 BBCode
+  final String formhash;
+  final String posttime;
+  final String fid;
+  final String tid;
+  final String pid;
+  final bool hasSubject;
+  final String? message2;  // 論壇的提示（沒權限時）
+
+  const EditForm({
+    this.subject = '',
+    this.message = '',
+    this.formhash = '',
+    this.posttime = '',
+    this.fid = '',
+    this.tid = '',
+    this.pid = '',
+    this.hasSubject = false,
+    this.message2,
+  });
+
+  bool get canEdit => formhash.isNotEmpty && pid.isNotEmpty;
+}

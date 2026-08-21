@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
@@ -10,8 +11,11 @@ import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
 class PmChatPage extends StatefulWidget {
-  const PmChatPage({super.key, required this.touid});
+  const PmChatPage({super.key, required this.touid, this.name = ''});
   final int touid;
+
+  /// 從列表帶過來的對方暱稱；論壇的頁面標題只有「查看消息」
+  final String name;
 
   @override
   State<PmChatPage> createState() => _PmChatPageState();
@@ -93,7 +97,16 @@ class _PmChatPageState extends State<PmChatPage> {
     final msgs = chat?.messages ?? const <PmMessage>[];
 
     return Scaffold(
-      appBar: AppBar(title: Text(chat?.title.isNotEmpty == true ? chat!.title : tr('私人訊息'))),
+      appBar: AppBar(
+        title: Text(widget.name.isNotEmpty ? widget.name : tr('私人訊息')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: tr('個人資料'),
+            onPressed: () => context.push('/u/${widget.touid}'),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -110,7 +123,13 @@ class _PmChatPageState extends State<PmChatPage> {
                     emptyText: tr('還沒有訊息'),
                     onRetry: _load,
                   ),
-                  for (final m in msgs) _Bubble(msg: m),
+                  for (final m in msgs)
+                    _Bubble(
+                      msg: m,
+                      onTapAvatar: m.mine
+                          ? null
+                          : () => context.push('/u/${widget.touid}'),
+                    ),
                 ],
               ),
             ),
@@ -123,8 +142,9 @@ class _PmChatPageState extends State<PmChatPage> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.msg});
+  const _Bubble({required this.msg, this.onTapAvatar});
   final PmMessage msg;
+  final VoidCallback? onTapAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -175,10 +195,10 @@ class _Bubble extends StatelessWidget {
                 const SizedBox(width: 48),
                 bubble,
                 const SizedBox(width: 8),
-                Avatar(msg.avatar, size: 32),
+                Avatar(msg.avatar, size: 32, onTap: onTapAvatar),
               ]
             : [
-                Avatar(msg.avatar, size: 32),
+                Avatar(msg.avatar, size: 32, onTap: onTapAvatar),
                 const SizedBox(width: 8),
                 bubble,
                 const SizedBox(width: 48),

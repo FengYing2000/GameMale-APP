@@ -1,9 +1,11 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
+import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/login_required.dart';
@@ -150,6 +152,18 @@ class _ThreadPageState extends State<ThreadPage> {
                   onShowRatings: p.pid == null
                       ? null
                       : () => showRatings(context, tid: widget.tid, pid: p.pid!),
+                  onEdit: (p.pid == null ||
+                          d.fid == null ||
+                          p.uid == null ||
+                          p.uid != context.read<SessionStore>().uid)
+                      ? null
+                      : () async {
+                          final ok = await context.push<bool>(Uri(
+                            path: '/t/${widget.tid}/edit/${p.pid}',
+                            queryParameters: {'fid': '${d.fid}'},
+                          ).toString());
+                          if (ok == true) _load();
+                        },
                 ),
               PagerBar(
                 pager: d.pager,
@@ -172,11 +186,15 @@ class _PostCard extends StatelessWidget {
     required this.onReply,
     this.onRate,
     this.onShowRatings,
+    this.onEdit,
   });
   final PostItem post;
   final VoidCallback onReply;
   final VoidCallback? onRate;
   final VoidCallback? onShowRatings;
+
+  /// 只有自己的樓層才會有值
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -237,6 +255,16 @@ class _PostCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              if (onEdit != null)
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: Text(tr('編輯')),
+                  style: TextButton.styleFrom(
+                    foregroundColor: subtle(context),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
               if (onShowRatings != null)
                 TextButton.icon(
                   onPressed: onShowRatings,

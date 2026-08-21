@@ -9,6 +9,7 @@ import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
 import 'ui/pages/doing_page.dart';
+import 'ui/pages/edit_post_page.dart';
 import 'ui/pages/forum_page.dart';
 import 'ui/pages/guide_page.dart';
 import 'ui/pages/home_page.dart';
@@ -121,9 +122,23 @@ GoRouter _buildRouter(SessionStore session) {
           to: s.uri.queryParameters['to'] ?? '',
         ),
       ),
+      GoRoute(
+        path: '/t/:tid/edit/:pid',
+        builder: (c, s) => EditPostPage(
+          tid: _int(s, 'tid'),
+          pid: _int(s, 'pid'),
+          fid: int.tryParse(s.uri.queryParameters['fid'] ?? '') ?? 0,
+        ),
+      ),
       GoRoute(path: '/t/:tid', builder: (c, s) => ThreadPage(tid: _int(s, 'tid'))),
       GoRoute(path: '/notice', builder: (c, s) => const NoticePage()),
-      GoRoute(path: '/pm/:touid', builder: (c, s) => PmChatPage(touid: _int(s, 'touid'))),
+      GoRoute(
+        path: '/pm/:touid',
+        builder: (c, s) => PmChatPage(
+          touid: _int(s, 'touid'),
+          name: s.uri.queryParameters['name'] ?? '',
+        ),
+      ),
       GoRoute(path: '/u/:uid', builder: (c, s) => ProfilePage(uid: _int(s, 'uid'))),
       GoRoute(
         path: '/my/:type',

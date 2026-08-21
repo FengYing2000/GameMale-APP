@@ -177,7 +177,7 @@ ForumData parseForumFromDoc(dom.Document doc, int fid) {
     list: parseThreadList(doc),
     pager: parsePager(doc),
     message: noticeMessage(doc),
-    requiresLogin: isGuestPage(doc),
+    requiresLogin: isLoginWall(doc),
   );
 }
 
@@ -281,7 +281,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
     posts: posts,
     pager: parsePager(doc),
     poll: _parsePoll(doc),
-    requiresLogin: isGuestPage(doc),
+    requiresLogin: isLoginWall(doc),
   );
 }
 
@@ -295,9 +295,10 @@ List<FloorComment> _parseFloorComments(dom.Element post) {
   for (final li in box.querySelectorAll('li')) {
     final link = li.querySelector('a');
     final name = txt(li.querySelector('font'));
-    // 第二個 em 才是內容，第一個包在 <a> 裡是作者
-    final ems = li.querySelectorAll('em');
-    final body = ems.length > 1 ? txt(ems.last) : '';
+    // 結構是 <a><em>暱稱</em></a><em>:內容</em><div>時間</div>
+    // 內容是 li 的「直接子 em」；用 querySelectorAll 取最後一個會抓到時間
+    final direct = li.children.where((e) => e.localName == 'em').toList();
+    final body = direct.isEmpty ? '' : txt(direct.first);
     final text = body.replaceFirst(RegExp(r'^[:：]\s*'), '');
     if (name.isEmpty && text.isEmpty) continue;
     out.add(FloorComment(
@@ -547,9 +548,15 @@ Future<SubmitResult> doSign() async {
   await _ensureFormhash();
   final html = await Api.instance
       .get('plugin.php?id=k_misign:sign&operation=qiandao&format=text&formhash=$_formhash');
-  final text = txt(toDoc(html).body).isNotEmpty
-      ? txt(toDoc(html).body)
+  final doc = toDoc(html);
+  final text = txt(doc.body).isNotEmpty
+      ? txt(doc.body)
       : html.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+
+  // 未登入時論壇回一整頁提示，直接丟給使用者會是一大段亂七八糟的文字
+  if (RegExp('需要先登录|需要先登入|请先登录|請先登入').hasMatch(text)) {
+    return const SubmitResult(ok: false, message: '需要先登入才能簽到');
+  }
   return SubmitResult(
     ok: RegExp('已签到|成功|签到').hasMatch(text),
     message: text.isEmpty ? '簽到完成' : text,
@@ -1087,6 +1094,54 @@ Future<List<RateRecord>> fetchRatings({required int tid, required int pid}) asyn
 
   final out = [for (final k in order) merged[k]!];
   return out;
+}
+
+
+/* ─────────────── 編輯自己的帖子 ─────────────── */
+
+/// 手機版模板沒有編輯連結，但端點是通的，而且回的是原始 BBCode
+Future<EditForm> fetchEditForm({
+  required int fid,
+  required int tid,
+  required int pid,
+}) async {
+  final html = await Api.instance
+      .get('forum.php?mod=post&action=edit&fid=$fid&tid=$tid&pid=$pid');
+  final doc = toDoc(html);
+  _capture(doc, html);
+
+  final subjectInput = doc.querySelector('input[name="subject"]');
+  return EditForm(
+    subject: attr(subjectInput, 'value'),
+    message: doc.querySelector('textarea[name="message"]')?.text ?? '',
+    formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
+    posttime: attr(doc.querySelector('input[name="posttime"]'), 'value'),
+    fid: attr(doc.querySelector('input[name="fid"]'), 'value'),
+    tid: attr(doc.querySelector('input[name="tid"]'), 'value'),
+    pid: attr(doc.querySelector('input[name="pid"]'), 'value'),
+    hasSubject: subjectInput != null,
+    message2: noticeMessage(doc),
+  );
+}
+
+Future<SubmitResult> submitEdit({
+  required EditForm form,
+  required String message,
+  String subject = '',
+}) async {
+  final html = await Api.instance
+      .post('forum.php?mod=post&action=edit&extra=&editsubmit=yes', {
+    'formhash': form.formhash,
+    'posttime': form.posttime,
+    'fid': form.fid,
+    'tid': form.tid,
+    'pid': form.pid,
+    'page': '',
+    'editsubmit': 'yes',
+    if (form.hasSubject) 'subject': subject,
+    'message': message,
+  });
+  return _submitResult(html, '編輯');
 }
 
 /* ─────────────── 登入 / 登出 ─────────────── */

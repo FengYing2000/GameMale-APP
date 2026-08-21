@@ -20,14 +20,36 @@ class MePage extends StatefulWidget {
 class _MePageState extends State<MePage> {
   MeData? _me;
 
+  // needsLogin=false 的訪客也能看，論壇本來就開放
   static const _entries = [
-    (Icons.star_outline, '我的收藏', '/my/favorite'),
-    (Icons.edit_note, '我的主題', '/my/thread'),
-    (Icons.reply_outlined, '我的回覆', '/my/reply'),
-    (Icons.event_available_outlined, '每日簽到', '/sign'),
-    (Icons.chat_bubble_outline, '記錄廣場', '/doing'),
-    (Icons.notifications_none, '系統通知', '/notice'),
+    (Icons.star_outline, '我的收藏', '/my/favorite', true),
+    (Icons.edit_note, '我的主題', '/my/thread', true),
+    (Icons.reply_outlined, '我的回覆', '/my/reply', true),
+    (Icons.event_available_outlined, '每日簽到', '/sign', true),
+    (Icons.chat_bubble_outline, '記錄廣場', '/doing', false),
+    (Icons.notifications_none, '系統通知', '/notice', true),
   ];
+
+
+  int _rev = -1;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 登入/登出後這個分頁還被保活著，靠 revision 判斷要不要重抓。
+    // 第一次只記錄不重抓 —— initState 已經載過了，否則每次開頁都會抓兩遍
+    final rev = context.watch<SessionStore>().revision;
+    if (_rev == -1) {
+      _rev = rev;
+      return;
+    }
+    if (_rev != rev) {
+      _rev = rev;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -124,23 +146,30 @@ class _MePageState extends State<MePage> {
                 ),
               ),
             ),
-            if (session.loggedIn)
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var i = 0; i < _entries.length; i++) ...[
-                    ListTile(
-                      leading: Icon(_entries[i].$1, size: 22),
-                      title: Text(tr(_entries[i].$2)),
-                      trailing: Icon(Icons.chevron_right, size: 18, color: faint(context)),
-                      onTap: () => context.push(_entries[i].$3),
-                    ),
-                    if (i != _entries.length - 1) const Divider(indent: 56, endIndent: 14),
+            Builder(builder: (context) {
+              final items = _entries
+                  .where((e) => session.loggedIn || !e.$4)
+                  .toList();
+              if (items.isEmpty) return const SizedBox.shrink();
+              return Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      ListTile(
+                        leading: Icon(items[i].$1, size: 22),
+                        title: Text(tr(items[i].$2)),
+                        trailing:
+                            Icon(Icons.chevron_right, size: 18, color: faint(context)),
+                        onTap: () => context.push(items[i].$3),
+                      ),
+                      if (i != items.length - 1)
+                        const Divider(indent: 56, endIndent: 14),
+                    ],
                   ],
-                ],
-              ),
-            ),
+                ),
+              );
+            }),
             Card(
               clipBehavior: Clip.antiAlias,
               child: session.loggedIn

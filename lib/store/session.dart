@@ -17,6 +17,10 @@ class SessionStore extends ChangeNotifier {
   SignInfo? sign;
   String? error;
 
+  /// 每次登入狀態改變就 +1。分頁被 IndexedStack 保活著不會自己重建，
+  /// 各頁比對這個值就知道要不要重抓。
+  int revision = 0;
+
   /// 冷啟動：先讀本機快取讓畫面有東西，再問伺服器 cookie 還有沒有效。
   Future<void> restore() async {
     try {
@@ -57,11 +61,14 @@ class SessionStore extends ChangeNotifier {
     if (!loggedIn) return;
     loggedIn = false;
     sign = null;
+    revision++;
     notifyListeners();
   }
 
   void applyUser(SessionUser user) {
+    final was = uid;
     _apply(user);
+    if (was != uid) revision++;
     notifyListeners();
   }
 
@@ -89,6 +96,7 @@ class SessionStore extends ChangeNotifier {
     name = '';
     avatar = '';
     sign = null;
+    revision++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
     notifyListeners();

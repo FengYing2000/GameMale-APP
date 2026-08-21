@@ -483,6 +483,43 @@ void main() {
     });
   });
 
+
+  group('樓中樓內容', () {
+    final doc = _load('poll.html');
+    if (doc == null) return;
+    final t = api.parseThread(doc, 129896);
+    final withComments = t.posts.where((p) => p.comments.isNotEmpty).toList();
+
+    test('有解析出樓中樓', () => expect(withComments, isNotEmpty));
+
+    test('每則都有內容，不能只有暱稱和時間', () {
+      // 結構是 <a><em>暱稱</em></a><em>:內容</em><div>時間</div>
+      // 取 querySelectorAll('em').last 會抓到時間那個 em
+      for (final p in withComments) {
+        for (final c in p.comments) {
+          expect(c.text, isNotEmpty, reason: '${c.name} 的樓中樓沒有內容');
+          expect(c.text, isNot(startsWith(':')));
+        }
+      }
+    });
+  });
+
+  group('是否需要登入', () {
+    test('訪客瀏覽公開板塊不算被擋', () {
+      final doc = _load('guest_index.html');
+      if (doc == null) return;
+      // 訪客頁尾一樣有登入連結，不能拿 isGuestPage 當「需要登入」
+      expect(isLoginWall(doc), isFalse);
+      expect(isGuestPage(doc), isTrue);
+    });
+
+    test('真的被轉到登入表單才算', () {
+      final doc = _load('guest_locked_forum.html');
+      if (doc == null) return;
+      expect(isLoginWall(doc), isTrue);
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

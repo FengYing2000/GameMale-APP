@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/store/session.dart';
 import 'package:gamemale/store/settings.dart';
+import 'package:gamemale/ui/pages/edit_post_page.dart';
 import 'package:gamemale/ui/pages/forum_page.dart';
 import 'package:gamemale/ui/pages/guide_page.dart';
 import 'package:gamemale/ui/pages/home_page.dart';
@@ -74,6 +75,7 @@ void main() {
     '我的主題': const MyListPage(type: 'thread'),
     '簽到': const SignPage(),
     '設定': const SettingsPage(),
+    '編輯帖子': const EditPostPage(fid: 150, tid: 1, pid: 1),
     '登入': const LoginPage(),
   };
 

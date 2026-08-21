@@ -1,7 +1,9 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
+import '../../store/session.dart';
 import '../../api/models.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
@@ -28,6 +30,27 @@ class _GuidePageState extends State<GuidePage> {
   bool _loading = true;
   String? _err;
   final _scroll = ScrollController();
+
+
+  int _rev = -1;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 登入/登出後這個分頁還被保活著，靠 revision 判斷要不要重抓。
+    // 第一次只記錄不重抓 —— initState 已經載過了，否則每次開頁都會抓兩遍
+    final rev = context.watch<SessionStore>().revision;
+    if (_rev == -1) {
+      _rev = rev;
+      return;
+    }
+    if (_rev != rev) {
+      _rev = rev;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
+  }
 
   @override
   void initState() {
