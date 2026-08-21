@@ -83,6 +83,12 @@ class PostBody extends StatelessWidget {
       return true;
     }
 
+    // 論壇的「您需要登录才可以查看」提示，導到 App 自己的登入頁
+    if (url.contains('mod=logging') && url.contains('action=login')) {
+      context.push('/login');
+      return true;
+    }
+
     // redirect 連結（通知、樓中樓）的主題 id 放在 ptid
     final tid = paramInt(url, 'tid') ??
         paramInt(url, 'ptid') ??

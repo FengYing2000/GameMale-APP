@@ -457,6 +457,27 @@ void main() {
     });
   });
 
+
+  group('訪客看帖的附件提示', () {
+    final doc = _load('guest_thread.html');
+    if (doc == null) return;
+    final t = api.parseThread(doc, 194065);
+
+    // 訪客時論壇把附件換成 .warning 提示，它和 .img_list 一樣在內文之外，
+    // 沒撈進來的話畫面上會是一片空白，使用者不知道發生什麼事
+    test('提示文字有出現在內容裡', () {
+      expect(t.posts.first.html, contains('登录'));
+    });
+
+    test('提示裡的登入連結有保留', () {
+      expect(t.posts.first.html, contains('mod=logging'));
+    });
+
+    test('訪客看帖仍可解析出樓層', () {
+      expect(t.posts.length, greaterThan(3));
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

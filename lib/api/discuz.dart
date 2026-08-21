@@ -350,7 +350,12 @@ Future<SubmitResult> votePoll(Poll poll, List<String> answers) async {
 /// Discuz 手機版把附件圖放在 `<ul class="img_list">`，那是 .postListCon 的
 /// 兄弟節點而不是內文的一部分 —— 只讀內文的話用附件上傳的照片全都不會出現。
 dom.Element? _mergeAttachments(dom.Element? body, dom.Element post) {
-  final lists = post.querySelectorAll('.img_list');
+  // .img_list 是附件圖；訪客或權限不足時論壇會改放 .warning 提示
+  //（「您需要登录才可以下载或查看附件」），兩者都在內文之外
+  final lists = [
+    ...post.querySelectorAll('.img_list'),
+    ...post.querySelectorAll('.warning'),
+  ];
   if (lists.isEmpty) return body;
 
   final wrap = dom.Element.tag('div');
