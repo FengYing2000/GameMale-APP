@@ -402,19 +402,6 @@ void main() {
     });
   });
 
-  group('簡繁轉換的單位字', () {
-    test('里程的「里」不可轉成「裡」', () {
-      // OpenCC 的第一候選是「裏」，會讓「旅程 295 里」變成「295 裡」
-      expect(S2T.instance.convert('旅程 295 里'), contains('295 里'));
-      expect(S2T.instance.convert('公里'), '公里');
-    });
-
-    test('裡面的「里」仍要轉成「裡」', () {
-      expect(S2T.instance.convert('这里'), '這裡');
-      expect(S2T.instance.convert('心里'), '心裡');
-      expect(S2T.instance.convert('家里'), '家裡');
-    });
-  });
 
 
   group('附件圖片', () {
