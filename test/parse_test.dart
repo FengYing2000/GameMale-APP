@@ -361,6 +361,25 @@ void main() {
       expect(isGuestPage(doc), isFalse);
     });
 
+    test('訪客首頁：不可被判成已登入', () {
+      // 訪客版底部導覽也有 mycenter=1 的「我的」連結，
+      // 拿它當已登入的證據會讓畫面顯示「已登入」卻抓不到 uid
+      final doc = _load('guest_index.html');
+      if (doc == null) return;
+      expect(isLoggedIn(doc), isFalse);
+      expect(isGuestPage(doc), isTrue);
+      expect(api.parseHeaderUser(doc).uid, isNull);
+    });
+
+    test('鎖定板塊：仍算已登入，不可被踢出', () {
+      final doc = _load('locked_forum.html');
+      if (doc == null) return;
+      expect(isLoggedIn(doc), isTrue);
+      expect(isGuestPage(doc), isFalse);
+      expect(api.parseHeaderUser(doc).uid, 677863);
+      expect(noticeMessage(doc), contains('权限'));
+    });
+
     test('登入頁：是訪客頁', () {
       final doc = _load('login.html');
       if (doc == null) return;
@@ -419,6 +438,22 @@ void main() {
       final i = head.indexOf('img_list');
       if (i < 0) return;
       expect(head.substring(i), isNot(contains('<a ')));
+    });
+  });
+
+
+  group('評分紀錄合併', () {
+    final doc = _load('viewratings.html');
+    if (doc == null) return;
+
+    test('同一人同一次評分合併成一筆', () {
+      final rows = doc
+          .querySelectorAll('table.list tr')
+          .where((tr) => tr.querySelectorAll('td').length >= 4)
+          .where((tr) => txt(tr.querySelectorAll('td')[0]) != '积分')
+          .length;
+      // 論壇是一項積分一列，合併後筆數一定比原始列數少
+      expect(rows, greaterThan(3));
     });
   });
 

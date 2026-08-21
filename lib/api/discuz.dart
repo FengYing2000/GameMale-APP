@@ -172,6 +172,7 @@ Future<ForumData> fetchForum(
     }).toList(),
     list: parseThreadList(doc),
     pager: parsePager(doc),
+    message: noticeMessage(doc),
   );
 }
 
@@ -1032,24 +1033,48 @@ Future<List<RateRecord>> fetchRatings({required int tid, required int pid}) asyn
       .get('forum.php?mod=misc&action=viewratings&tid=$tid&pid=$pid&inajax=1');
   final doc = toDoc(_unwrapAjax(xml));
 
-  final out = <RateRecord>[];
+  // 論壇每一列只放一項積分，同一人同一次評分會出現好幾列。
+  // 用「評分者 + 時間 + 理由」當鍵合併，畫面才不會被同一個人洗版。
+  final merged = <String, RateRecord>{};
+  final order = <String>[];
+
   for (final tr in doc.querySelectorAll('table.list tr')) {
     final tds = tr.querySelectorAll('td');
     if (tds.length < 4) continue;
     final credit = txt(tds[0]);
     if (credit.isEmpty || credit == '积分') continue;
+
     final link = tds[1].querySelector('a');
-    out.add(RateRecord(
-      credit: credit,
-      name: txt(tds[1]),
-      uid: int.tryParse(
-          RegExp(r'space-uid-(\d+)').firstMatch(attr(link, 'href'))?.group(1) ?? ''),
-      time: attr(tds[2].querySelector('span'), 'title').isNotEmpty
-          ? attr(tds[2].querySelector('span'), 'title')
-          : txt(tds[2]),
-      reason: txt(tds[3]),
-    ));
+    final name = txt(tds[1]);
+    final uid = int.tryParse(
+        RegExp(r'space-uid-(\d+)').firstMatch(attr(link, 'href'))?.group(1) ?? '');
+    final rawTime = attr(tds[2].querySelector('span'), 'title');
+    final time = rawTime.isNotEmpty ? rawTime : txt(tds[2]);
+    final reason = txt(tds[3]);
+
+    final key = '$uid|$time|$reason';
+    final prev = merged[key];
+    if (prev == null) {
+      order.add(key);
+      merged[key] = RateRecord(
+        credits: [credit],
+        name: name,
+        uid: uid,
+        time: time,
+        reason: reason,
+      );
+    } else {
+      merged[key] = RateRecord(
+        credits: [...prev.credits, credit],
+        name: prev.name,
+        uid: prev.uid,
+        time: prev.time,
+        reason: prev.reason,
+      );
+    }
   }
+
+  final out = [for (final k in order) merged[k]!];
   return out;
 }
 

@@ -282,32 +282,58 @@ Future<void> showRatings(BuildContext context, {required int tid, required int p
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               for (final r in list)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: r.uid == null
-                      ? null
-                      : Avatar('https://www.gamemale.com/uc_server/avatar.php?uid=${r.uid}&size=small',
-                          size: 30),
-                  title: Row(
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(r.credit,
-                          style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(c).colorScheme.primary)),
-                      const SizedBox(width: 8),
+                      if (r.uid != null) ...[
+                        Avatar(
+                          'https://www.gamemale.com/uc_server/avatar.php?uid=${r.uid}&size=small',
+                          size: 30,
+                        ),
+                        const SizedBox(width: 10),
+                      ],
                       Expanded(
-                        child: Text(r.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13.5)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(r.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 14, fontWeight: FontWeight.w600)),
+                                ),
+                                Text(r.time,
+                                    style: TextStyle(fontSize: 11, color: faint(c))),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            // 同一次評分的多項積分排在同一行
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 2,
+                              children: [
+                                for (final credit in r.credits)
+                                  Text(credit,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(c).colorScheme.primary)),
+                              ],
+                            ),
+                            if (r.reason.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(r.reason,
+                                  style: TextStyle(fontSize: 12.5, color: subtle(c))),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                  subtitle: Text(
-                    [r.time, if (r.reason.isNotEmpty) r.reason].join(' · '),
-                    style: TextStyle(fontSize: 11.5, color: faint(c)),
                   ),
                 ),
             ],

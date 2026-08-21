@@ -165,9 +165,10 @@ void main() {
   test('評分紀錄讀得出來', () async {
     final list = await api.fetchRatings(tid: 194078, pid: 7282915);
     expect(list, isNotEmpty);
-    expect(list.every((r) => r.credit.isNotEmpty && r.name.isNotEmpty), isTrue);
+    expect(list.every((r) => r.credits.isNotEmpty && r.name.isNotEmpty), isTrue);
     // ignore: avoid_print
-    print('  ${list.length} 筆，例如：${list.first.credit} — ${list.first.name}'
+    print('  合併後 ${list.length} 筆，例如：${list.first.name} '
+        '${list.first.credits.join('、')}'
         '${list.first.reason.isEmpty ? '' : '（${list.first.reason}）'}');
   }, timeout: const Timeout(Duration(seconds: 40)));
 

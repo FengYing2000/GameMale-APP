@@ -45,10 +45,12 @@ String? formhashOf(dom.Document doc, [String? html]) {
   return m?.group(1);
 }
 
-/// Discuz 未登入時頁面沒有登出連結，用這個判斷比去猜 cookie 可靠
+/// 只認登出連結。
+///
+/// 不能拿 mycenter=1 當證據 —— 訪客版的底部導覽也有「我的」這個連結，
+/// 會讓訪客頁被判成已登入（畫面就會出現「已登入」卻抓不到 uid 的矛盾狀態）。
 bool isLoggedIn(dom.Document doc) =>
-    doc.querySelector('a[href*="action=logout"]') != null ||
-    doc.querySelector('a[href*="mycenter=1"]') != null;
+    doc.querySelector('a[href*="action=logout"]') != null;
 
 /// 明確判定「這是訪客頁」——必須看到登入入口，不能只憑「沒有登出連結」。
 ///

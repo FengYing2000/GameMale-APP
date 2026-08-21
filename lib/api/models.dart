@@ -152,6 +152,9 @@ class ForumData {
   final List<ThreadItem> list;
   final PageInfo pager;
 
+  /// 論壇給的提示，例如「抱歉，您没有权限访问该群组」
+  final String? message;
+
   const ForumData({
     required this.fid,
     required this.name,
@@ -161,6 +164,7 @@ class ForumData {
     this.tabs = const [],
     this.list = const [],
     this.pager = const PageInfo(),
+    this.message,
   });
 }
 
@@ -513,13 +517,15 @@ class RateForm {
 }
 
 class RateRecord {
-  final String credit;   // 血液 +2 滴
+  /// 同一次評分可能同時給多項積分，論壇是拆成多列回傳的，這裡合併成一筆
+  final List<String> credits;   // ['血液 +2 滴', '追随 +1 人']
   final String name;
   final int? uid;
   final String time;
   final String reason;
+
   const RateRecord({
-    this.credit = '',
+    this.credits = const [],
     this.name = '',
     this.uid,
     this.time = '',
