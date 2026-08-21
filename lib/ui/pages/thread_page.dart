@@ -6,6 +6,7 @@ import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/login_required.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/poll_card.dart';
 import '../widgets/post_body.dart';
@@ -100,8 +101,11 @@ class _ThreadPageState extends State<ThreadPage> {
           controller: _scroll,
           padding: const EdgeInsets.only(bottom: 90),
           children: [
-            ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
-            if (d != null) ...[
+            if (d?.requiresLogin ?? false)
+              const LoginRequired()
+            else
+              ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
+            if (d != null && !d.requiresLogin) ...[
               if (_page == 1 && d.title.isNotEmpty)
                 Container(
                   color: Theme.of(context).colorScheme.surface,

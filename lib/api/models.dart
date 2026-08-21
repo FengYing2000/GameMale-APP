@@ -155,6 +155,9 @@ class ForumData {
   /// 論壇給的提示，例如「抱歉，您没有权限访问该群组」
   final String? message;
 
+  /// 論壇把需要登入的板塊直接轉到登入頁，跟隨轉址後拿到的是登入表單
+  final bool requiresLogin;
+
   const ForumData({
     required this.fid,
     required this.name,
@@ -165,6 +168,7 @@ class ForumData {
     this.list = const [],
     this.pager = const PageInfo(),
     this.message,
+    this.requiresLogin = false,
   });
 }
 
@@ -203,6 +207,7 @@ class ThreadData {
   final List<PostItem> posts;
   final PageInfo pager;
   final Poll? poll;
+  final bool requiresLogin;
 
   const ThreadData({
     required this.tid,
@@ -213,6 +218,7 @@ class ThreadData {
     this.posts = const [],
     this.pager = const PageInfo(),
     this.poll,
+    this.requiresLogin = false,
   });
 }
 

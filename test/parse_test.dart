@@ -478,6 +478,24 @@ void main() {
     });
   });
 
+
+  group('需要登入的板塊', () {
+    // 訪客進需要登入的板塊時，論壇直接 302 轉到登入頁，
+    // 跟隨轉址後解析到的是登入表單 —— 照一般流程會顯示成「這個板塊沒有主題」
+    final doc = _load('guest_locked_forum.html');
+    if (doc == null) return;
+
+    test('被判定為需要登入', () {
+      expect(isGuestPage(doc), isTrue);
+    });
+
+    test('板塊資料帶上 requiresLogin', () {
+      final f = api.parseForumFromDoc(doc, 150);
+      expect(f.requiresLogin, isTrue);
+      expect(f.list, isEmpty);
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

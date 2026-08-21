@@ -145,6 +145,10 @@ Future<ForumData> fetchForum(
   if (digest) q['digest'] = '1';
 
   final doc = await _page('forum.php?${_qs(q)}');
+  return parseForumFromDoc(doc, fid);
+}
+
+ForumData parseForumFromDoc(dom.Document doc, int fid) {
   return ForumData(
     fid: fid,
     name: txt(doc.querySelector('header h1')).isNotEmpty
@@ -173,6 +177,7 @@ Future<ForumData> fetchForum(
     list: parseThreadList(doc),
     pager: parsePager(doc),
     message: noticeMessage(doc),
+    requiresLogin: isGuestPage(doc),
   );
 }
 
@@ -276,6 +281,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
     posts: posts,
     pager: parsePager(doc),
     poll: _parsePoll(doc),
+    requiresLogin: isGuestPage(doc),
   );
 }
 

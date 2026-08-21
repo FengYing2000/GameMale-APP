@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../theme.dart';
+import '../widgets/login_required.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';
@@ -211,13 +212,16 @@ class _ForumPageState extends State<ForumPage> {
                   ],
                 ),
               ),
-            ?StateBox.maybe(
-              loading: _loading,
-              error: _err,
-              empty: !_loading && _err == null && (d?.list.isEmpty ?? false),
-              emptyText: d?.message ?? tr('這個板塊沒有主題'),
-              onRetry: _load,
-            ),
+            if (d?.requiresLogin ?? false)
+              LoginRequired(message: d?.message)
+            else
+              ?StateBox.maybe(
+                loading: _loading,
+                error: _err,
+                empty: !_loading && _err == null && (d?.list.isEmpty ?? false),
+                emptyText: d?.message ?? tr('這個板塊沒有主題'),
+                onRetry: _load,
+              ),
             if (d != null && d.list.isNotEmpty) ThreadListCard(list: d.list),
             if (d != null)
               PagerBar(
