@@ -452,9 +452,10 @@ SubmitResult _submitResult(String html, String what) {
     return SubmitResult(ok: false, message: '需要先登入才能$what');
   }
 
-  // 轉址後落在帖子頁 → 一定是成功
+  // 轉址後落在帖子頁 → 一定是成功（手機版 .postListItem／桌面版 #postlist）
   if (doc.querySelector('.postListItem') != null ||
-      doc.querySelector('.postlist') != null) {
+      doc.querySelector('.postlist') != null ||
+      doc.getElementById('postlist') != null) {
     return SubmitResult(ok: true, message: '$what成功');
   }
 
@@ -506,6 +507,7 @@ Future<SubmitResult> replyThread({
       'usesig': '1',
       'subject': '',
     },
+    desktop: true,
   );
   return _submitResult(html, '回覆');
 }
@@ -535,6 +537,7 @@ Future<SubmitResult> newThread({
       'usesig': '1',
       'allownoticeauthor': '1',
     },
+    desktop: true,
   );
   return _submitResult(html, '發表');
 }

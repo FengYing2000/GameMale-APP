@@ -158,6 +158,15 @@ class _ForumPageState extends State<ForumPage> {
               child: const Icon(Icons.edit_outlined),
             )
           : null,
+      bottomNavigationBar: d == null
+          ? null
+          : StickyPager(
+              pager: d.pager,
+              onGo: (p) {
+                setState(() => _page = p);
+                _load();
+              },
+            ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -227,14 +236,6 @@ class _ForumPageState extends State<ForumPage> {
                 onRetry: _load,
               ),
             if (d != null && d.list.isNotEmpty) ThreadListCard(list: d.list),
-            if (d != null)
-              PagerBar(
-                pager: d.pager,
-                onGo: (p) {
-                  setState(() => _page = p);
-                  _load();
-                },
-              ),
           ],
         ),
       ),

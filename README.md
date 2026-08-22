@@ -1,23 +1,84 @@
-# GameMale iOS
+<div align="center">
 
-給 [www.gamemale.com](https://www.gamemale.com/)（Discuz! X）用的 iOS 客戶端。
-Flutter 原生 UI，資料直接讀論壇手機版頁面 —— 不經過任何第三方伺服器。
+<img src="assets/icon.png" width="96" alt="GameMale" />
+
+# GameMale for iOS
+
+**[GameMale](https://www.gamemale.com/) 論壇的原生 iOS 客戶端**
+
+以 Flutter 打造 · 直連論壇 · 不經第三方伺服器
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
+[![Tests](https://img.shields.io/badge/測試-165%20項-4CAF50)](#測試策略)
+[![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
+
+[繁體中文](README.md) · [简体中文](README.zh-CN.md)
+
+</div>
 
 ---
 
-## 為什麼是解析 HTML，不是打 API
+## 這是什麼
 
-先探測過了：這站的官方 Discuz 手機 API **是關掉的**。
+GameMale 官方沒有 App，App Store 上的「论坛助手」是通用型 Discuz 客戶端，體驗不佳。
+這個專案把論壇做成一個真正好用的 iOS App：原生介面、深色模式、繁簡切換、流量控制，
+以及論壇本身的完整功能 —— 簽到、評分、樓中樓、投票、私訊、記錄廣場。
 
+> **為什麼不是套殼瀏覽器？**
+> 因為那樣就只是把網頁塞進 App 圖示裡。這個專案解析論壇資料後用原生元件重繪，
+> 才能做到深色模式下文字可讀、圖片依流量策略載入、繁簡即時切換這些網頁版做不到的事。
+
+---
+
+## 技術取捨
+
+### 為什麼是解析 HTML，不是打 API
+
+探測結果很明確 —— 這站的官方 Discuz 手機 API **已被關閉**：
+
+```http
+GET /api/mobile/index.php?version=4&module=forumindex
+→ 200 OK，回應長度 0
 ```
-GET /api/mobile/index.php?version=4&module=forumindex  →  200，回應長度 0
-```
 
-PHP 有執行（會回 `Set-Cookie`），但所有 JSON 模組都回空字串，只有 `mynotelist`
-漏出老舊的 WAP 模板。所以走的是第二條路：帶 `mobile=2` 取手機版模板
-（`xinrui_iuni_mobile/touch`），再用 `package:html` 解析。
+PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字串，
+只有 `mynotelist` 漏出老舊的 WAP 模板。
 
-手機版模板只有 37 KB（桌面版 187 KB），節點結構乾淨，解析成本比想像中低很多。
+所以走第二條路：帶 `mobile=2` 取手機版模板（`xinrui_iuni_mobile/touch`），
+再用 `package:html` 解析。手機版模板只有 **37 KB**（桌面版 187 KB），節點結構乾淨。
+
+### 幾個關鍵決定
+
+| 決定 | 原因 |
+|---|---|
+| **登入狀態只認登出連結** | 訪客版底部導覽也有 `mycenter=1` 的「我的」，拿它當證據會把訪客判成已登入 |
+| **判定訪客要看到登入入口** | `inajax=1` 的浮層片段兩種標記都沒有，用「缺少登出連結」反推會害使用者一點評分就被登出 |
+| **需要登入要看 `#loginform`** | 訪客瀏覽公開板塊時頁尾一樣有登入連結，用它會把每個板塊都擋掉 |
+| **驗證碼走 `getBytes` + `Image.memory`** | `Image.network` 不會帶 session cookie，拿到的驗證碼跟伺服器記的對不起來 |
+| **發文走桌面端點** | 論壇處理邏輯相同，但外掛（勳章積分）掛在桌面流程上 |
+| **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
+
+---
+
+## 功能
+
+<table>
+<tr><td width="90"><b>瀏覽</b></td><td>板塊列表 · 主題列表（全部／最新／熱門／精華）· 主題分類 · 子版塊 · 帖子內頁 · 分頁</td></tr>
+<tr><td><b>互動</b></td><td>回覆 · 引用回覆 · 發表主題 · 編輯自己的帖子 · 收藏 · 評分（快速評分／自動跳過缺項）· 投票</td></tr>
+<tr><td><b>社群</b></td><td>私訊（氣泡對話）· 通知（兩層分類）· 個人資料 · 加好友 · 打招呼 · 記錄廣場</td></tr>
+<tr><td><b>帳號</b></td><td>帳密登入（圖形驗證碼／安全提問）· 登出 · 每日簽到 · 我的收藏／主題／回覆</td></tr>
+<tr><td><b>體驗</b></td><td>深／淺色 · 繁簡切換 · 流量控制 · 圖片長按選單 · 樓中樓 · 固定分頁列 · 下拉重新整理</td></tr>
+</table>
+
+### 訪客與會員
+
+論壇本身允許訪客瀏覽，App 忠實反映這一點：
+
+- **訪客可看**：板塊、主題、帖子、記錄廣場（隨便看看）、他人資料
+- **需要登入**：回覆、發文、編輯、評分、收藏、簽到、私訊、發布記錄、通知
+
+寫入動作有三道防線：送出結果會辨識登入牆、動手前先問一次、UI 直接藏掉按鈕。
 
 ---
 
@@ -25,101 +86,101 @@ PHP 有執行（會回 `Set-Cookie`），但所有 JSON 模組都回空字串，
 
 ```
 lib/
-  api/
-    models.dart    所有資料型別（空安全，UI 端不會拿到 dynamic）
-    http.dart      dio + PersistCookieJar，cookie 落地所以冷啟動免重登
-    parse.dart     DOM 工具 + 內容淨化（去 script、還原延遲載入圖、網址絕對化）
-    discuz.dart    所有端點；純解析函式獨立匯出，方便測試
-  store/session.dart
-  theme.dart       品牌色沿用論壇的簽到綠，Material 3 深淺色自動
-  ui/
-    widgets/       PostBody ThreadTile Avatar StateBox PagerBar ImageViewer
-    pages/         17 個頁面
-test/
-  parse_test.dart    真實頁面樣本驗證解析器（70 項）
-  render_test.dart   真實帖子 HTML 丟進 PostBody 確認畫得出來（12 項）
-  pages_test.dart    每一頁 pump 起來 + 離線行為（20 項）
-  live_test.dart     對真實論壇的端對端測試（9 項，需要 cookie）
+├── api/
+│   ├── models.dart      所有資料型別（空安全，UI 拿不到 dynamic）
+│   ├── http.dart        dio + PersistCookieJar，cookie 落地免重登
+│   ├── parse.dart       DOM 工具、內容淨化、登入狀態判定
+│   └── discuz.dart      所有端點；純解析函式獨立匯出方便測試
+├── i18n/
+│   ├── s2t.dart         簡→繁（台灣用語）
+│   └── ui.dart          介面繁→簡
+├── store/               session（登入狀態）· settings（語言／主題／流量）
+└── ui/
+    ├── widgets/         PostBody · ThreadTile · Avatar · StateBox · StickyPager …
+    └── pages/           18 個頁面
+
 tool/
-  fetch_fixtures.dart  重抓樣本
-  build-ipa.sh         在任一台 Mac 上產出 IPA（不需要 GitHub 或任何 CI）
-  make-icon.mjs        產生 App 圖示（純 Node，不依賴影像套件）
+├── zh_rules.py          簡繁轉換的人工規則 ← 要調整用字改這裡
+├── build_zh_table.py    產生 assets/s2t.json
+├── fetch_fixtures.dart  重抓測試樣本
+├── make-icon.mjs        產生 App 圖示（純 Node）
+└── build-ipa.sh         在任一台 Mac 上產 IPA
 ```
-
-### 幾個關鍵決定
-
-**登入狀態不靠讀 cookie 判斷**，而是看頁面裡有沒有登出連結。Discuz 的
-cookie 有沒有效只有伺服器知道，去猜只會出錯。
-
-**驗證碼圖片走 `Api.getBytes()` 拿 bytes 再用 `Image.memory`**，不能直接丟
-`Image.network` —— 那條請求不會帶上 session cookie，拿到的驗證碼跟伺服器記的對不起來。
-
-**`package:html` 的選擇器引擎不支援 `:first-of-type` / `:last-child`**，
-子版塊那類查詢改成手動走訪子節點（`firstChildTag`）。
-
-**spoiler 折疊區塊**在淨化階段標成 `data-spoiler`，再由 `PostBody` 的
-`customWidgetBuilder` 畫成 `ExpansionTile`。
 
 ---
 
-## 功能
+## 測試策略
 
-| | |
-|---|---|
-| 瀏覽 | 板塊列表、主題列表（全部／最新／熱門／精華、主題分類、子版塊）、帖子內頁、分頁 |
-| 互動 | 回覆、引用回覆、發新主題（含主題分類）、收藏／取消收藏 |
-| 帳號 | 帳密登入（含圖形驗證碼、安全提問）、登出、個人中心、他人資料 |
-| 訊息 | 系統通知（我的帖子／坛友互动／系统通知／管理）、私訊列表與對話 |
-| 其他 | 每日簽到（k_misign，含等級經驗條）、導讀、搜尋、我的收藏／主題／回覆 |
-| 體驗 | 深／淺色自動、下拉重新整理、圖片點擊全螢幕可縮放、BBCode 快捷列、五分頁各自保有導航堆疊 |
+論壇隨時可能改版，選擇器一壞畫面就空白。所以測試不是形式，而是**用真實頁面驗證解析器**。
+
+| 檔案 | 內容 | 數量 |
+|---|---|---|
+| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 約 110 |
+| `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
+| `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 20 |
+| `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
+| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 14 |
+
+```bash
+flutter test                        # 165 項離線測試
+flutter analyze                     # 零問題
+```
+
+**論壇改版時：**
+
+```powershell
+$env:GM_COOKIE = "TVj0_2132_auth=...; TVj0_2132_saltkey=..."
+$env:GM_UID = "677863"
+dart run tool/fetch_fixtures.dart   # 重抓樣本
+flutter test                        # 壞掉的選擇器會直接指名
+```
 
 ---
 
 ## 開發
 
-Flutter SDK 3.47.1 以上。
+需要 Flutter SDK 3.47 以上。
 
 ```bash
 flutter pub get
 flutter analyze
-flutter test              # 102 項離線測試
-```
-
-> **Windows 上必須把專案放在純 ASCII 路徑**（例如 `C:\src\gamemale`）。
-> 路徑含中文時 Dart 分析伺服器會因為 LSP 訊息長度用字元數算、實際傳輸用位元組數
-> 而崩潰（`FormatException: Unexpected end of input`）。這是工具鏈的限制，不是設定問題。
-
-### 論壇改版時
-
-```bash
-$env:GM_COOKIE = "TVj0_2132_auth=...; TVj0_2132_saltkey=..."
-$env:GM_UID = "733814"
-dart run tool/fetch_fixtures.dart
 flutter test
 ```
 
-壞掉的選擇器會直接被指出來，不用在手機上瞎猜哪裡白畫面。
+> [!IMPORTANT]
+> **Windows 上必須把專案放在純 ASCII 路徑**（例如 `C:\src\gamemale`）。
+> 路徑含中文時 Dart 分析伺服器會崩潰 —— LSP 訊息長度用字元數算、實際傳輸用位元組數，
+> 中文百分比編碼後對不上。這是工具鏈限制，不是設定問題。
 
-### 端對端測試（會發真實請求）
+### 調整簡繁用字
 
-```bash
-flutter test test/live_test.dart --dart-define="GM_COOKIE=$env:GM_COOKIE"
+不需要動程式碼，改 [`tool/zh_rules.py`](tool/zh_rules.py) 即可：
+
+```python
+EXCLUDE       # 完全不轉的字：里 台 范 谷 尸 姜 …
+CHAR          # 一對多時選哪個：签→簽（不是籤）
+DISAMBIGUATE  # 逐字會錯的詞：这里→這裡、头发→頭髮
+TAIWAN        # 台灣用語：软件→軟體、鼠标→滑鼠、链接→連結
 ```
 
-沒帶 cookie 就整組略過，CI 不會因此失敗。
+```bash
+python tool/build_zh_table.py       # 重新產生 assets/s2t.json
+flutter test test/s2t_test.dart     # 驗證
+```
+
+> 4012 個簡體字裡 3736 個是一對一（`国→國`），沒有判斷空間；
+> 只有 276 個一對多的會轉錯，規則檔只管這些。
 
 ---
 
 ## 產出 IPA
 
-編 iOS 一定要 macOS，這點沒有例外 —— 換框架、裝外掛都繞不過去，因為最後一步要連結
-iOS SDK、跑 `actool` 編素材，那些二進位檔只在 macOS 上發行。
+編譯 iOS 一定要 macOS —— 換框架、裝外掛都繞不過去，因為最後一步要連結 iOS SDK、
+跑 `actool` 編素材，那些二進位檔只在 macOS 上發行。
 
-但**不一定要用 GitHub**，兩條路都能產出未簽名 IPA 供你自簽側載。
+但**不一定要用 GitHub**。
 
-### 方式一：自己找一台 Mac（不需要 GitHub）
-
-租的雲端 Mac、借來的 Mac 都行。把專案傳過去，跑：
+### 方式一：任一台 Mac
 
 ```bash
 chmod +x tool/build-ipa.sh
@@ -128,43 +189,50 @@ chmod +x tool/build-ipa.sh
 
 腳本會檢查 Xcode、必要時自動裝 Flutter、跑分析與測試、產出 `GameMale.ipa`。
 
-> 免費 Apple ID 憑證雖然 7 天到期，但**重簽用的是同一個 IPA**，不必重編。
-> 所以只有改程式碼時才需要跑建置。
-
 ### 方式二：GitHub Actions
 
-推上 `main` 就會自動建置，也可以在 Actions 頁手動點 **Run workflow**。
-跑完在該次 run 的 Artifacts 下載 `GameMale-unsigned-ipa`。
+推上 `main` 自動建置，或在 Actions 頁手動觸發，完成後從 Artifacts 下載。
 
-> **私有 repo 要注意**：macOS runner 的用量以 **10 倍**計。免費額度 2000 分鐘
-> ≈ 200 分鐘 macOS，一次建置約 8–12 分鐘，所以大約每月 16–24 次。
-> 公開 repo 則完全免費不限量。
+```bash
+gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
+```
 
-### 側載到手機
+> [!NOTE]
+> 私有 repo 的 macOS runner 用量以 **10 倍**計。免費額度 2000 分鐘 ≈ 200 分鐘 macOS，
+> 一次建置約 5 分鐘，大約每月 40 次。公開 repo 免費不限量。
 
-下載的 `GameMale.ipa` 是未簽名的，三種方式擇一：
+### 側載
 
-- **Sideloadly**（Windows 最省事）— 接上 iPhone、拖入 IPA、填 Apple ID，按 Start
-- **AltStore / SideStore** — 可自動續簽，免費帳號 7 天到期前會自己重簽
-- **ESign / TrollStore** — 手機上直接簽，不用電腦
+產出的是**未簽名 IPA**，三種方式擇一：
 
-免費 Apple ID 的憑證 7 天到期，到期重簽即可，資料不會掉。
+| 工具 | 適用 | 特點 |
+|---|---|---|
+| **Sideloadly** | Windows | 接手機、拖入 IPA、填 Apple ID |
+| **AltStore / SideStore** | 跨平台 | 可自動續簽，免費帳號到期前自動重簽 |
+| **ESign / TrollStore** | 手機端 | 不用電腦 |
+
+免費 Apple ID 憑證 7 天到期，**重簽用同一個 IPA 即可，不必重編**。
 
 ---
 
 ## 目前沒做的部分
 
-- **發文上傳圖片／附件** — Discuz 的 `swfupload` 是 multipart 端點，沒有實機沒辦法驗證，
-  與其塞一個沒測過的功能不如先不做。目前發文可以用 `[img]網址[/img]`
-- **樓中樓回覆**（`dxksst` 外掛）— 只顯示主樓層，樓中樓內容不展開
-- **勳章商城／道具商城** — 已經有 Tampermonkey 腳本在做這兩件事
-- **投票、評分、積分明細**
+- **發文上傳圖片／附件** — Discuz 的 `swfupload` 是 multipart 端點，沒有實機無法驗證
+- **搜尋的日誌／相冊／群組／用戶分類** — 目前只有帖子搜尋
+- **個人空間子頁**（動態／日誌／相冊／留言板）與完整個人資料欄位
+- **回帖獎勵、外部連結跳轉提示、表情選擇器**
 - **推播通知** — 需要自架推播伺服器與 APNs 憑證，自簽 App 拿不到
 
-## 隱私
+---
 
-帳號密碼只會送到 `www.gamemale.com`，cookie 存在 App 自己的沙箱裡，
-不連任何第三方服務。
+## 授權與隱私
 
-`Info.plist` 有開 `NSAllowsArbitraryLoads` —— 帖子裡的圖片來自使用者貼的任意外站網址，
-沒辦法列舉白名單。這是側載自用的 App，不上架，所以這樣取捨。
+個人自用專案，非官方、與 GameMale 官方無關。
+
+帳號密碼只會送到 `www.gamemale.com`，cookie 存在 App 沙箱內，不連任何第三方服務。
+
+`Info.plist` 開了 `NSAllowsArbitraryLoads` —— 帖子圖片來自使用者貼的任意外站網址，
+無法列舉白名單。這是側載自用的 App，不上架，故如此取捨。
+
+簡繁對照資料衍生自 [OpenCC](https://github.com/BYVoid/OpenCC)（Apache-2.0）的字元對應表，
+用字判斷與台灣詞彙為本專案自訂。

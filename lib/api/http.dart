@@ -80,8 +80,12 @@ class Api {
     }
   }
 
-  /// Discuz 的表單一律 application/x-www-form-urlencoded
-  Future<String> post(String path, Map<String, dynamic> form) async {
+  /// Discuz 的表單一律 application/x-www-form-urlencoded。
+  ///
+  /// desktop=true 時不加 mobile=2 —— 發文走桌面端點，
+  /// 論壇的處理邏輯一樣，但外掛（勳章積分）掛在桌面流程上。
+  Future<String> post(String path, Map<String, dynamic> form,
+      {bool desktop = false}) async {
     await init();
     final data = <String, dynamic>{};
     form.forEach((k, v) {
@@ -89,7 +93,7 @@ class Api {
     });
     try {
       final res = await _dio.post<String>(
-        mobileUrl(path),
+        desktop ? '/${path.replaceFirst(RegExp(r'^/'), '')}' : mobileUrl(path),
         data: data,
         options: Options(
           responseType: ResponseType.plain,

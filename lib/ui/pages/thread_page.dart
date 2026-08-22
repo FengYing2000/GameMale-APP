@@ -106,6 +106,15 @@ class _ThreadPageState extends State<ThreadPage> {
               child: const Icon(Icons.reply),
             )
           : null,
+      bottomNavigationBar: d == null
+          ? null
+          : StickyPager(
+              pager: d.pager,
+              onGo: (p) {
+                setState(() => _page = p);
+                _load();
+              },
+            ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -174,13 +183,6 @@ class _ThreadPageState extends State<ThreadPage> {
                           if (ok == true) _load();
                         },
                 ),
-              PagerBar(
-                pager: d.pager,
-                onGo: (page) {
-                  setState(() => _page = page);
-                  _load();
-                },
-              ),
             ],
           ],
         ),
