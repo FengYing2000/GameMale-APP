@@ -4,7 +4,6 @@
 //   flutter test test/live_test.dart --dart-define=GM_COOKIE="$env:GM_COOKIE"
 //
 // 沒帶 cookie 就整組略過，CI 不會因此失敗。
-import 'package:characters/characters.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
@@ -216,9 +215,10 @@ void main() {
       final d = await space.fetchSpace(610657, tab);
       expect(d.owner, isNotEmpty, reason: '${tab.label} 拿不到空間主人');
       expect(d.items, isNotEmpty, reason: '${tab.label} 沒有內容：${d.message}');
+      final first = d.items.first.title;
       // ignore: avoid_print
       print('  ${tab.label} ${d.items.length} 筆，例如：'
-          '${d.items.first.title.characters.take(24)}');
+          '${first.length > 24 ? first.substring(0, 24) : first}');
     }
   }, timeout: const Timeout(Duration(seconds: 120)));
 
