@@ -213,3 +213,10 @@ PageInfo parsePager(dom.Document doc) {
   }
   return PageInfo(page: cur, total: total);
 }
+
+/// 把一小段 HTML 轉純文字。勳章說明藏在 `tip` 屬性裡，是被跳脫過的 HTML
+String plainText(String html) {
+  if (html.isEmpty) return '';
+  final t = txt(dom.Element.html('<div>$html</div>'));
+  return t.replaceAll(RegExp(r'\s+'), ' ').trim();
+}

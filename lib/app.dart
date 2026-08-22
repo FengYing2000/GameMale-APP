@@ -24,6 +24,7 @@ import 'ui/pages/profile_page.dart';
 import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
 import 'ui/pages/settings_page.dart';
+import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
 
@@ -147,6 +148,7 @@ GoRouter _buildRouter(SessionStore session) {
         ),
       ),
       GoRoute(path: '/u/:uid', builder: (c, s) => ProfilePage(uid: _int(s, 'uid'))),
+      GoRoute(path: '/space/:uid', builder: (c, s) => SpacePage(uid: _int(s, 'uid'))),
       GoRoute(
         path: '/my/:type',
         builder: (c, s) => MyListPage(type: s.pathParameters['type'] ?? 'thread'),

@@ -65,12 +65,24 @@ class Api {
     }
     return '/$p';
   }
+  /// 桌面模板。光是不帶 mobile=2 沒用 —— Discuz 會看 User-Agent 自動轉手機版，
+  /// 一定要明寫 mobile=no 才拿得到桌面版（個人資料的角色組／勳章只有桌面版有）
+  static String desktopUrl(String path) {
+    var p = path.startsWith('/') ? path.substring(1) : path;
+    p = p.replaceAll(RegExp(r'[?&]mobile=(2|no)'), '');
+    if (!p.contains('?') && p.contains('&')) p = p.replaceFirst('&', '?');
+    p += '${p.contains('?') ? '&' : '?'}mobile=no';
+    return '/$p';
+  }
 
-  Future<String> get(String path, {bool followInterstitial = true}) async {
+
+  /// desktop=true 取桌面模板（個人資料的擴展角色組、勳章等只有桌面版才有）
+  Future<String> get(String path,
+      {bool followInterstitial = true, bool desktop = false}) async {
     await init();
     try {
       final res = await _dio.get<String>(
-        mobileUrl(path),
+        desktop ? desktopUrl(path) : mobileUrl(path),
         options: Options(responseType: ResponseType.plain),
       );
       _guard(res.statusCode);
@@ -120,7 +132,7 @@ class Api {
     });
     try {
       final res = await _dio.post<String>(
-        desktop ? '/${path.replaceFirst(RegExp(r'^/'), '')}' : mobileUrl(path),
+        desktop ? desktopUrl(path) : mobileUrl(path),
         data: data,
         options: Options(
           responseType: ResponseType.plain,

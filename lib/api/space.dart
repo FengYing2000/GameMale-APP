@@ -1,0 +1,258 @@
+import 'package:html/dom.dart' as dom;
+
+import 'discuz.dart' show submitResult;
+import 'http.dart';
+import 'models.dart';
+import 'parse.dart';
+
+/// 個人空間。這些子頁在這站**只有桌面模板**：帶 mobile=2 一律回「無手機頁面」，
+/// 所以整支檔案都走 desktop:true。
+Future<SpaceData> fetchSpace(int uid, SpaceTab tab, {int page = 1}) async {
+  final q = StringBuffer('home.php?mod=space&uid=$uid&do=${tab.action}');
+  if (tab.view.isNotEmpty) q.write('&view=${tab.view}');
+  if (page > 1) q.write('&page=$page');
+
+  final html = await Api.instance.get(q.toString(), desktop: true);
+  final doc = toDoc(html);
+
+  if (isLoginWall(doc)) {
+    return SpaceData(tab: tab, message: '需要先登入才能看${tab.label}');
+  }
+
+  return parseSpace(doc, tab);
+}
+
+/// 純解析，測試直接餵 fixture 用
+SpaceData parseSpace(dom.Document doc, SpaceTab tab) {
+  final items = switch (tab) {
+    SpaceTab.home => _home(doc),
+    SpaceTab.doing => _doing(doc),
+    SpaceTab.blog => _blog(doc),
+    SpaceTab.album => _album(doc),
+    SpaceTab.thread => _thread(doc),
+    SpaceTab.wall => _wall(doc),
+    SpaceTab.friend => _friend(doc),
+  };
+
+  // 空白有兩種：真的沒東西，跟被主人鎖起來。後者論壇會給一段提示
+  final notice = noticeMessage(doc);
+  return SpaceData(
+    tab: tab,
+    owner: _owner(doc),
+    items: items,
+    pager: parsePager(doc),
+    formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
+    message: items.isEmpty ? (notice ?? '沒有${tab.label}') : null,
+  );
+}
+
+/// 只有首頁有 #pcd 側欄，其他子頁的主人名字只能從 `<title>` 取：「cdcai的记录-GameMale」
+String _owner(dom.Document doc) {
+  final side = txt(doc.querySelector('#pcd h2'));
+  if (side.isNotEmpty) return side;
+  final title = txt(doc.querySelector('title'));
+  return RegExp(r'^(.*?)的').firstMatch(title)?.group(1) ?? '';
+}
+
+/// 空間首頁：把首頁那幾個區塊（最近訪客／記錄／主題／好友）拉平成一份摘要
+List<SpaceItem> _home(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final block in doc.querySelectorAll('.block')) {
+    final title = txt(block.querySelector('.blocktitle'));
+    final content = block.querySelector('.dxb_bc');
+    if (content == null || title.isEmpty) continue;
+    if (title.contains('头像')) continue;
+
+    final links = <SpaceItem>[];
+    for (final li in content.querySelectorAll('li')) {
+      final a = li.querySelector('a');
+      final em = li.querySelector('em');
+      // 「个人资料」那塊是 <em>標籤</em>值，不補空白會黏成「网名昵称风」
+      final label = em == null
+          ? txt(li)
+          : '${txt(em)}  ${txt(li).replaceFirst(txt(em), '').trim()}'.trim();
+      if (label.isEmpty) continue;
+      links.add(SpaceItem(
+        title: label,
+        url: a == null ? '' : absolute(attr(a, 'href')),
+        uid: a == null ? null : _uidOf(attr(a, 'href')),
+        tid: a == null ? null : _tidOf(attr(a, 'href')),
+        image: absolute(attr(li.querySelector('img'), 'src')),
+      ));
+    }
+    if (links.isEmpty) continue;
+    out.add(SpaceItem(title: title, children: links));
+  }
+  return out;
+}
+
+/// 記錄：`dl` 裡有正文、底下 `dd.cmt li` 是回覆
+List<SpaceItem> _doing(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final dl in doc.querySelectorAll('.xld dl')) {
+    final body = dl.querySelector('dd.ptm span');
+    if (body == null) continue;
+    final who = dl.querySelector('dd.ptm a');
+    final time = dl.querySelector('dd.ptn span[title]');
+    out.add(SpaceItem(
+      title: txt(body),
+      author: txt(who),
+      uid: _uidOf(attr(who, 'href')),
+      avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
+      date: attr(time, 'title').isEmpty ? txt(time) : attr(time, 'title'),
+      children: [
+        for (final li in dl.querySelectorAll('dd.cmt li'))
+          SpaceItem(
+            author: txt(li.querySelector('a.lit')),
+            uid: _uidOf(attr(li.querySelector('a.lit'), 'href')),
+            title: txt(li)
+                .replaceFirst(txt(li.querySelector('a.lit')), '')
+                .replaceFirst(':', '')
+                .replaceFirst('回复', '')
+                .trim(),
+          ),
+      ],
+    ));
+  }
+  return out;
+}
+
+/// 日誌：`dt a` 標題、`dd.cl` 摘要（可能有縮圖）、`dd.xg1` 閱讀／評論數
+List<SpaceItem> _blog(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final dl in doc.querySelectorAll('.xld dl')) {
+    final a = dl.querySelector('dt a');
+    if (a == null) continue;
+    final excerpt = dl.querySelector('dd.cl');
+    out.add(SpaceItem(
+      title: txt(a),
+      url: absolute(attr(a, 'href')),
+      author: txt(dl.querySelector('dd:not(.m) a[href*="space-uid"]')),
+      uid: _uidOf(attr(dl.querySelector('dd:not(.m) a[href*="space-uid"]'), 'href')),
+      avatar: absolute(attr(dl.querySelector('.avt img'), 'src')),
+      date: txt(dl.querySelector('dd span.xg1')),
+      body: txt(excerpt),
+      image: absolute(attr(excerpt?.querySelector('img'), 'src')),
+      meta: txt(dl.querySelector('dd.xg1')),
+    ));
+  }
+  return out;
+}
+
+/// 相冊：封面圖 + `(張數)`
+List<SpaceItem> _album(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final li in doc.querySelectorAll('.ml li')) {
+    final a = li.querySelector('p a') ?? li.querySelector('a');
+    if (a == null) continue;
+    final href = attr(a, 'href');
+    out.add(SpaceItem(
+      title: txt(a),
+      url: absolute(href),
+      image: absolute(attr(li.querySelector('img'), 'src')),
+      meta: txt(li.querySelector('p.ptn')).replaceFirst(txt(a), '').trim(),
+      albumId: paramInt(href, 'id'),
+      uid: _uidOf(href),
+    ));
+  }
+  return out;
+}
+
+/// 主題：桌面版是表格，`th a` 標題、`td.frm` 版塊、`td.num` 回覆／查看
+List<SpaceItem> _thread(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final tr in doc.querySelectorAll('.tl tr')) {
+    final a = tr.querySelector('th a');
+    if (a == null) continue;
+    final tid = _tidOf(attr(a, 'href'));
+    if (tid == null) continue;
+    final num = tr.querySelector('td.num');
+    final forum = tr
+        .querySelectorAll('td')
+        .where((td) => td.classes.isEmpty && td.querySelector('a') != null)
+        .firstOrNull;
+    out.add(SpaceItem(
+      title: txt(a),
+      tid: tid,
+      url: absolute(attr(a, 'href')),
+      fid: paramInt(attr(forum?.querySelector('a'), 'href'), 'fid') ??
+          int.tryParse(RegExp(r'forum-(\d+)')
+                  .firstMatch(attr(forum?.querySelector('a'), 'href'))
+                  ?.group(1) ??
+              ''),
+      meta: [
+        txt(forum),
+        if (num != null) '${txt(num.querySelector('a'))} / ${txt(num.querySelector('em'))}',
+      ].where((s) => s.trim().isNotEmpty).join(' · '),
+      author: txt(tr.querySelector('td.by cite a')),
+      date: txt(tr.querySelector('td.by em span')),
+    ));
+  }
+  return out;
+}
+
+/// 留言板：`#comment_ul dl`
+List<SpaceItem> _wall(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final dl in doc.querySelectorAll('#comment_ul dl')) {
+    final who = dl.querySelector('dt a');
+    // 內文那個 dd 沒有 class，跟頭像／標題那兩個區分得開
+    dom.Element? body;
+    for (final dd in dl.querySelectorAll('dd')) {
+      if (dd.classes.isEmpty && attr(dd, 'id').startsWith('comment_')) body = dd;
+    }
+    if (who == null && body == null) continue;
+    out.add(SpaceItem(
+      title: txt(body),
+      author: txt(who),
+      uid: _uidOf(attr(who, 'href')),
+      avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
+      date: txt(dl.querySelector('dt span.xg1')),
+    ));
+  }
+  return out;
+}
+
+/// 好友：`ul.buddy li`
+List<SpaceItem> _friend(dom.Document doc) {
+  final out = <SpaceItem>[];
+  for (final li in doc.querySelectorAll('.buddy li')) {
+    final a = li.querySelector('h4 a') ?? li.querySelector('a');
+    if (a == null) continue;
+    final uid = _uidOf(attr(a, 'href'));
+    if (uid == null) continue;
+    out.add(SpaceItem(
+      title: txt(a),
+      uid: uid,
+      avatar: avatarUrl(uid),
+      meta: txt(li.querySelector('.maxh')),
+    ));
+  }
+  return out;
+}
+
+/// 留言板留言。走桌面端點，回的是 ajax 片段
+Future<SubmitResult> postWall(int uid, String message, String formhash) async {
+  final html = await Api.instance.post(
+    'home.php?mod=spacecp&ac=comment&commentsubmit=yes&handlekey=qcwall_$uid&inajax=1',
+    {
+      'formhash': formhash,
+      'message': message,
+      'id': '$uid',
+      'idtype': 'uid',
+      'commentsubmit': 'true',
+      'quickcomment': 'true',
+      'handlekey': 'qcwall_$uid',
+    },
+    desktop: true,
+  );
+  return submitResult(html, '留言');
+}
+
+int? _uidOf(String href) =>
+    int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(href)?.group(1) ?? '') ??
+    paramInt(href, 'uid');
+
+int? _tidOf(String href) =>
+    int.tryParse(RegExp(r'thread-(\d+)').firstMatch(href)?.group(1) ?? '') ??
+    paramInt(href, 'tid');

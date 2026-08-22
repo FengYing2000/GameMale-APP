@@ -29,6 +29,15 @@ Future<void> main() async {
     'favorite.html': 'home.php?mod=space&uid=$uid&do=favorite&view=me&type=thread&mobile=2',
     'notice.html': 'home.php?mod=space&do=notice&view=mypost&forcemobile=1&mobile=2',
     'replyform.html': 'forum.php?mod=post&action=reply&fid=57&tid=129896&mobile=2',
+    // 個人資料與個人空間只有桌面模板（帶 mobile=2 會被導到「無手機頁面」）
+    'profile.html': 'home.php?mod=space&uid=610657&do=profile&mobile=no',
+    'space_index.html': 'home.php?mod=space&uid=610657&do=index&mobile=no',
+    'space_doing.html': 'home.php?mod=space&uid=610657&do=doing&view=me&mobile=no',
+    'space_blog.html': 'home.php?mod=space&uid=610657&do=blog&view=me&mobile=no',
+    'space_album.html': 'home.php?mod=space&uid=610657&do=album&view=me&mobile=no',
+    'space_thread.html': 'home.php?mod=space&uid=610657&do=thread&view=me&mobile=no',
+    'space_wall.html': 'home.php?mod=space&uid=610657&do=wall&mobile=no',
+    'space_friend.html': 'home.php?mod=space&uid=610657&do=friend&view=me&mobile=no',
   };
 
   final dir = Directory('test/fixtures')..createSync(recursive: true);

@@ -21,6 +21,7 @@ import 'package:gamemale/ui/pages/profile_page.dart';
 import 'package:gamemale/ui/pages/reply_page.dart';
 import 'package:gamemale/ui/pages/search_page.dart';
 import 'package:gamemale/ui/pages/settings_page.dart';
+import 'package:gamemale/ui/pages/space_page.dart';
 import 'package:gamemale/ui/pages/sign_page.dart';
 import 'package:gamemale/ui/pages/thread_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -71,6 +72,7 @@ void main() {
     '通知': const NoticePage(),
     '私訊對話': const PmChatPage(touid: 1),
     '個人資料': const ProfilePage(uid: 733814),
+    '個人空間': const SpacePage(uid: 733814),
     '我的收藏': const MyListPage(type: 'favorite'),
     '我的主題': const MyListPage(type: 'thread'),
     '簽到': const SignPage(),

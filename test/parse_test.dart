@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
+import 'package:gamemale/api/models.dart';
 import 'package:gamemale/api/parse.dart';
+import 'package:gamemale/api/space.dart' as space;
 import 'package:gamemale/i18n/s2t.dart';
 
 File _f(String name) => File('test/fixtures/$name');
@@ -535,6 +537,122 @@ void main() {
       final ok = _load('index.html');
       if (ok == null) return;
       expect(isLoginWall(ok), isFalse);
+    });
+  });
+
+  group('個人資料（桌面模板）', () {
+    final doc = _load('profile.html');
+    if (doc == null) return;
+    final p = api.parseProfile(doc, 610657);
+
+    test('抓到名字，而且不含 UID 那一段', () {
+      expect(p.name, isNotEmpty);
+      expect(p.name, isNot(contains('UID')));
+    });
+    test('用戶組來自活躍概況，不是登入者自己的等級', () => expect(p.level, isNotEmpty));
+    test('擴展角色組會拆成多個', () {
+      // 這頁是「GM活动员,战士 · I」，逗號要拆開
+      expect(p.roles.length, greaterThan(1));
+      expect(p.roles.every((r) => !r.contains(',')), isTrue);
+    });
+    test('欄位有標籤也有值',
+        () => expect(p.fields.every((f) => f.label.isNotEmpty && f.value.isNotEmpty), isTrue));
+    test('積分不會混進一般欄位', () {
+      expect(p.credits.length, greaterThan(5));
+      expect(p.fields.any((f) => f.label.contains('金币') || f.label.contains('金幣')), isFalse);
+    });
+    test('統計是連結，不會被當成欄位', () {
+      expect(p.stats, isNotEmpty);
+      expect(p.stats.every((s) => s.url.isNotEmpty), isTrue);
+    });
+    test('勳章有圖有名字', () {
+      expect(p.medals, isNotEmpty);
+      expect(p.medals.every((m) => m.image.startsWith('http')), isTrue);
+      expect(p.medals.any((m) => m.name.isNotEmpty), isTrue);
+    });
+    test('勳章說明是純文字，不留 HTML 標籤', () {
+      expect(p.medals.any((m) => m.desc.isNotEmpty), isTrue);
+      expect(p.medals.every((m) => !m.desc.contains('<')), isTrue);
+    });
+    test('區塊只留有連結的（已加入群組），標題區塊與勳章不重複列入', () {
+      expect(p.sections.any((s) => s.title.contains('群')), isTrue);
+      expect(p.sections.any((s) => s.title.contains('勋章') || s.title.contains('勳章')), isFalse);
+      expect(p.sections.every((s) => s.links.isNotEmpty), isTrue);
+    });
+    test('版塊/群組連結解得出 fid',
+        () => expect(p.sections.expand((s) => s.links).any((l) => l.fid != null), isTrue));
+    test('看別人的資料 isSelf 是 false', () => expect(p.isSelf, isFalse));
+  });
+
+  group('個人空間', () {
+    SpaceData? load(String name, SpaceTab tab) {
+      final doc = _load('space_$name.html');
+      return doc == null ? null : space.parseSpace(doc, tab);
+    }
+
+    test('首頁把區塊拉平成摘要', () {
+      final d = load('index', SpaceTab.home);
+      if (d == null) return;
+      expect(d.owner, isNotEmpty);
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((b) => b.children.isNotEmpty), isTrue);
+      // 「个人资料」那塊是 <em>標籤</em>值，不補空白會黏成「网名昵称风」
+      final info = d.items.where((b) => b.title.contains('资料') || b.title.contains('資料'));
+      if (info.isNotEmpty) {
+        expect(info.first.children.any((c) => c.title.contains('  ')), isTrue);
+      }
+    });
+
+    test('記錄有正文、作者、時間，回覆掛在 children', () {
+      final d = load('doing', SpaceTab.doing);
+      if (d == null) return;
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((i) => i.title.isNotEmpty && i.author.isNotEmpty), isTrue);
+      expect(d.items.any((i) => i.children.isNotEmpty), isTrue);
+      expect(d.pager.total, greaterThan(1));
+    });
+
+    test('日誌的作者取自內文那列，不是頭像連結', () {
+      final d = load('blog', SpaceTab.blog);
+      if (d == null) return;
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((i) => i.title.isNotEmpty), isTrue);
+      expect(d.items.every((i) => i.author.isNotEmpty), isTrue);
+      expect(d.items.any((i) => i.meta.contains('阅读') || i.meta.contains('閱讀')), isTrue);
+    });
+
+    test('相冊有封面與張數', () {
+      final d = load('album', SpaceTab.album);
+      if (d == null) return;
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((i) => i.title.isNotEmpty), isTrue);
+      expect(d.items.any((i) => i.albumId != null), isTrue);
+    });
+
+    test('主題解得出 tid 與版塊（版塊那格沒有 class）', () {
+      final d = load('thread', SpaceTab.thread);
+      if (d == null) return;
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((i) => i.tid != null), isTrue);
+      expect(d.items.any((i) => i.fid != null), isTrue);
+      expect(d.items.any((i) => i.meta.contains(' · ')), isTrue);
+    });
+
+    test('留言板有留言者、時間、內文，也拿得到 formhash', () {
+      final d = load('wall', SpaceTab.wall);
+      if (d == null) return;
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((i) => i.author.isNotEmpty), isTrue);
+      expect(d.items.every((i) => i.title.isNotEmpty), isTrue);
+      expect(d.formhash, isNotEmpty);
+    });
+
+    test('好友有 uid 與頭像', () {
+      final d = load('friend', SpaceTab.friend);
+      if (d == null) return;
+      expect(d.items, isNotEmpty);
+      expect(d.items.every((i) => i.uid != null && i.uid! > 0), isTrue);
+      expect(d.items.every((i) => i.avatar.startsWith('http')), isTrue);
     });
   });
 

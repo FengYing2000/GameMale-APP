@@ -443,6 +443,8 @@ final _failurePatterns = RegExp(
     '权限|權限|间隔|間隔|太快|过快|禁止|不能|无权|無權|失败|失敗|错误|錯誤|'
     '请先登录|請先登錄|需要先登入|尚未登录|抱歉|不存在|已关闭|已關閉');
 
+SubmitResult submitResult(String html, String what) => _submitResult(html, what);
+
 SubmitResult _submitResult(String html, String what) {
   final doc = toDoc(html);
 
@@ -756,34 +758,138 @@ Future<MeData> fetchMe(int uid) async {
 /// 之前是把整頁 sanitize 後丟出來，連頁尾（自己的暱稱、登出連結）都被帶進去，
 /// 所以看別人的資料時最下面會冒出自己的資訊。
 Future<ProfileData> fetchProfile(int uid) async {
-  final doc = await _page('home.php?mod=space&uid=$uid&do=profile');
+  // 手機版只有九項積分，擴展角色組／勳章／管理的版塊／已加入群組全都只有桌面模板才有。
+  // 走 desktop:true —— 光是不帶 mobile=2 沒用，Discuz 會依 iPhone UA 自動轉手機版
+  final html = await Api.instance
+      .get('home.php?mod=space&uid=$uid&do=profile', desktop: true);
+  return parseProfile(toDoc(html), uid);
+}
 
-  final head = doc.querySelector('.user_avatar h2');
-  final title = txt(head);
-  final levelEl = head?.querySelector('span');
-  final level = txt(levelEl);
+/// 純解析，測試直接餵 fixture 用
+ProfileData parseProfile(dom.Document doc, int uid) {
+  final root = doc.querySelector('.u_profile') ?? doc.body!;
 
+  // 標題：`<h2>名字<img alt=online><span class="xw0">(UID: …)</span></h2>`
+  dom.Element? header;
+  for (final h in root.querySelectorAll('h2')) {
+    if (h.querySelector('.xw0') != null) {
+      header = h;
+      break;
+    }
+  }
+  final name = header == null
+      ? ''
+      : txt(header).replaceFirst(txt(header.querySelector('.xw0')), '').trim();
+
+  // 積分在「统计信息」區塊，比手機版多了已用空間
   final credits = <CreditItem>[];
-  for (final li in doc.querySelectorAll('.myinfo_list li')) {
-    final v = li.querySelector('span');
-    if (v == null) continue;
-    final value = txt(v);
-    final name = txt(li).replaceFirst(value, '').trim();
-    if (name.isNotEmpty) credits.add(CreditItem(name, value));
+  final psts = doc.querySelector('#psts');
+  for (final li in psts?.querySelectorAll('li') ?? const <dom.Element>[]) {
+    final em = li.querySelector('em');
+    if (em == null) continue;
+    final label = txt(em);
+    final value = txt(li).replaceFirst(label, '').trim();
+    if (label.isNotEmpty) credits.add(CreditItem(label, value));
+  }
+
+  var level = '';
+  final roles = <String>[];
+  final fields = <ProfileField>[];
+  final stats = <ProfileLink>[];
+
+  for (final li in root.querySelectorAll('li')) {
+    final em = li.querySelector('em');
+    if (em == null) continue;
+    if (psts != null && _within(li, psts)) continue; // 已經進 credits 了
+
+    final label = txt(em).replaceAll(' ', '').trim();
+    final value = txt(li).replaceFirst(txt(em), '').trim();
+
+    // 統計信息那列是一排連結（好友數／記錄數／日誌數／相冊數／回帖數／主題數）
+    if (li.querySelector('a[href*="from=space"]') != null) {
+      for (final a in li.querySelectorAll('a')) {
+        final t = txt(a);
+        if (t.isNotEmpty) stats.add(ProfileLink(t, url: absolute(attr(a, 'href'))));
+      }
+      continue;
+    }
+
+    if (label == '用户组' || label == '用戶組') {
+      level = value;
+      continue;
+    }
+    if (label.startsWith('扩展用户组') || label.startsWith('擴展用戶組')) {
+      // 多個角色是用逗號分隔的 <font>，例如「GM活动员,战士 · I」
+      roles.addAll(value.split(RegExp(r'[,，]')).map((e) => e.trim()).where((e) => e.isNotEmpty));
+      continue;
+    }
+    if (label.isNotEmpty && value.isNotEmpty) {
+      fields.add(ProfileField(label, value));
+    }
+  }
+
+  final medals = <Medal>[];
+  final sections = <ProfileSection>[];
+  for (final box in root.querySelectorAll('.pbm')) {
+    final h = box.querySelector('h2');
+    if (h == null) continue;
+    final heading = txt(h);
+    if (heading.isEmpty || h.querySelector('.xw0') != null) continue; // 標題區塊
+
+    if (heading.contains('勋章') || heading.contains('勳章')) {
+      for (final img in box.querySelectorAll('img')) {
+        final src = absolute(attr(img, 'src'));
+        if (src.isEmpty) continue;
+        medals.add(Medal(
+          image: src,
+          name: zh(attr(img, 'alt')),
+          desc: plainText(attr(img, 'tip')),
+        ));
+      }
+      continue;
+    }
+    if (heading.contains('活跃概况') || heading.contains('统计信息')) continue;
+
+    // 管理以下版块／已加入群组…每個人有哪些區塊都不同，所以通用解析
+    final links = <ProfileLink>[];
+    for (final a in box.querySelectorAll('a')) {
+      final t = txt(a);
+      if (t.isEmpty) continue;
+      final href = attr(a, 'href');
+      links.add(ProfileLink(
+        t,
+        fid: int.tryParse(RegExp(r'(?:forum|group)-(\d+)').firstMatch(href)?.group(1) ?? '') ??
+            paramInt(href, 'fid'),
+        url: absolute(href),
+      ));
+    }
+    if (links.isEmpty) continue;
+    sections.add(ProfileSection(title: heading, links: links));
   }
 
   return ProfileData(
     uid: uid,
-    name: level.isEmpty ? title : title.replaceFirst(level, '').trim(),
-    avatar: attr(doc.querySelector('.avatar_m img'), 'src').isNotEmpty
-        ? absolute(attr(doc.querySelector('.avatar_m img'), 'src'))
-        : avatarUrl(uid, size: 'big'),
+    name: name,
+    avatar: avatarUrl(uid, size: 'big'),
     level: level,
     credits: credits,
-    // 要限定在 .userProfile 內 —— 頁尾本來就有登出連結，
-    // 用整頁找會把每個人的資料都判成自己的
-    isSelf: doc.querySelector('.userProfile a[href*="action=logout"]') != null,
+    // 只有看自己的資料才會出現「編輯個人資料」的連結
+    isSelf: doc.querySelector('a[href*="mod=spacecp"][href*="ac=profile"]') != null,
+    online: header?.querySelector('img[alt="online"]') != null,
+    roles: roles,
+    fields: fields,
+    sections: sections,
+    medals: medals,
+    stats: stats,
   );
+}
+
+/// node 是不是在 ancestor 底下
+bool _within(dom.Element node, dom.Element ancestor) {
+  for (var p = node.parent; p != null; p = p.parent) {
+    if (identical(p, ancestor)) return true;
+  }
+  return false;
 }
 
 /// 加好友（論壇會回一個確認表單頁，成功與否看回應訊息）

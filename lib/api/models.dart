@@ -300,6 +300,38 @@ class CreditItem {
   const CreditItem(this.name, this.value);
 }
 
+/// 個人資料裡的一個欄位（網名暱稱、生日、居住地…）
+/// 勳章。`alt` 是名稱，`tip` 是一段 HTML 說明（含等級與加成效果）
+class Medal {
+  const Medal({required this.image, this.name = '', this.desc = ''});
+  final String image;
+  final String name;
+  final String desc;
+}
+
+class ProfileField {
+  final String label;
+  final String value;
+  const ProfileField(this.label, this.value);
+}
+
+/// 個人資料裡的一個連結（管理的版塊、已加入的群組…）
+class ProfileLink {
+  final String name;
+  final int? fid;
+  final String url;
+  const ProfileLink(this.name, {this.fid, this.url = ''});
+}
+
+/// 個人資料的一個區塊。每個人有哪些區塊都不一樣，所以通用解析：
+/// 桌面模板全都是 div.pbm + h2 標題 + 內容。
+class ProfileSection {
+  final String title;
+  final List<ProfileLink> links;
+  final String text;
+  const ProfileSection({required this.title, this.links = const [], this.text = ''});
+}
+
 class ProfileData {
   final int uid;
   final String name;
@@ -310,6 +342,13 @@ class ProfileData {
   /// 是不是自己的頁面（論壇只在自己的頁面放登出鈕）
   final bool isSelf;
 
+  final bool online;
+  final List<String> roles;          // 用戶組、擴展角色組
+  final List<ProfileField> fields;   // pf_l 的欄位
+  final List<ProfileSection> sections;
+  final List<Medal> medals;         // 勳章圖網址
+  final List<ProfileLink> stats;     // 主題數／回帖數／相冊數…
+
   const ProfileData({
     required this.uid,
     this.name = '',
@@ -317,6 +356,12 @@ class ProfileData {
     this.level = '',
     this.credits = const [],
     this.isSelf = false,
+    this.online = false,
+    this.roles = const [],
+    this.fields = const [],
+    this.sections = const [],
+    this.medals = const [],
+    this.stats = const [],
   });
 }
 
@@ -614,4 +659,77 @@ class SearchResult {
     this.pager = const PageInfo(),
     this.message,
   });
+}
+
+/// 個人空間的子頁。這站這些頁面只有桌面模板
+enum SpaceTab {
+  home('空間首頁', 'index', ''),
+  doing('記錄', 'doing', 'me'),
+  blog('日誌', 'blog', 'me'),
+  album('相冊', 'album', 'me'),
+  thread('主題', 'thread', 'me'),
+  wall('留言板', 'wall', ''),
+  friend('好友', 'friend', 'me');
+
+  const SpaceTab(this.label, this.action, this.view);
+  final String label;
+  final String action;
+  final String view;
+}
+
+/// 空間裡的一列。七個子頁版型差很多，共用一個寬鬆的型別，用得到才填
+class SpaceItem {
+  const SpaceItem({
+    this.title = '',
+    this.body = '',
+    this.meta = '',
+    this.author = '',
+    this.date = '',
+    this.image = '',
+    this.avatar = '',
+    this.url = '',
+    this.uid,
+    this.tid,
+    this.fid,
+    this.albumId,
+    this.children = const [],
+  });
+
+  final String title;
+  final String body;
+
+  /// 附註：日誌的閱讀數、主題的版塊與回覆數、相冊的張數
+  final String meta;
+  final String author;
+  final String date;
+  final String image;
+  final String avatar;
+  final String url;
+  final int? uid;
+  final int? tid;
+  final int? fid;
+  final int? albumId;
+
+  /// 記錄的回覆，或空間首頁裡一個區塊的內容
+  final List<SpaceItem> children;
+}
+
+class SpaceData {
+  const SpaceData({
+    required this.tab,
+    this.owner = '',
+    this.items = const [],
+    this.pager = const PageInfo(),
+    this.formhash = '',
+    this.message,
+  });
+
+  final SpaceTab tab;
+  final String owner;
+  final List<SpaceItem> items;
+  final PageInfo pager;
+  final String formhash;
+
+  /// 空的時候要說明為什麼空（沒東西／被鎖／要登入）
+  final String? message;
 }
