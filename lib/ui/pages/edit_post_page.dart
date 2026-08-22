@@ -4,6 +4,7 @@ import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
+import '../widgets/composer_toolbar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -27,6 +28,7 @@ class EditPostPage extends StatefulWidget {
 class _EditPostPageState extends State<EditPostPage> {
   final _subject = TextEditingController();
   final _message = TextEditingController();
+  final _messageFocus = FocusNode();
   EditForm? _form;
   bool _loading = true;
   bool _busy = false;
@@ -42,6 +44,7 @@ class _EditPostPageState extends State<EditPostPage> {
   void dispose() {
     _subject.dispose();
     _message.dispose();
+    _messageFocus.dispose();
     super.dispose();
   }
 
@@ -124,6 +127,7 @@ class _EditPostPageState extends State<EditPostPage> {
                         padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                         child: TextField(
                           controller: _message,
+                          focusNode: _messageFocus,
                           maxLines: 18,
                           minLines: 10,
                           decoration: InputDecoration(
@@ -132,6 +136,12 @@ class _EditPostPageState extends State<EditPostPage> {
                             isDense: true,
                           ),
                         ),
+                      ),
+                      const Divider(indent: 14, endIndent: 14),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: ComposerToolbar(
+                            controller: _message, focus: _messageFocus),
                       ),
                     ],
                   ),

@@ -8,6 +8,8 @@ import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
 import 'package:gamemale/api/models.dart';
 import 'package:gamemale/api/parse.dart';
+import 'package:gamemale/api/register.dart' as register;
+import 'package:gamemale/api/smilies.dart' as smilies;
 import 'package:gamemale/api/space.dart' as space;
 import 'package:gamemale/i18n/s2t.dart';
 
@@ -654,6 +656,89 @@ void main() {
       expect(d.items.every((i) => i.uid != null && i.uid! > 0), isTrue);
       expect(d.items.every((i) => i.avatar.startsWith('http')), isTrue);
     });
+  });
+
+  group('表情', () {
+    final f = _f('smilies.js');
+    if (!f.existsSync()) return;
+    final groups = smilies.parseSmilies(f.readAsStringSync());
+
+    test('解析出多組表情', () => expect(groups.length, greaterThan(3)));
+    test('每組都有名字跟內容', () {
+      expect(groups.every((g) => g.name.isNotEmpty), isTrue);
+      expect(groups.every((g) => g.items.isNotEmpty), isTrue);
+    });
+    test('BBCode 是 {:分組_編號:}', () {
+      final all = groups.expand((g) => g.items);
+      expect(all.every((s) => RegExp(r'^\{:\d+_\d+:\}$').hasMatch(s.code)), isTrue);
+    });
+    test('圖片是絕對網址', () {
+      final all = groups.expand((g) => g.items);
+      expect(all.every((s) => s.url.startsWith('https://')), isTrue);
+      expect(all.every((s) => s.url.contains('/smiley/')), isTrue);
+    });
+    test('對得上手機回覆表單給的代碼（呆呆第一個是 {:3_41:}）', () {
+      final all = groups.expand((g) => g.items).toList();
+      final m = all.where((s) => s.code == '{:3_41:}');
+      expect(m, isNotEmpty);
+      expect(m.first.url, endsWith('/smiley/grapeman/01.gif'));
+    });
+    test('編號不重複', () {
+      final codes = groups.expand((g) => g.items).map((s) => s.code).toList();
+      expect(codes.toSet().length, codes.length);
+    });
+  });
+
+  group('回帖獎勵', () {
+    test('沒有 #pl_top 就是沒有獎勵', () {
+      final doc = _load('thread.html');
+      if (doc == null) return;
+      expect(api.parseThreadPrize(doc), isNull);
+    });
+    test('解得出獎池與規則', () {
+      final doc = toDoc('<div id="pl_top"><table><tr class="ad">'
+          '<td class="pls"></td><td class="plc"></td></tr><tr>'
+          '<td class="pls"><img src="static/image/common//thread_prize_s.png" alt="回帖奖励" />'
+          '<strong>13783 枚金币</strong></td>'
+          '<td class="plc">回复本帖可获得 77 枚金币奖励! 每人限 1 次</td></tr></table></div>');
+      final p = api.parseThreadPrize(doc);
+      expect(p, isNotNull);
+      expect(p!.pool, contains('13783'));
+      // 第一列是空的廣告列，不能抓到空字串
+      expect(p.rule, contains('77'));
+    });
+  });
+
+  group('註冊問答', () {
+    final doc = _load('register.html');
+    if (doc == null) return;
+    final q = register.parseRegisterQuiz(doc);
+
+    test('抓得到 formhash', () => expect(q.formhash, isNotEmpty));
+    test('解析出題目', () => expect(q.questions.length, greaterThan(3)));
+    test('每題都有題幹跟選項', () {
+      expect(q.questions.every((x) => x.title.isNotEmpty), isTrue);
+      expect(q.questions.every((x) => x.options.length > 1), isTrue);
+    });
+    test('欄位名是 Discuz 的 question[n] 形式', () {
+      expect(q.questions.every((x) => x.field.startsWith('question[')), isTrue);
+    });
+    test('複選題認得出來（欄位名結尾是 []）', () {
+      final multi = q.questions.where((x) => x.multi);
+      expect(multi, isNotEmpty);
+      expect(multi.every((x) => x.field.endsWith('[]')), isTrue);
+    });
+    test('單選題欄位名是 [0]', () {
+      final single = q.questions.where((x) => !x.multi);
+      expect(single.every((x) => x.field.endsWith('[0]')), isTrue);
+    });
+    test('選項都有 value', () {
+      expect(
+        q.questions.expand((x) => x.options).every((o) => o.value.isNotEmpty),
+        isTrue,
+      );
+    });
+    test('讀得到頂端公告（目前是關閉註冊）', () => expect(q.notice, isNotEmpty));
   });
 
   group('工具函式', () {

@@ -10,7 +10,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Tests](https://img.shields.io/badge/測試-165%20項-4CAF50)](#測試策略)
+[![Tests](https://img.shields.io/badge/測試-202%20項-4CAF50)](#測試策略)
 [![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -57,6 +57,8 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 | **需要登入要看 `#loginform`** | 訪客瀏覽公開板塊時頁尾一樣有登入連結，用它會把每個板塊都擋掉 |
 | **驗證碼走 `getBytes` + `Image.memory`** | `Image.network` 不會帶 session cookie，拿到的驗證碼跟伺服器記的對不起來 |
 | **發文走桌面端點** | 論壇處理邏輯相同，但外掛（勳章積分）掛在桌面流程上 |
+| **桌面模板要明寫 `mobile=no`** | 只是不帶 `mobile=2` 沒用 —— Discuz 會依 iPhone UA 自動轉手機版 |
+| **POST 的轉址要自己跟** | Dart 的 HttpClient 只自動跟隨 GET/HEAD，POST 收到 302 會拿到空 body |
 | **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -66,9 +68,10 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 <table>
 <tr><td width="90"><b>瀏覽</b></td><td>板塊列表 · 主題列表（全部／最新／熱門／精華）· 主題分類 · 子版塊 · 帖子內頁 · 分頁</td></tr>
 <tr><td><b>互動</b></td><td>回覆 · 引用回覆 · 發表主題 · 編輯自己的帖子 · 收藏 · 評分（快速評分／自動跳過缺項）· 投票</td></tr>
-<tr><td><b>社群</b></td><td>私訊（氣泡對話）· 通知（兩層分類）· 個人資料 · 加好友 · 打招呼 · 記錄廣場</td></tr>
-<tr><td><b>帳號</b></td><td>帳密登入（圖形驗證碼／安全提問）· 登出 · 每日簽到 · 我的收藏／主題／回覆</td></tr>
-<tr><td><b>體驗</b></td><td>深／淺色 · 繁簡切換 · 流量控制 · 圖片長按選單 · 樓中樓 · 固定分頁列 · 下拉重新整理</td></tr>
+<tr><td><b>社群</b></td><td>私訊（氣泡對話）· 通知（兩層分類）· 個人資料（角色組／勳章／管理版塊／已加入群組）· 個人空間七個子頁 · 加好友 · 打招呼 · 記錄廣場</td></tr>
+<tr><td><b>搜尋</b></td><td>帖子 · 日誌 · 相冊 · 群組 · 用戶 · 本版搜尋 · 高級搜索</td></tr>
+<tr><td><b>帳號</b></td><td>帳密登入（圖形驗證碼／安全提問）· 註冊問答 · 登出 · 每日簽到 · 我的收藏／主題／回覆 · 回帖紀錄</td></tr>
+<tr><td><b>體驗</b></td><td>深／淺色 · 六色強調色 · 繁簡切換 · 流量控制 · 表情選擇器 · 外部連結跳轉提示 · 回帖獎勵橫幅 · 圖片長按選單 · 樓中樓 · 固定分頁列 · 下拉重新整理</td></tr>
 </table>
 
 ### 訪客與會員
@@ -90,14 +93,18 @@ lib/
 │   ├── models.dart      所有資料型別（空安全，UI 拿不到 dynamic）
 │   ├── http.dart        dio + PersistCookieJar，cookie 落地免重登
 │   ├── parse.dart       DOM 工具、內容淨化、登入狀態判定
-│   └── discuz.dart      所有端點；純解析函式獨立匯出方便測試
+│   ├── discuz.dart      主要端點；純解析函式獨立匯出方便測試
+│   ├── search.dart      五種搜尋分類
+│   ├── space.dart       個人空間七個子頁
+│   ├── smilies.dart     表情清單（讀論壇自己的快取檔）
+│   └── register.dart    註冊問答
 ├── i18n/
 │   ├── s2t.dart         簡→繁（台灣用語）
 │   └── ui.dart          介面繁→簡
-├── store/               session（登入狀態）· settings（語言／主題／流量）
+├── store/               session（登入狀態）· settings（語言／主題／強調色／流量）· history（回帖紀錄）
 └── ui/
-    ├── widgets/         PostBody · ThreadTile · Avatar · StateBox · StickyPager …
-    └── pages/           18 個頁面
+    ├── widgets/         PostBody · ComposerToolbar · Avatar · StateBox · StickyPager …
+    └── pages/           21 個頁面
 
 tool/
 ├── zh_rules.py          簡繁轉換的人工規則 ← 要調整用字改這裡
@@ -115,14 +122,14 @@ tool/
 
 | 檔案 | 內容 | 數量 |
 |---|---|---|
-| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 約 110 |
-| `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
-| `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 20 |
+| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 148 |
+| `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 24 |
 | `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
-| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 14 |
+| `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
+| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 21 |
 
 ```bash
-flutter test                        # 165 項離線測試
+flutter test                        # 202 項離線測試
 flutter analyze                     # 零問題
 ```
 
@@ -218,9 +225,8 @@ gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
 ## 目前沒做的部分
 
 - **發文上傳圖片／附件** — Discuz 的 `swfupload` 是 multipart 端點，沒有實機無法驗證
-- **搜尋的日誌／相冊／群組／用戶分類** — 目前只有帖子搜尋
-- **個人空間子頁**（動態／日誌／相冊／留言板）與完整個人資料欄位
-- **回帖獎勵、外部連結跳轉提示、表情選擇器**
+- **註冊最後一步** — 答題通過後的帳號／信箱／驗證碼表單交給瀏覽器。論壇目前關閉註冊，這條路徑無法驗證，寧可不寫沒把握的程式碼
+- **相冊內頁** — 只有桌面模板，點開交給瀏覽器
 - **推播通知** — 需要自架推播伺服器與 APNs 憑證，自簽 App 拿不到
 
 ---

@@ -10,7 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
-[![Tests](https://img.shields.io/badge/测试-165%20项-4CAF50)](#测试策略)
+[![Tests](https://img.shields.io/badge/测试-202%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -57,6 +57,8 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 | **需要登录要看 `#loginform`** | 游客浏览公开版块时页脚一样有登录链接，用它会把每个版块都拦掉 |
 | **验证码走 `getBytes` + `Image.memory`** | `Image.network` 不会带 session cookie，拿到的验证码跟服务器记的对不上 |
 | **发帖走桌面端点** | 论坛处理逻辑相同，但插件（勋章积分）挂在桌面流程上 |
+| **桌面模板要明写 `mobile=no`** | 只是不带 `mobile=2` 没用 —— Discuz 会依 iPhone UA 自动转手机版 |
+| **POST 的跳转要自己跟** | Dart 的 HttpClient 只自动跟随 GET/HEAD，POST 收到 302 会拿到空 body |
 | **繁简转换自定规则** | OpenCC 的第一候选常常不合语境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -66,9 +68,10 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 <table>
 <tr><td width="90"><b>浏览</b></td><td>版块列表 · 主题列表（全部／最新／热门／精华）· 主题分类 · 子版块 · 帖子内页 · 分页</td></tr>
 <tr><td><b>互动</b></td><td>回复 · 引用回复 · 发表主题 · 编辑自己的帖子 · 收藏 · 评分（快速评分／自动跳过缺项）· 投票</td></tr>
-<tr><td><b>社区</b></td><td>私信（气泡对话）· 通知（两层分类）· 个人资料 · 加好友 · 打招呼 · 记录广场</td></tr>
-<tr><td><b>账号</b></td><td>账密登录（图形验证码／安全提问）· 登出 · 每日签到 · 我的收藏／主题／回复</td></tr>
-<tr><td><b>体验</b></td><td>深／浅色 · 繁简切换 · 流量控制 · 图片长按菜单 · 楼中楼 · 固定分页栏 · 下拉刷新</td></tr>
+<tr><td><b>社区</b></td><td>私信（气泡对话）· 通知（两层分类）· 个人资料（角色组／勋章／管理版块／已加入群组）· 个人空间七个子页 · 加好友 · 打招呼 · 记录广场</td></tr>
+<tr><td><b>搜索</b></td><td>帖子 · 日志 · 相册 · 群组 · 用户 · 本版搜索 · 高级搜索</td></tr>
+<tr><td><b>账号</b></td><td>账密登录（图形验证码／安全提问）· 注册问答 · 登出 · 每日签到 · 我的收藏／主题／回复 · 回帖记录</td></tr>
+<tr><td><b>体验</b></td><td>深／浅色 · 六色强调色 · 繁简切换 · 流量控制 · 表情选择器 · 外部链接跳转提示 · 回帖奖励横幅 · 图片长按菜单 · 楼中楼 · 固定分页栏 · 下拉刷新</td></tr>
 </table>
 
 ### 游客与会员
@@ -90,14 +93,18 @@ lib/
 │   ├── models.dart      所有数据类型（空安全，UI 拿不到 dynamic）
 │   ├── http.dart        dio + PersistCookieJar，cookie 落地免重登
 │   ├── parse.dart       DOM 工具、内容净化、登录状态判定
-│   └── discuz.dart      所有端点；纯解析函数独立导出方便测试
+│   ├── discuz.dart      主要端点；纯解析函数独立导出方便测试
+│   ├── search.dart      五种搜索分类
+│   ├── space.dart       个人空间七个子页
+│   ├── smilies.dart     表情列表（读论坛自己的缓存文件）
+│   └── register.dart    注册问答
 ├── i18n/
 │   ├── s2t.dart         简→繁（台湾用语）
 │   └── ui.dart          界面繁→简
-├── store/               session（登录状态）· settings（语言／主题／流量）
+├── store/               session（登录状态）· settings（语言／主题／强调色／流量）· history（回帖记录）
 └── ui/
-    ├── widgets/         PostBody · ThreadTile · Avatar · StateBox · StickyPager …
-    └── pages/           18 个页面
+    ├── widgets/         PostBody · ComposerToolbar · Avatar · StateBox · StickyPager …
+    └── pages/           21 个页面
 
 tool/
 ├── zh_rules.py          繁简转换的人工规则 ← 要调整用字改这里
@@ -115,14 +122,14 @@ tool/
 
 | 文件 | 内容 | 数量 |
 |---|---|---|
-| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 约 110 |
-| `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
-| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 20 |
+| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 148 |
+| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 24 |
 | `s2t_test.dart` | 繁简转换的每一类判断 | 18 |
-| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 14 |
+| `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
+| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 21 |
 
 ```bash
-flutter test                        # 165 项离线测试
+flutter test                        # 202 项离线测试
 flutter analyze                     # 零问题
 ```
 
@@ -218,9 +225,8 @@ gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
 ## 目前没做的部分
 
 - **发帖上传图片／附件** — Discuz 的 `swfupload` 是 multipart 端点，没有真机无法验证
-- **搜索的日志／相册／群组／用户分类** — 目前只有帖子搜索
-- **个人空间子页**（动态／日志／相册／留言板）与完整个人资料字段
-- **回帖奖励、外部链接跳转提示、表情选择器**
+- **注册最后一步** — 答题通过后的账号／邮箱／验证码表单交给浏览器。论坛目前关闭注册，这条路径无法验证，宁可不写没把握的代码
+- **相册内页** — 只有桌面模板，点开交给浏览器
 - **推送通知** — 需要自建推送服务器与 APNs 证书，自签 App 拿不到
 
 ---

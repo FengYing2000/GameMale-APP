@@ -4,11 +4,15 @@
 //   flutter test test/live_test.dart --dart-define=GM_COOKIE="$env:GM_COOKIE"
 //
 // 沒帶 cookie 就整組略過，CI 不會因此失敗。
+import 'package:characters/characters.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
 import 'package:gamemale/api/models.dart';
+import 'package:gamemale/api/register.dart' as register;
 import 'package:gamemale/api/search.dart' as search;
+import 'package:gamemale/api/smilies.dart' as smilies;
+import 'package:gamemale/api/space.dart' as space;
 
 const _cookie = String.fromEnvironment('GM_COOKIE');
 
@@ -195,6 +199,48 @@ void main() {
     print('  我的回覆 ${r.list.length} 筆，例如：${r.list.first.title}');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
+  test('個人資料（桌面模板）抓得到角色組、勳章、群組', () async {
+    final p = await api.fetchProfile(610657);
+    expect(p.name, isNotEmpty);
+    expect(p.level, isNotEmpty, reason: '用戶組來自活躍概況');
+    expect(p.credits.length, greaterThan(5));
+    expect(p.medals, isNotEmpty);
+    expect(p.stats, isNotEmpty);
+    // ignore: avoid_print
+    print('  ${p.name}｜${p.level}｜角色 ${p.roles.join('、')}'
+        '｜勳章 ${p.medals.length}｜區塊 ${p.sections.map((s) => s.title).join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('個人空間七個子頁都解得出東西', () async {
+    for (final tab in SpaceTab.values) {
+      final d = await space.fetchSpace(610657, tab);
+      expect(d.owner, isNotEmpty, reason: '${tab.label} 拿不到空間主人');
+      expect(d.items, isNotEmpty, reason: '${tab.label} 沒有內容：${d.message}');
+      // ignore: avoid_print
+      print('  ${tab.label} ${d.items.length} 筆，例如：'
+          '${d.items.first.title.characters.take(24)}');
+    }
+  }, timeout: const Timeout(Duration(seconds: 120)));
+
+  test('表情清單抓得到全部分組', () async {
+    final g = await smilies.fetchSmilies();
+    expect(g.length, greaterThan(3));
+    expect(g.every((x) => x.items.isNotEmpty), isTrue);
+    // ignore: avoid_print
+    print('  ${g.map((x) => '${x.name}(${x.items.length})').join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('回帖獎勵：有獎勵的帖子讀得到，沒獎勵的回 null', () async {
+    final has = await api.fetchThreadPrize(194186);
+    expect(has, isNotNull, reason: '這帖有回帖獎勵');
+    expect(has!.pool, isNotEmpty);
+    expect(has.rule, isNotEmpty, reason: '#pl_top 第一列是空的廣告列，不能抓到空字串');
+    final none = await api.fetchThreadPrize(129896);
+    expect(none, isNull);
+    // ignore: avoid_print
+    print('  獎池 ${has.pool}　${has.rule}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {
@@ -209,5 +255,21 @@ void main() {
     print('  loginhash=${m.loginhash}  驗證碼圖 ${m.seccodeImage!.length} bytes');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
-
+  // 註冊只有訪客做得到 —— 已登入的話論壇會直接把你踢回首頁，
+  // 所以這題要排在上面那個登出測試之後
+  test('註冊問答讀得到題目，答錯會退回考卷', () async {
+    final q = await register.fetchRegisterQuiz();
+    expect(q.formhash, isNotEmpty);
+    expect(q.questions, isNotEmpty);
+    // 故意全選第一個選項，不會建立帳號
+    final wrong = {
+      for (final x in q.questions) x.field: [x.options.first.value]
+    };
+    final next = await register.submitRegisterQuiz(q.formhash, wrong);
+    // 送出走桌面端點且會 302 —— Dart 的 HttpClient 不會自動跟隨 POST 轉址，
+    // 沒補那一手的話這裡會拿到空字串
+    expect(next.questions, isNotEmpty, reason: '答錯應該退回重新出題的考卷');
+    // ignore: avoid_print
+    print('  ${q.questions.length} 題｜公告：${q.notice}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
 }

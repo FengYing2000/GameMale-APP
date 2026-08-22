@@ -38,6 +38,8 @@ Future<void> main() async {
     'space_thread.html': 'home.php?mod=space&uid=610657&do=thread&view=me&mobile=no',
     'space_wall.html': 'home.php?mod=space&uid=610657&do=wall&mobile=no',
     'space_friend.html': 'home.php?mod=space&uid=610657&do=friend&view=me&mobile=no',
+    'smilies.js': 'data/cache/common_smilies_var.js',
+    'register.html': 'plugin.php?id=k_qareg:k_qareg&mobile=2',
   };
 
   final dir = Directory('test/fixtures')..createSync(recursive: true);

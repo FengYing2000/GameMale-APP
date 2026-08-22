@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import '../../store/history.dart';
+import '../widgets/composer_toolbar.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -38,16 +39,6 @@ class _ReplyPageState extends State<ReplyPage> {
   final _focus = FocusNode();
   bool _busy = false;
 
-  static const _tools = [
-    ('B', '[b]', '[/b]'),
-    ('I', '[i]', '[/i]'),
-    ('U', '[u]', '[/u]'),
-    ('引用', '[quote]', '[/quote]'),
-    ('圖片', '[img]', '[/img]'),
-    ('連結', '[url=]', '[/url]'),
-    ('隱藏', '[hide]', '[/hide]'),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -59,24 +50,6 @@ class _ReplyPageState extends State<ReplyPage> {
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
-  }
-
-  /// 包 BBCode，並把選取範圍留在標籤中間
-  void _wrap(String open, String close) {
-    final sel = _ctrl.selection;
-    final text = _ctrl.text;
-    final start = sel.start < 0 ? text.length : sel.start;
-    final end = sel.end < 0 ? text.length : sel.end;
-    final inner = text.substring(start, end);
-
-    _ctrl.value = TextEditingValue(
-      text: text.replaceRange(start, end, '$open$inner$close'),
-      selection: TextSelection(
-        baseOffset: start + open.length,
-        extentOffset: start + open.length + inner.length,
-      ),
-    );
-    _focus.requestFocus();
   }
 
   Future<void> _submit() async {
@@ -156,23 +129,7 @@ class _ReplyPageState extends State<ReplyPage> {
               ),
             ),
           ),
-          SizedBox(
-            height: 46,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                for (final t in _tools)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8, top: 5, bottom: 5),
-                    child: ActionChip(
-                      label: Text(tr(t.$1)),
-                      onPressed: () => _wrap(t.$2, t.$3),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          ComposerToolbar(controller: _ctrl, focus: _focus),
           SafeArea(
             top: false,
             child: Padding(

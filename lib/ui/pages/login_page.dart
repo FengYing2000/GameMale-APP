@@ -229,6 +229,12 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.push('/register'),
+                    child: Text(tr('還沒有帳號？註冊')),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(26, 12, 26, 30),
                   child: Text(

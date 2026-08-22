@@ -140,18 +140,34 @@ class Api {
         ),
       );
       _guard(res.statusCode);
-      return res.data ?? '';
+      return await _afterPost(res, desktop: desktop);
     } on DioException catch (e) {
       throw DiscuzException('送出失敗：${_reason(e)}');
     }
   }
 
+  /// Dart 的 HttpClient 只會自動跟隨 GET/HEAD 的轉址，POST 收到 302 就直接把
+  /// 空 body 交回來（`member.php?mod=register` 就是這樣）。這裡手動補一次 GET。
+  Future<String> _afterPost(Response<String> res, {required bool desktop}) async {
+    final body = res.data ?? '';
+    if (body.isNotEmpty) return body;
+
+    final location = res.headers.value('location');
+    if (location == null || location.isEmpty) return body;
+
+    var target = location;
+    if (target.startsWith(kOrigin)) target = target.substring(kOrigin.length);
+    if (target.startsWith('http')) return body;   // 轉去站外就不跟了
+    return get(target.replaceFirst(RegExp(r'^/'), ''), desktop: desktop);
+  }
+
   /// 已經編碼好的表單字串（投票的 pollanswers[] 是陣列，用 Map 帶不過去）
-  Future<String> postRaw(String path, String body) async {
+  Future<String> postRaw(String path, String body,
+      {bool desktop = false}) async {
     await init();
     try {
       final res = await _dio.post<String>(
-        mobileUrl(path),
+        desktop ? desktopUrl(path) : mobileUrl(path),
         data: body,
         options: Options(
           responseType: ResponseType.plain,
@@ -159,7 +175,7 @@ class Api {
         ),
       );
       _guard(res.statusCode);
-      return res.data ?? '';
+      return await _afterPost(res, desktop: desktop);
     } on DioException catch (e) {
       throw DiscuzException('送出失敗：${_reason(e)}');
     }

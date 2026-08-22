@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../theme.dart';
+import '../widgets/composer_toolbar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -19,6 +20,7 @@ class NewThreadPage extends StatefulWidget {
 class _NewThreadPageState extends State<NewThreadPage> {
   final _subject = TextEditingController();
   final _message = TextEditingController();
+  final _messageFocus = FocusNode();
   NewThreadMeta? _meta;
   int? _typeid;
   bool _loading = true;
@@ -35,6 +37,7 @@ class _NewThreadPageState extends State<NewThreadPage> {
   void dispose() {
     _subject.dispose();
     _message.dispose();
+    _messageFocus.dispose();
     super.dispose();
   }
 
@@ -150,6 +153,7 @@ class _NewThreadPageState extends State<NewThreadPage> {
                         padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                         child: TextField(
                           controller: _message,
+                          focusNode: _messageFocus,
                           maxLines: 12,
                           minLines: 8,
                           decoration: InputDecoration(
@@ -159,6 +163,12 @@ class _NewThreadPageState extends State<NewThreadPage> {
                             isDense: true,
                           ),
                         ),
+                      ),
+                      const Divider(indent: 14, endIndent: 14),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: ComposerToolbar(
+                            controller: _message, focus: _messageFocus),
                       ),
                     ],
                   ),

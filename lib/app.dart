@@ -23,6 +23,7 @@ import 'ui/pages/notice_page.dart';
 import 'ui/pages/pm_chat_page.dart';
 import 'ui/pages/profile_page.dart';
 import 'ui/pages/history_page.dart';
+import 'ui/pages/register_page.dart';
 import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
 import 'ui/pages/settings_page.dart';
@@ -128,6 +129,7 @@ GoRouter _buildRouter(SessionStore session) {
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/history', builder: (c, s) => const HistoryPage()),
+      GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
       GoRoute(
         path: '/t/:tid/reply',
         builder: (c, s) => ReplyPage(

@@ -20,6 +20,7 @@ import 'package:gamemale/ui/pages/new_thread_page.dart';
 import 'package:gamemale/ui/pages/notice_page.dart';
 import 'package:gamemale/ui/pages/pm_chat_page.dart';
 import 'package:gamemale/ui/pages/profile_page.dart';
+import 'package:gamemale/ui/pages/register_page.dart';
 import 'package:gamemale/ui/pages/reply_page.dart';
 import 'package:gamemale/ui/pages/search_page.dart';
 import 'package:gamemale/ui/pages/settings_page.dart';
@@ -83,6 +84,7 @@ void main() {
     '設定': const SettingsPage(),
     '編輯帖子': const EditPostPage(fid: 150, tid: 1, pid: 1),
     '登入': const LoginPage(),
+    '註冊': const RegisterPage(),
   };
 
   pages.forEach((name, page) {

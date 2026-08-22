@@ -740,3 +740,43 @@ class ThreadPrize {
   final String pool;
   final String rule;
 }
+
+/// 註冊問答的一個選項
+class QuizOption {
+  const QuizOption({required this.value, required this.label});
+  final String value;
+  final String label;
+}
+
+/// 註冊問答的一題。`multi` 是複選（表單欄位名字結尾是 `[]`）
+class QuizQuestion {
+  const QuizQuestion({
+    required this.field,
+    required this.title,
+    required this.options,
+    required this.multi,
+  });
+
+  final String field;
+  final String title;
+  final List<QuizOption> options;
+  final bool multi;
+}
+
+/// 註冊問答頁（plugin.php?id=k_qareg:k_qareg）。
+/// `notice` 是頁面頂端那行字，論壇關閉註冊時會寫在這裡
+class RegisterQuiz {
+  const RegisterQuiz({
+    this.notice = '',
+    this.formhash = '',
+    this.questions = const [],
+    this.closed = false,
+  });
+
+  final String notice;
+  final String formhash;
+  final List<QuizQuestion> questions;
+
+  /// 論壇是否關閉註冊
+  final bool closed;
+}
