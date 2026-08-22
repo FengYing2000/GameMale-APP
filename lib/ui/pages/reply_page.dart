@@ -1,6 +1,8 @@
 import '../../i18n/ui.dart';
+import '../../store/history.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
@@ -15,6 +17,7 @@ class ReplyPage extends StatefulWidget {
     this.page = 1,
     this.repquote = '',
     this.to = '',
+    this.threadTitle = '',
   });
 
   final int tid;
@@ -22,6 +25,9 @@ class ReplyPage extends StatefulWidget {
   final int page;
   final String repquote;
   final String to;
+
+  /// 只用來寫進本機的回帖紀錄
+  final String threadTitle;
 
   @override
   State<ReplyPage> createState() => _ReplyPageState();
@@ -97,6 +103,14 @@ class _ReplyPageState extends State<ReplyPage> {
       // 發文成功後論壇會把積分變化寫進 cookie（勳章觸發也走這套），
       // 網頁版是用彈窗顯示，這裡也顯示出來，才看得出到底有沒有加到分
       final credits = await api.consumeCreditNotice();
+      if (!mounted) return;
+
+      await context.read<ReplyHistory>().add(ReplyRecord(
+            tid: widget.tid,
+            title: widget.threadTitle,
+            excerpt: text.length > 80 ? '${text.substring(0, 80)}…' : text,
+            at: DateTime.now(),
+          ));
       if (!mounted) return;
       toast(context,
           credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');

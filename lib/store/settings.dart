@@ -25,14 +25,35 @@ enum AppLang {
   final String desc;
 }
 
+/// 主題強調色。深淺兩種模式都用同一顆種子色去產配色
+enum Accent {
+  forum('論壇綠', Color(0xFF70A128)),
+  blue('海藍', Color(0xFF2F6FB5)),
+  violet('紫羅蘭', Color(0xFF7A5AF8)),
+  teal('青碧', Color(0xFF00897B)),
+  rose('玫瑰', Color(0xFFD5427C)),
+  amber('琥珀', Color(0xFFE08A00));
+
+  const Accent(this.label, this.seed);
+  final String label;
+  final Color seed;
+}
+
 class SettingsStore extends ChangeNotifier {
   static const _kImage = 'gm.imagePolicy';
   static const _kLang = 'gm.lang';
   static const _kTheme = 'gm.theme';
+  static const _kAccent = 'gm.accent';
+  static const _kPrize = 'gm.prize';
 
   ImagePolicy imagePolicy = ImagePolicy.always;
   AppLang lang = AppLang.auto;
   ThemeMode themeMode = ThemeMode.system;
+  Accent accent = Accent.forum;
+
+  /// 顯示回帖獎勵橫幅。手機版模板沒有這段，要另外抓一次桌面頁（約 90 KB），
+  /// 所以行動網路下預設不抓
+  bool showPrize = true;
 
   bool _onWifi = true;
   bool get onWifi => _onWifi;
@@ -75,6 +96,11 @@ class SettingsStore extends ChangeNotifier {
       (e) => e.name == prefs.getString(_kTheme),
       orElse: () => ThemeMode.system,
     );
+    accent = Accent.values.firstWhere(
+      (e) => e.name == prefs.getString(_kAccent),
+      orElse: () => Accent.forum,
+    );
+    showPrize = prefs.getBool(_kPrize) ?? true;
 
     await _refreshNetwork();
     Connectivity().onConnectivityChanged.listen((_) => _refreshNetwork());
@@ -109,6 +135,23 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kLang, v.name);
+  }
+
+  /// 現在這個當下該不該去抓回帖獎勵
+  bool get loadPrize => showPrize && _onWifi;
+
+  Future<void> setAccent(Accent v) async {
+    accent = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kAccent, v.name);
+  }
+
+  Future<void> setShowPrize(bool v) async {
+    showPrize = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kPrize, v);
   }
 
   Future<void> setThemeMode(ThemeMode v) async {

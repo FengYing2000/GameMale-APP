@@ -733,3 +733,10 @@ class SpaceData {
   /// 空的時候要說明為什麼空（沒東西／被鎖／要登入）
   final String? message;
 }
+
+/// 回帖獎勵：`pool` 是獎池餘額（13783 枚金幣），`rule` 是規則說明
+class ThreadPrize {
+  const ThreadPrize({required this.pool, required this.rule});
+  final String pool;
+  final String rule;
+}

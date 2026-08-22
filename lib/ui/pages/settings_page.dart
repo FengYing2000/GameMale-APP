@@ -70,6 +70,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   descOf: (_) => null,
                   onPick: settings.setThemeMode,
                 ),
+                const Divider(indent: 56, endIndent: 14),
+                _accentRow(context, settings),
               ],
             ),
           ),
@@ -90,6 +92,17 @@ class _SettingsPageState extends State<SettingsPage> {
                   trailingNote: settings.imagePolicy == ImagePolicy.wifiOnly
                       ? (settings.onWifi ? tr('目前：Wi-Fi') : tr('目前：行動網路'))
                       : null,
+                ),
+                const Divider(indent: 56, endIndent: 14),
+                SwitchListTile(
+                  value: settings.showPrize,
+                  secondary: const Icon(Icons.redeem_outlined),
+                  title: Text(tr('顯示回帖獎勵')),
+                  subtitle: Text(
+                    tr('手機版模板沒有這段，要另外載入桌面頁（約 90 KB）；行動網路下自動略過'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onChanged: settings.setShowPrize,
                 ),
               ],
             ),
@@ -216,6 +229,41 @@ class _SettingsPageState extends State<SettingsPage> {
       },
     );
   }
+
+  /// 強調色用色票列，比下拉選單直觀
+  Widget _accentRow(BuildContext c, SettingsStore settings) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+        child: Row(
+          children: [
+            const SizedBox(width: 40, child: Icon(Icons.palette_outlined)),
+            Expanded(child: Text(tr('強調色'))),
+            for (final a in Accent.values)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: GestureDetector(
+                  onTap: () => settings.setAccent(a),
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: a.seed,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: settings.accent == a
+                            ? Theme.of(c).colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: settings.accent == a
+                        ? const Icon(Icons.check, size: 15, color: Colors.white)
+                        : null,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
 
   Widget _section(BuildContext c, String title) => Padding(
         padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),

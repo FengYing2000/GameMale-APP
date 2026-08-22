@@ -12,6 +12,7 @@ import '../../store/settings.dart';
 import '../../theme.dart';
 import 'image_actions.dart';
 import 'image_viewer.dart';
+import 'external_link.dart';
 
 /// 渲染 Discuz 的帖子 HTML。
 ///
@@ -76,10 +77,10 @@ class PostBody extends StatelessWidget {
     );
   }
 
-  /// 站內連結留在 App 裡，站外交給系統瀏覽器
+  /// 站內連結留在 App 裡，站外先跳提示再交給系統瀏覽器
   bool _openUrl(BuildContext context, String url) {
     if (!url.startsWith(kOrigin)) {
-      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      confirmExternal(context, url);
       return true;
     }
 
@@ -105,6 +106,7 @@ class PostBody extends StatelessWidget {
     } else if (uid != null) {
       context.push('/u/$uid');
     } else {
+      // 站內但認不出是什麼頁（外掛、活動頁…），一樣走瀏覽器但不用問
       launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
     return true;

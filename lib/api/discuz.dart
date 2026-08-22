@@ -892,6 +892,31 @@ bool _within(dom.Element node, dom.Element ancestor) {
   return false;
 }
 
+/// 回帖獎勵橫幅。這段只在桌面模板有（`#pl_top`），手機版整塊被拿掉了，
+/// 所以要另外抓一次桌面頁 —— 大約 90 KB，故由設定決定要不要抓。
+Future<ThreadPrize?> fetchThreadPrize(int tid, {int page = 1}) async {
+  final html = await Api.instance.get(
+    'forum.php?mod=viewthread&tid=$tid&page=$page',
+    desktop: true,
+  );
+  return parseThreadPrize(toDoc(html));
+}
+
+ThreadPrize? parseThreadPrize(dom.Document doc) {
+  final top = doc.querySelector('#pl_top');
+  if (top == null) return null;
+  final icon = top.querySelector('img[alt*="奖励"], img[alt*="獎勵"]');
+  if (icon == null) return null;
+  final pool = txt(top.querySelector('strong'));
+  // #pl_top 第一列是空的廣告列，規則在後面那個有字的 td.plc
+  final rule = top
+          .querySelectorAll('td.plc')
+          .map(txt)
+          .firstWhere((t) => t.isNotEmpty, orElse: () => '');
+  if (pool.isEmpty && rule.isEmpty) return null;
+  return ThreadPrize(pool: pool, rule: rule);
+}
+
 /// 加好友（論壇會回一個確認表單頁，成功與否看回應訊息）
 Future<SubmitResult> addFriend(int uid) async {
   await _ensureFormhash();

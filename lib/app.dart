@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'api/parse.dart' as parse;
 import 'i18n/s2t.dart';
+import 'store/history.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
@@ -21,6 +22,7 @@ import 'ui/pages/new_thread_page.dart';
 import 'ui/pages/notice_page.dart';
 import 'ui/pages/pm_chat_page.dart';
 import 'ui/pages/profile_page.dart';
+import 'ui/pages/history_page.dart';
 import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
 import 'ui/pages/settings_page.dart';
@@ -38,6 +40,7 @@ class GameMaleApp extends StatefulWidget {
 class _GameMaleAppState extends State<GameMaleApp> {
   late final SessionStore _session;
   late final SettingsStore _settings;
+  late final ReplyHistory _history;
   late final GoRouter _router;
 
   @override
@@ -45,6 +48,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     super.initState();
     _session = SessionStore();
     _settings = SettingsStore();
+    _history = ReplyHistory();
     _router = _buildRouter(_session);
     _boot();
   }
@@ -55,6 +59,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     await _settings.load();
     _applyLang();
     _settings.addListener(_applyLang);
+    await _history.load();
     await _session.restore();
   }
 
@@ -72,6 +77,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
   void dispose() {
     _settings.removeListener(_applyLang);
     _session.dispose();
+    _history.dispose();
     _settings.dispose();
     super.dispose();
   }
@@ -82,13 +88,14 @@ class _GameMaleAppState extends State<GameMaleApp> {
       providers: [
         ChangeNotifierProvider.value(value: _session),
         ChangeNotifierProvider.value(value: _settings),
+        ChangeNotifierProvider.value(value: _history),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp.router(
           title: 'GameMale',
           debugShowCheckedModeBanner: false,
-          theme: lightTheme,
-          darkTheme: darkTheme,
+          theme: lightThemeOf(settings.accent.seed),
+          darkTheme: darkThemeOf(settings.accent.seed),
           themeMode: settings.themeMode,
           routerConfig: _router,
         ),
@@ -120,6 +127,7 @@ GoRouter _buildRouter(SessionStore session) {
         ),
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
+      GoRoute(path: '/history', builder: (c, s) => const HistoryPage()),
       GoRoute(
         path: '/t/:tid/reply',
         builder: (c, s) => ReplyPage(
@@ -128,6 +136,7 @@ GoRouter _buildRouter(SessionStore session) {
           page: int.tryParse(s.uri.queryParameters['page'] ?? '') ?? 1,
           repquote: s.uri.queryParameters['repquote'] ?? '',
           to: s.uri.queryParameters['to'] ?? '',
+          threadTitle: s.uri.queryParameters['title'] ?? '',
         ),
       ),
       GoRoute(

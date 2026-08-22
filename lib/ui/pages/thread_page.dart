@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../store/session.dart';
+import '../../store/settings.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/login_required.dart';
@@ -27,6 +28,7 @@ class ThreadPage extends StatefulWidget {
 
 class _ThreadPageState extends State<ThreadPage> {
   ThreadData? _data;
+  ThreadPrize? _prize;
   bool _loading = true;
   String? _err;
   int _page = 1;
@@ -60,6 +62,20 @@ class _ThreadPageState extends State<ThreadPage> {
         if (_scroll.hasClients) _scroll.jumpTo(0);
       }
     }
+    _loadPrize();
+  }
+
+  /// 回帖獎勵只有桌面模板有，要多抓一次約 90 KB 的頁面，
+  /// 所以獨立於主流程之外，失敗也不影響帖子顯示
+  Future<void> _loadPrize() async {
+    if (!mounted) return;
+    if (!context.read<SettingsStore>().loadPrize) return;
+    try {
+      final p = await api.fetchThreadPrize(widget.tid, page: _page);
+      if (mounted) setState(() => _prize = p);
+    } on DiscuzException {
+      // 靜靜放棄
+    }
   }
 
   Future<void> _fav() async {
@@ -81,6 +97,7 @@ class _ThreadPageState extends State<ThreadPage> {
       'page': '$_page',
       if (post?.pid != null) 'repquote': '${post!.pid}',
       if (post != null && post.author.isNotEmpty) 'to': post.author,
+      if (_data?.title.isNotEmpty ?? false) 'title': _data!.title,
     });
     context.push(uri.toString());
   }
@@ -126,6 +143,7 @@ class _ThreadPageState extends State<ThreadPage> {
             else
               ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
             if (d != null && !d.requiresLogin) ...[
+              if (_prize != null) _PrizeBanner(prize: _prize!),
               if (_page == 1 && d.title.isNotEmpty)
                 Container(
                   color: Theme.of(context).colorScheme.surface,
@@ -358,6 +376,51 @@ class _FloorComments extends StatelessWidget {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// 回帖獎勵橫幅
+class _PrizeBanner extends StatelessWidget {
+  const _PrizeBanner({required this.prize});
+  final ThreadPrize prize;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: c.primary.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.primary.withValues(alpha: .28)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.redeem_outlined, size: 22, color: c.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${tr('回帖獎勵')}　${prize.pool}',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: c.primary),
+                ),
+                if (prize.rule.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(prize.rule,
+                      style: TextStyle(
+                          fontSize: 12.5, height: 1.4, color: subtle(context))),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

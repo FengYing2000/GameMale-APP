@@ -5,13 +5,17 @@ const brand = Color(0xFF70A128);
 const brandLight = Color(0xFF8DB943);
 const accent = Color(0xFFF15A23);
 
-ThemeData _base(Brightness b) {
+ThemeData _base(Brightness b, [Color seed = brand]) {
   final dark = b == Brightness.dark;
+  // 深色底下原色會太暗，統一往白色拉一點；綠色沿用手調過的 brandLight
+  final primary = dark
+      ? (seed == brand ? brandLight : Color.lerp(seed, Colors.white, .28)!)
+      : seed;
   final scheme = ColorScheme.fromSeed(
-    seedColor: brand,
+    seedColor: seed,
     brightness: b,
   ).copyWith(
-    primary: dark ? brandLight : brand,
+    primary: primary,
     surface: dark ? const Color(0xFF191C22) : Colors.white,
   );
 
@@ -69,6 +73,9 @@ ThemeData _base(Brightness b) {
     ),
   );
 }
+
+ThemeData lightThemeOf(Color seed) => _base(Brightness.light, seed);
+ThemeData darkThemeOf(Color seed) => _base(Brightness.dark, seed);
 
 final lightTheme = _base(Brightness.light);
 final darkTheme = _base(Brightness.dark);
