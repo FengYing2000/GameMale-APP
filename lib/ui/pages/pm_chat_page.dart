@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -68,6 +69,8 @@ class _PmChatPageState extends State<PmChatPage> {
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _busy) return;
+    if (!await requireLogin(context, action: tr('傳送私訊'))) return;
+    if (!mounted) return;
 
     setState(() => _busy = true);
     try {

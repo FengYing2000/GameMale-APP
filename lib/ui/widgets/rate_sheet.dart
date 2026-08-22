@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import 'require_login.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -93,6 +94,8 @@ class _RateSheetState extends State<_RateSheet> {
   Future<void> _submit() async {
     final f = _form;
     if (f == null) return;
+    if (!await requireLogin(context, action: tr('評分'))) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       final r = await api.submitRate(

@@ -1,8 +1,11 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
+import '../../store/session.dart';
 import '../../api/models.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
@@ -46,6 +49,8 @@ class _DoingPageViewState extends State<DoingPageView> {
   }
 
   Future<void> _compose() async {
+    if (!await requireLogin(context, action: tr('發布記錄'))) return;
+    if (!mounted) return;
     final ctrl = TextEditingController();
     final text = await showDialog<String>(
       context: context,
@@ -84,14 +89,17 @@ class _DoingPageViewState extends State<DoingPageView> {
   @override
   Widget build(BuildContext context) {
     final d = _data;
+    final session = context.watch<SessionStore>();
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('記錄廣場'))),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _busy ? null : _compose,
-        tooltip: tr('發布記錄'),
-        child: const Icon(Icons.edit_outlined),
-      ),
+      floatingActionButton: session.loggedIn
+          ? FloatingActionButton(
+              onPressed: _busy ? null : _compose,
+              tooltip: tr('發布記錄'),
+              child: const Icon(Icons.edit_outlined),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -103,11 +111,13 @@ class _DoingPageViewState extends State<DoingPageView> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
                 children: [
+                  // 我和好友／我的記錄需要帳號，訪客不顯示
                   for (final v in api.doingViews)
+                    if (!v.needsLogin || session.loggedIn)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
-                        label: Text(v.value),
+                        label: Text(tr(v.name)),
                         selected: _view == v.key,
                         onSelected: (_) {
                           setState(() => _view = v.key);

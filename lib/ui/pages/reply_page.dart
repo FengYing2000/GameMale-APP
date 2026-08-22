@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -75,6 +76,8 @@ class _ReplyPageState extends State<ReplyPage> {
   Future<void> _submit() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) return toast(context, tr('內容不能空白'));
+    if (!await requireLogin(context, action: tr('回覆主題'))) return;
+    if (!mounted) return;
 
     setState(() => _busy = true);
     try {

@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -47,6 +48,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _act(Future<SubmitResult> Function() run, String what) async {
+    if (!await requireLogin(context, action: what)) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       final r = await run();

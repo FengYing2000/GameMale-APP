@@ -441,6 +441,17 @@ final _failurePatterns = RegExp(
 SubmitResult _submitResult(String html, String what) {
   final doc = toDoc(html);
 
+  // 論壇把我們轉到登入頁 = 這個操作根本沒送出。
+  // 少了這一關，訪客按回覆／收藏／評分都會顯示「成功」但實際什麼都沒發生。
+  if (isLoginWall(doc)) {
+    return SubmitResult(ok: false, message: '需要先登入才能$what');
+  }
+  final notice = noticeMessage(doc) ?? '';
+  if (RegExp('需要先登录|需要先登入|请先登录|請先登入|尚未登录|尚未登入').hasMatch(notice) ||
+      RegExp('您需要先登录才能继续本操作').hasMatch(html)) {
+    return SubmitResult(ok: false, message: '需要先登入才能$what');
+  }
+
   // 轉址後落在帖子頁 → 一定是成功
   if (doc.querySelector('.postListItem') != null ||
       doc.querySelector('.postlist') != null) {
@@ -904,10 +915,11 @@ Future<List<CreditChange>> consumeCreditNotice() async {
 
 /* ─────────────── 記錄廣場 ─────────────── */
 
-const doingViews = <MapEntry<String, String>>[
-  MapEntry('all', '隨便看看'),
-  MapEntry('we', '我和好友'),
-  MapEntry('me', '我的記錄'),
+/// 只有 all 是公開的；we/me 需要帳號
+const doingViews = <({String key, String name, bool needsLogin})>[
+  (key: 'all', name: '隨便看看', needsLogin: false),
+  (key: 'we', name: '我和好友', needsLogin: true),
+  (key: 'me', name: '我的記錄', needsLogin: true),
 ];
 
 /// 記錄沒有手機版，帶 forcemobile=1 拿桌面模板來解析

@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -53,6 +54,8 @@ class _NewThreadPageState extends State<NewThreadPage> {
   }
 
   Future<void> _submit() async {
+    if (!await requireLogin(context, action: tr('發表主題'))) return;
+    if (!mounted) return;
     if (_subject.text.trim().isEmpty) return toast(context, tr('請填標題'));
     if (_message.text.trim().isEmpty) return toast(context, tr('請填內容'));
     if ((_meta?.types.isNotEmpty ?? false) && _typeid == null) {

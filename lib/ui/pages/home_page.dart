@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -79,6 +80,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _sign() async {
     if (_signing || (_data?.sign?.signed ?? false)) return;
+    if (!await requireLogin(context, action: tr('簽到'))) return;
+    if (!mounted) return;
     setState(() => _signing = true);
     try {
       final r = await api.doSign();

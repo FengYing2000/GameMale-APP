@@ -520,6 +520,24 @@ void main() {
     });
   });
 
+
+  group('送出動作遇到登入牆', () {
+    // 訪客按回覆／收藏／評分時，論壇會把我們轉到登入頁。
+    // 少了這個判斷會顯示「成功」但實際什麼都沒發生 —— 最容易讓人白忙的 bug
+    final wall = _load('guest_locked_forum.html');
+    if (wall == null) return;
+
+    test('登入頁被視為未送出', () {
+      expect(isLoginWall(wall), isTrue);
+    });
+
+    test('公開內容頁不會被誤判成登入牆', () {
+      final ok = _load('index.html');
+      if (ok == null) return;
+      expect(isLoginWall(ok), isFalse);
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

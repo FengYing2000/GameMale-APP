@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -62,6 +63,8 @@ class _ThreadPageState extends State<ThreadPage> {
   }
 
   Future<void> _fav() async {
+    if (!await requireLogin(context, action: tr('收藏主題'))) return;
+    if (!mounted) return;
     try {
       final r = await api.favoriteThread(widget.tid);
       if (mounted) toast(context, r.message);
@@ -70,7 +73,9 @@ class _ThreadPageState extends State<ThreadPage> {
     }
   }
 
-  void _reply([PostItem? post]) {
+  Future<void> _reply([PostItem? post]) async {
+    if (!await requireLogin(context, action: tr('回覆主題'))) return;
+    if (!mounted) return;
     final uri = Uri(path: '/t/${widget.tid}/reply', queryParameters: {
       'fid': '${_data?.fid ?? 0}',
       'page': '$_page',
@@ -83,20 +88,24 @@ class _ThreadPageState extends State<ThreadPage> {
   @override
   Widget build(BuildContext context) {
     final d = _data;
+    final session = context.watch<SessionStore>();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(d?.forumName ?? tr('主題')),
         actions: [
-          IconButton(
-              icon: const Icon(Icons.star_border), tooltip: tr('收藏'), onPressed: _fav),
+          if (session.loggedIn)
+            IconButton(
+                icon: const Icon(Icons.star_border), tooltip: tr('收藏'), onPressed: _fav),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _reply(),
-        tooltip: tr('回覆'),
-        child: const Icon(Icons.reply),
-      ),
+      floatingActionButton: session.loggedIn
+          ? FloatingActionButton(
+              onPressed: () => _reply(),
+              tooltip: tr('回覆'),
+              child: const Icon(Icons.reply),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -141,8 +150,8 @@ class _ThreadPageState extends State<ThreadPage> {
               for (final p in d.posts)
                 _PostCard(
                   post: p,
-                  onReply: () => _reply(p),
-                  onRate: (p.pid == null || d.fid == null)
+                  onReply: session.loggedIn ? () => _reply(p) : null,
+                  onRate: (!session.loggedIn || p.pid == null || d.fid == null)
                       ? null
                       : () async {
                           final ok = await showRateSheet(context,
@@ -183,13 +192,13 @@ class _ThreadPageState extends State<ThreadPage> {
 class _PostCard extends StatelessWidget {
   const _PostCard({
     required this.post,
-    required this.onReply,
+    this.onReply,
     this.onRate,
     this.onShowRatings,
     this.onEdit,
   });
   final PostItem post;
-  final VoidCallback onReply;
+  final VoidCallback? onReply;
   final VoidCallback? onRate;
   final VoidCallback? onShowRatings;
 
@@ -285,6 +294,7 @@ class _PostCard extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
+              if (onReply != null)
               TextButton.icon(
                 onPressed: onReply,
                 icon: const Icon(Icons.reply, size: 16),

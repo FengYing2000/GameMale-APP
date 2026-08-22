@@ -1,8 +1,10 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
+import '../../store/session.dart';
 import '../../api/models.dart';
 import '../../theme.dart';
 import '../widgets/login_required.dart';
@@ -149,11 +151,13 @@ class _ForumPageState extends State<ForumPage> {
             IconButton(icon: const Icon(Icons.tune), tooltip: tr('分類'), onPressed: _openMenu),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/f/${widget.fid}/post'),
-        tooltip: tr('發表新主題'),
-        child: const Icon(Icons.edit_outlined),
-      ),
+      floatingActionButton: context.watch<SessionStore>().loggedIn
+          ? FloatingActionButton(
+              onPressed: () => context.push('/f/${widget.fid}/post'),
+              tooltip: tr('發表新主題'),
+              child: const Icon(Icons.edit_outlined),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

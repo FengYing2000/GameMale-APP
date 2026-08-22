@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/discuz.dart' as api;
@@ -42,6 +43,8 @@ class _SignPageState extends State<SignPage> {
   }
 
   Future<void> _sign() async {
+    if (!await requireLogin(context, action: tr('簽到'))) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       final r = await api.doSign();
