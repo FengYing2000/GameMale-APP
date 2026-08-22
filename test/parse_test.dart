@@ -741,6 +741,22 @@ void main() {
     test('讀得到頂端公告（目前是關閉註冊）', () => expect(q.notice, isNotEmpty));
   });
 
+  group('網址組裝', () {
+    test('手機版一律補 mobile=2', () {
+      expect(Api.mobileUrl('forum.php'), '/forum.php?mobile=2');
+      expect(Api.mobileUrl('forum.php?fid=1'), '/forum.php?fid=1&mobile=2');
+      // 已經有了就不要重複加
+      expect(Api.mobileUrl('forum.php?mobile=2'), '/forum.php?mobile=2');
+    });
+    test('桌面版要明寫 mobile=no —— 只是拿掉 mobile=2 沒用', () {
+      // Discuz 會依 iPhone UA 自動轉手機版，不明講就拿不到桌面模板
+      expect(Api.desktopUrl('home.php?mod=space'), '/home.php?mod=space&mobile=no');
+      expect(Api.desktopUrl('home.php?do=profile&mobile=2'),
+          '/home.php?do=profile&mobile=no');
+      expect(Api.desktopUrl('/forum.php'), '/forum.php?mobile=no');
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');
