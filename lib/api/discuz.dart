@@ -197,10 +197,15 @@ List<SubForum> _parseSubforums(dom.Document doc) {
 List<ThreadItem> parseThreadList(dom.Document doc) {
   final out = <ThreadItem>[];
   for (final li in doc.querySelectorAll('.threadlist li')) {
+    // 「我的回覆」的連結是 mod=redirect&goto=findpost&ptid=…，
+    // 只認 mod=viewthread + tid 會讓整頁被過濾成空的
     final a = li.querySelector('a.forumDisplayImgList') ??
-        li.querySelector('a[href*="mod=viewthread"]');
+        li.querySelector('a[href*="mod=viewthread"]') ??
+        li.querySelector('a[href*="goto=findpost"]') ??
+        li.querySelector('a[href*="ptid="]');
     if (a == null) continue;
-    final tid = paramInt(attr(a, 'href'), 'tid');
+    final href = attr(a, 'href');
+    final tid = paramInt(href, 'tid') ?? paramInt(href, 'ptid');
     if (tid == null) continue;
 
     final count = li.querySelector('.count');
@@ -817,9 +822,20 @@ List<ThreadItem> parseFavList(dom.Document doc) {
   return out;
 }
 
-Future<ListPage> _myList(int uid, String doType, int page) async {
+/// 我的主題／回覆／點評都走 do=thread，靠 type 區分
+const myPostTypes = <({String type, String name})>[
+  (type: 'thread', name: '主題'),
+  (type: 'reply', name: '回覆'),
+  (type: 'pcomment', name: '點評'),
+];
+
+Future<ListPage> _myList(int uid, String doType, int page, {String type = ''}) async {
   final q = <String, String>{'mod': 'space', 'uid': '$uid', 'do': doType, 'view': 'me'};
-  if (doType == 'favorite') q['type'] = 'thread';
+  if (doType == 'favorite') {
+    q['type'] = 'thread';
+  } else if (type.isNotEmpty) {
+    q['type'] = type;
+  }
   if (page > 1) q['page'] = '$page';
   final doc = await _page('home.php?${_qs(q)}');
 
@@ -827,9 +843,10 @@ Future<ListPage> _myList(int uid, String doType, int page) async {
   if (list.isNotEmpty) return ListPage(list: list, pager: parsePager(doc));
 
   final seen = <int, ThreadItem>{};
-  for (final a in doc.querySelectorAll('a[href*="mod=viewthread"], a[href*="/thread-"]')) {
+  for (final a in doc.querySelectorAll('a[href*="mod=viewthread"], a[href*="/thread-"], a[href*="ptid="]')) {
     final href = attr(a, 'href');
     final tid = paramInt(href, 'tid') ??
+        paramInt(href, 'ptid') ??
         int.tryParse(RegExp(r'thread-(\d+)').firstMatch(href)?.group(1) ?? '');
     final title = txt(a);
     if (tid != null && title.isNotEmpty) {
@@ -860,8 +877,10 @@ Future<List<SubForum>> fetchFavoriteForums(int uid, {int page = 1}) async {
 }
 
 Future<ListPage> fetchFavorites(int uid, {int page = 1}) => _myList(uid, 'favorite', page);
-Future<ListPage> fetchMyThreads(int uid, {int page = 1}) => _myList(uid, 'thread', page);
-Future<ListPage> fetchMyReplies(int uid, {int page = 1}) => _myList(uid, 'reply', page);
+
+/// 我的主題／回覆／點評共用 do=thread，type 決定看哪一種
+Future<ListPage> fetchMyPosts(int uid, {String type = 'thread', int page = 1}) =>
+    _myList(uid, 'thread', page, type: type);
 
 Future<SubmitResult> favoriteThread(int tid) async {
   await _ensureFormhash();

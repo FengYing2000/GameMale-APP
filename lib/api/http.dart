@@ -66,7 +66,7 @@ class Api {
     return '/$p';
   }
 
-  Future<String> get(String path) async {
+  Future<String> get(String path, {bool followInterstitial = true}) async {
     await init();
     try {
       final res = await _dio.get<String>(
@@ -74,10 +74,37 @@ class Api {
         options: Options(responseType: ResponseType.plain),
       );
       _guard(res.statusCode);
-      return res.data ?? '';
+      final body = res.data ?? '';
+
+      // 有些模組沒有手機版，論壇會先丟一頁「您访问的页面无手机页面」，
+      // 真正的內容在那頁的「继续访问」連結後面。自動跟過去，
+      // 否則搜尋（日誌／相簿／群組／使用者）之類的功能全部拿到空白。
+      if (followInterstitial) {
+        final next = _interstitialTarget(body);
+        if (next != null) return await get(next, followInterstitial: false);
+      }
+      return body;
     } on DioException catch (e) {
       throw DiscuzException('網路連線失敗：${_reason(e)}');
     }
+  }
+
+  static final _jumpLink =
+      RegExp(r'<div class="jump_c">[\s\S]*?<a href="([^"]+)" class="mtn"');
+
+  static String? _interstitialTarget(String html) {
+    if (!html.contains('无手机页面') && !html.contains('無手機頁面')) return null;
+    final m = _jumpLink.firstMatch(html);
+    if (m == null) return null;
+
+    // 提示頁給的是絕對網址，直接丟回 get() 會被接在 baseUrl 後面變成 /https://…
+    var target = m.group(1)!.replaceAll('&amp;', '&');
+    if (target.startsWith(kOrigin)) {
+      target = target.substring(kOrigin.length);
+    } else if (target.startsWith('http')) {
+      return null;   // 指到站外就不跟了
+    }
+    return target.replaceFirst(RegExp(r'^/'), '');
   }
 
   /// Discuz 的表單一律 application/x-www-form-urlencoded。

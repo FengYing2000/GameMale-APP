@@ -565,3 +565,53 @@ class EditForm {
 
   bool get canEdit => formhash.isNotEmpty && pid.isNotEmpty;
 }
+
+/// 搜尋的分類。日誌／相簿／群組／使用者都沒有手機版，
+/// 靠 Api.get 自動跟進「無手機頁面」提示才拿得到內容。
+enum SearchScope {
+  forum('帖子', 'forum'),
+  blog('日誌', 'blog'),
+  album('相簿', 'album'),
+  group('群組', 'group'),
+  user('使用者', 'user');
+
+  const SearchScope(this.label, this.mod);
+  final String label;
+  final String mod;
+}
+
+/// 一筆搜尋結果（各分類共用）
+class SearchHit {
+  final String title;
+  final String subtitle;
+  final String image;
+  final int? tid;
+  final int? uid;
+  final int? fid;
+
+  /// 站外或站內都可能，點擊時由 UI 決定怎麼開
+  final String url;
+
+  const SearchHit({
+    required this.title,
+    this.subtitle = '',
+    this.image = '',
+    this.tid,
+    this.uid,
+    this.fid,
+    this.url = '',
+  });
+}
+
+class SearchResult {
+  final List<SearchHit> hits;
+  final String summary;
+  final PageInfo pager;
+  final String? message;
+  const SearchResult({
+    this.hits = const [],
+    this.summary = '',
+    this.pager = const PageInfo(),
+    this.message,
+  });
+}

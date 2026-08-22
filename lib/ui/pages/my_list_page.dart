@@ -28,6 +28,7 @@ class _MyListPageState extends State<MyListPage> {
 
   ListPage? _data;
   List<SubForum>? _forums;
+  String _postType = 'thread';
   bool _favForums = false;   // 收藏頁的「版塊」分頁
   bool _loading = true;
   String? _err;
@@ -36,6 +37,7 @@ class _MyListPageState extends State<MyListPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.type == 'reply') _postType = 'reply';
     _load();
   }
 
@@ -58,11 +60,9 @@ class _MyListPageState extends State<MyListPage> {
         final f = await api.fetchFavoriteForums(uid, page: _page);
         if (mounted) setState(() => _forums = f);
       } else {
-        final d = switch (widget.type) {
-          'favorite' => await api.fetchFavorites(uid, page: _page),
-          'reply' => await api.fetchMyReplies(uid, page: _page),
-          _ => await api.fetchMyThreads(uid, page: _page),
-        };
+        final d = widget.type == 'favorite'
+            ? await api.fetchFavorites(uid, page: _page)
+            : await api.fetchMyPosts(uid, type: _postType, page: _page);
         if (mounted) setState(() => _data = d);
       }
     } on DiscuzException catch (e) {
@@ -133,6 +133,31 @@ class _MyListPageState extends State<MyListPage> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
+            if (!isFav)
+              SizedBox(
+                height: 50,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+                  children: [
+                    for (final t in api.myPostTypes)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(tr(t.name)),
+                          selected: _postType == t.type,
+                          onSelected: (_) {
+                            setState(() {
+                              _postType = t.type;
+                              _page = 1;
+                            });
+                            _load();
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             if (isFav)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),

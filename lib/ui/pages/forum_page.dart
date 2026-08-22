@@ -147,6 +147,14 @@ class _ForumPageState extends State<ForumPage> {
       appBar: AppBar(
         title: Text(d?.name ?? tr('板塊')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: tr('在本版搜尋'),
+            onPressed: () => context.push(Uri(
+              path: '/f/${widget.fid}/search',
+              queryParameters: {'name': d?.name ?? ''},
+            ).toString()),
+          ),
           if (d != null && (d.subforums.isNotEmpty || d.types.isNotEmpty))
             IconButton(icon: const Icon(Icons.tune), tooltip: tr('分類'), onPressed: _openMenu),
         ],

@@ -111,6 +111,13 @@ GoRouter _buildRouter(SessionStore session) {
     routes: [
       GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
       GoRoute(path: '/f/:fid/post', builder: (c, s) => NewThreadPage(fid: _int(s, 'fid'))),
+      GoRoute(
+        path: '/f/:fid/search',
+        builder: (c, s) => SearchPage(
+          fid: _int(s, 'fid'),
+          forumName: s.uri.queryParameters['name'] ?? '',
+        ),
+      ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
       GoRoute(
         path: '/t/:tid/reply',

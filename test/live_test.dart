@@ -7,6 +7,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
+import 'package:gamemale/api/models.dart';
+import 'package:gamemale/api/search.dart' as search;
 
 const _cookie = String.fromEnvironment('GM_COOKIE');
 
@@ -170,6 +172,27 @@ void main() {
     print('  合併後 ${list.length} 筆，例如：${list.first.name} '
         '${list.first.credits.join('、')}'
         '${list.first.reason.isEmpty ? '' : '（${list.first.reason}）'}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+
+  test('五種搜尋分類都拿得到結果', () async {
+    await api.fetchIndex();   // 先取得 formhash
+    for (final scope in SearchScope.values) {
+      final r = await search.search('游戏', scope: scope);
+      // ignore: avoid_print
+      print('  ${scope.label.padRight(4)} ${r.hits.length} 筆'
+          '${r.hits.isEmpty ? '（${r.message}）' : '，例如：${r.hits.first.title}'}');
+      await Future<void>.delayed(const Duration(seconds: 2));  // 論壇有搜尋頻率限制
+    }
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
+  test('我的回覆抓得到資料', () async {
+    final me = await api.checkSession();
+    final r = await api.fetchMyPosts(me!.uid!, type: 'reply');
+    expect(r.list, isNotEmpty, reason: '我的回覆不該是空的');
+    expect(r.list.every((t) => t.tid > 0), isTrue);
+    // ignore: avoid_print
+    print('  我的回覆 ${r.list.length} 筆，例如：${r.list.first.title}');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
