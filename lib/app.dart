@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'api/parse.dart' as parse;
 import 'i18n/s2t.dart';
-import 'store/history.dart';
+import 'store/replied.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
@@ -22,7 +22,8 @@ import 'ui/pages/new_thread_page.dart';
 import 'ui/pages/notice_page.dart';
 import 'ui/pages/pm_chat_page.dart';
 import 'ui/pages/profile_page.dart';
-import 'ui/pages/history_page.dart';
+import 'ui/pages/album_page.dart';
+import 'ui/pages/blog_page.dart';
 import 'ui/pages/register_page.dart';
 import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
@@ -41,7 +42,7 @@ class GameMaleApp extends StatefulWidget {
 class _GameMaleAppState extends State<GameMaleApp> {
   late final SessionStore _session;
   late final SettingsStore _settings;
-  late final ReplyHistory _history;
+  late final RepliedStore _replied;
   late final GoRouter _router;
 
   @override
@@ -49,7 +50,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     super.initState();
     _session = SessionStore();
     _settings = SettingsStore();
-    _history = ReplyHistory();
+    _replied = RepliedStore();
     _router = _buildRouter(_session);
     _boot();
   }
@@ -60,7 +61,9 @@ class _GameMaleAppState extends State<GameMaleApp> {
     await _settings.load();
     _applyLang();
     _settings.addListener(_applyLang);
-    await _history.load();
+    _settings.addListener(_applyReplied);
+    _session.addListener(_applyReplied);
+    _applyReplied();
     await _session.restore();
   }
 
@@ -74,11 +77,19 @@ class _GameMaleAppState extends State<GameMaleApp> {
     if (changed && mounted) setState(() {});
   }
 
+  /// 已回帖標記：開關來自設定，資料屬於某個帳號，兩邊都要跟著變
+  void _applyReplied() {
+    _replied.setUser(_session.uid);
+    _replied.setEnabled(_settings.markReplied && _session.loggedIn);
+  }
+
   @override
   void dispose() {
     _settings.removeListener(_applyLang);
+    _settings.removeListener(_applyReplied);
+    _session.removeListener(_applyReplied);
     _session.dispose();
-    _history.dispose();
+    _replied.dispose();
     _settings.dispose();
     super.dispose();
   }
@@ -89,7 +100,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
       providers: [
         ChangeNotifierProvider.value(value: _session),
         ChangeNotifierProvider.value(value: _settings),
-        ChangeNotifierProvider.value(value: _history),
+        ChangeNotifierProvider.value(value: _replied),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp.router(
@@ -128,8 +139,16 @@ GoRouter _buildRouter(SessionStore session) {
         ),
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
-      GoRoute(path: '/history', builder: (c, s) => const HistoryPage()),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
+      GoRoute(
+        path: '/album/:uid/:id',
+        builder: (c, s) =>
+            AlbumPage(uid: _int(s, 'uid'), albumId: _int(s, 'id')),
+      ),
+      GoRoute(
+        path: '/blog/:uid/:id',
+        builder: (c, s) => BlogPage(uid: _int(s, 'uid'), blogId: _int(s, 'id')),
+      ),
       GoRoute(
         path: '/t/:tid/reply',
         builder: (c, s) => ReplyPage(

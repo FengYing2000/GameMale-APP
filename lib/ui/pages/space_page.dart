@@ -116,14 +116,23 @@ class _SpacePageState extends State<SpacePage>
   void _open(SpaceItem it) {
     if (it.tid != null) {
       context.push('/t/${it.tid}');
-    } else if (it.albumId != null || it.url.contains('do=album')) {
-      // 相冊內頁沒有手機版，交給瀏覽器
-      _openExternal(it.url);
-    } else if (it.uid != null && it.url.contains('space-uid')) {
-      context.push('/u/${it.uid}');
-    } else if (it.url.isNotEmpty) {
-      _openExternal(it.url);
+      return;
     }
+    if (it.albumId != null) {
+      context.push('/album/${it.uid ?? widget.uid}/${it.albumId}');
+      return;
+    }
+    // 日誌網址是 blog-<uid>-<blogid>.html
+    final blog = RegExp(r'blog-(\d+)-(\d+)').firstMatch(it.url);
+    if (blog != null) {
+      context.push('/blog/${blog.group(1)}/${blog.group(2)}');
+      return;
+    }
+    if (it.uid != null) {
+      context.push('/u/${it.uid}');
+      return;
+    }
+    if (it.url.isNotEmpty) _openExternal(it.url);
   }
 
   void _openExternal(String url) {
@@ -325,6 +334,9 @@ class _SpacePageState extends State<SpacePage>
             final it = items[i];
             return InkWell(
               onTap: () => _open(it),
+              onLongPress: it.uid == null
+                  ? null
+                  : () => context.push('/space/${it.uid}'),
               borderRadius: BorderRadius.circular(8),
               child: Column(
                 children: [

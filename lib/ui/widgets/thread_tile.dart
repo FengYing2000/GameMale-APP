@@ -1,8 +1,10 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/models.dart';
+import '../../store/replied.dart';
 import '../../theme.dart';
 import 'avatar.dart';
 
@@ -19,6 +21,7 @@ class ThreadTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meta = TextStyle(fontSize: 12, color: faint(context));
+    final replied = context.watch<RepliedStore>().statusOf(item.tid);
 
     return InkWell(
       onTap: () => context.push('/t/${item.tid}'),
@@ -29,6 +32,25 @@ class ThreadTile extends StatelessWidget {
           children: [
             Text.rich(
               TextSpan(children: [
+                // 已回帖標記放在最前面，一眼掃得到
+                if (replied == true)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32).withValues(alpha: .16),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(tr('已回'),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF2E7D32))),
+                    ),
+                  ),
                 if (item.type.isNotEmpty)
                   WidgetSpan(
                     alignment: PlaceholderAlignment.middle,

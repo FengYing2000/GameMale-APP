@@ -10,6 +10,8 @@ import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/external_link.dart';
+import '../widgets/image_reveal.dart';
 import '../widgets/login_required.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/poll_card.dart';
@@ -28,7 +30,9 @@ class ThreadPage extends StatefulWidget {
 
 class _ThreadPageState extends State<ThreadPage> {
   ThreadData? _data;
-  ThreadPrize? _prize;
+  ThreadExtras _extras = const ThreadExtras();
+  bool _faved = false;
+  final _revealImages = ValueNotifier<bool>(false);
   bool _loading = true;
   String? _err;
   int _page = 1;
@@ -43,6 +47,7 @@ class _ThreadPageState extends State<ThreadPage> {
   @override
   void dispose() {
     _scroll.dispose();
+    _revealImages.dispose();
     super.dispose();
   }
 
@@ -62,17 +67,15 @@ class _ThreadPageState extends State<ThreadPage> {
         if (_scroll.hasClients) _scroll.jumpTo(0);
       }
     }
-    _loadPrize();
+    _loadExtras();
   }
 
-  /// 回帖獎勵只有桌面模板有，要多抓一次約 90 KB 的頁面，
-  /// 所以獨立於主流程之外，失敗也不影響帖子顯示
-  Future<void> _loadPrize() async {
-    if (!mounted) return;
-    if (!context.read<SettingsStore>().loadPrize) return;
+  /// 回帖獎勵與附件只有桌面模板有，要多抓一次頁面（約 90 KB），
+  /// 所以獨立於主流程之外跑，失敗也不影響帖子顯示
+  Future<void> _loadExtras() async {
     try {
-      final p = await api.fetchThreadPrize(widget.tid, page: _page);
-      if (mounted) setState(() => _prize = p);
+      final e = await api.fetchThreadExtras(widget.tid, page: _page);
+      if (mounted) setState(() => _extras = e);
     } on DiscuzException {
       // 靜靜放棄
     }
@@ -83,7 +86,12 @@ class _ThreadPageState extends State<ThreadPage> {
     if (!mounted) return;
     try {
       final r = await api.favoriteThread(widget.tid);
-      if (mounted) toast(context, r.message);
+      if (!mounted) return;
+      toast(context, r.message);
+      // 論壇不會在帖子頁告訴你收過沒有，只有送出時才知道。
+      // 「已收藏过本主题」也代表已收藏，星星一樣要亮起來
+      final already = r.message.contains('已收藏');
+      if (r.ok || already) setState(() => _faved = true);
     } on DiscuzException catch (e) {
       if (mounted) toast(context, tr('收藏失敗：${e.message}'));
     }
@@ -111,9 +119,25 @@ class _ThreadPageState extends State<ThreadPage> {
       appBar: AppBar(
         title: Text(d?.forumName ?? tr('主題')),
         actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: _revealImages,
+            builder: (c, all, _) => context.watch<SettingsStore>().autoLoadImages
+                ? const SizedBox.shrink()
+                : IconButton(
+                    tooltip: all ? tr('圖片已全部載入') : tr('全部載入圖片'),
+                    icon: Icon(all
+                        ? Icons.photo_library
+                        : Icons.photo_library_outlined),
+                    onPressed: all ? null : () => _revealImages.value = true,
+                  ),
+          ),
           if (session.loggedIn)
             IconButton(
-                icon: const Icon(Icons.star_border), tooltip: tr('收藏'), onPressed: _fav),
+              icon: Icon(_faved ? Icons.star : Icons.star_border),
+              color: _faved ? const Color(0xFFF6B93B) : null,
+              tooltip: _faved ? tr('已收藏') : tr('收藏'),
+              onPressed: _fav,
+            ),
         ],
       ),
       floatingActionButton: session.loggedIn
@@ -132,7 +156,9 @@ class _ThreadPageState extends State<ThreadPage> {
                 _load();
               },
             ),
-      body: RefreshIndicator(
+      body: ImageReveal(
+        notifier: _revealImages,
+        child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           controller: _scroll,
@@ -143,7 +169,7 @@ class _ThreadPageState extends State<ThreadPage> {
             else
               ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
             if (d != null && !d.requiresLogin) ...[
-              if (_prize != null) _PrizeBanner(prize: _prize!),
+              if (_extras.prize != null) _PrizeBanner(prize: _extras.prize!),
               if (_page == 1 && d.title.isNotEmpty)
                 Container(
                   color: Theme.of(context).colorScheme.surface,
@@ -174,6 +200,8 @@ class _ThreadPageState extends State<ThreadPage> {
                 ),
               if (d.poll case final poll?)
                 PollCard(poll: poll, onVoted: _load),
+              if (_extras.attachments.isNotEmpty)
+                _AttachmentCard(items: _extras.attachments),
               for (final p in d.posts)
                 _PostCard(
                   post: p,
@@ -204,7 +232,72 @@ class _ThreadPageState extends State<ThreadPage> {
             ],
           ],
         ),
+        ),
       ),
+    );
+  }
+}
+
+/// 附件清單。免費的點了直接開下載，付費的先讓使用者知道要花多少
+class _AttachmentCard extends StatelessWidget {
+  const _AttachmentCard({required this.items});
+  final List<Attachment> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
+          child: Text('${tr('附件')} · ${items.length}',
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: faint(context))),
+        ),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                ListTile(
+                  leading: Icon(
+                    items[i].needsPay
+                        ? Icons.lock_outline
+                        : Icons.attach_file,
+                    size: 22,
+                  ),
+                  title: Text(items[i].name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, height: 1.35)),
+                  subtitle: Text(
+                    [
+                      if (items[i].needsPay) '${tr('售價')} ${items[i].price}',
+                      if (items[i].info.isNotEmpty) items[i].info,
+                    ].join('　'),
+                    style: TextStyle(fontSize: 11.5, color: faint(context)),
+                  ),
+                  trailing: Icon(
+                      items[i].needsPay ? Icons.shopping_cart_outlined : Icons.download,
+                      size: 18),
+                  onTap: () => confirmExternal(
+                    context,
+                    items[i].url,
+                    title: items[i].needsPay ? tr('購買附件') : tr('下載附件'),
+                    note: items[i].needsPay
+                        ? tr('購買要在論壇頁面上完成，App 會交給瀏覽器。')
+                        : tr('App 不能直接存檔，下載會交給瀏覽器處理。'),
+                  ),
+                ),
+                if (i != items.length - 1)
+                  const Divider(height: 1, indent: 56, endIndent: 14),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

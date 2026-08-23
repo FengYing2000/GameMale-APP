@@ -95,14 +95,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const Divider(indent: 56, endIndent: 14),
                 SwitchListTile(
-                  value: settings.showPrize,
-                  secondary: const Icon(Icons.redeem_outlined),
-                  title: Text(tr('顯示回帖獎勵')),
+                  value: settings.markReplied,
+                  secondary: const Icon(Icons.reply_all_outlined),
+                  title: Text(tr('標記已回過的帖')),
                   subtitle: Text(
-                    tr('手機版模板沒有這段，要另外載入桌面頁（約 90 KB）；行動網路下自動略過'),
+                    tr('主題列表會標出自己回過的帖。每個主題都要單獨問論壇一次，'
+                        '列表載入後會慢慢補上'),
                     style: const TextStyle(fontSize: 12),
                   ),
-                  onChanged: settings.setShowPrize,
+                  onChanged: settings.setMarkReplied,
                 ),
               ],
             ),

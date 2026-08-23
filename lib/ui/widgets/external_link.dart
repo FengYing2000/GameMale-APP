@@ -8,7 +8,12 @@ import 'toast.dart';
 
 /// 離開論壇前先問一聲。帖子裡常有網盤、短網址、廣告轉址，
 /// 直接跳出去使用者根本不知道被帶去哪，所以把完整網址攤開來看。
-Future<void> confirmExternal(BuildContext context, String url) async {
+Future<void> confirmExternal(
+  BuildContext context,
+  String url, {
+  String? title,
+  String? note,
+}) async {
   final uri = Uri.tryParse(url);
   final host = uri?.host ?? url;
 
@@ -16,7 +21,7 @@ Future<void> confirmExternal(BuildContext context, String url) async {
     context: context,
     builder: (ctx) => AlertDialog(
       icon: const Icon(Icons.open_in_new, size: 26),
-      title: Text(tr('即將離開 GameMale')),
+      title: Text(title ?? tr('即將離開 GameMale')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,7 +41,7 @@ Future<void> confirmExternal(BuildContext context, String url) async {
                     fontSize: 12, height: 1.45, color: subtle(ctx))),
           ),
           const SizedBox(height: 10),
-          Text(tr('這個連結不屬於論壇，請自行判斷是否安全。'),
+          Text(note ?? tr('這個連結不屬於論壇，請自行判斷是否安全。'),
               style: TextStyle(fontSize: 12, color: faint(ctx))),
         ],
       ),

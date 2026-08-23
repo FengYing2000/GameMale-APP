@@ -4,13 +4,14 @@
 // 這正好順便驗證「論壇連不上時 App 不會白畫面或崩潰」。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gamemale/store/history.dart';
+import 'package:gamemale/store/replied.dart';
 import 'package:gamemale/store/session.dart';
 import 'package:gamemale/store/settings.dart';
 import 'package:gamemale/ui/pages/edit_post_page.dart';
 import 'package:gamemale/ui/pages/forum_page.dart';
 import 'package:gamemale/ui/pages/guide_page.dart';
-import 'package:gamemale/ui/pages/history_page.dart';
+import 'package:gamemale/ui/pages/album_page.dart';
+import 'package:gamemale/ui/pages/blog_page.dart';
 import 'package:gamemale/ui/pages/home_page.dart';
 import 'package:gamemale/ui/pages/login_page.dart';
 import 'package:gamemale/ui/pages/me_page.dart';
@@ -35,7 +36,7 @@ Widget _host(Widget page) => MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SessionStore()),
         ChangeNotifierProvider(create: (_) => SettingsStore()),
-        ChangeNotifierProvider(create: (_) => ReplyHistory()),
+        ChangeNotifierProvider(create: (_) => RepliedStore()),
       ],
       child: MaterialApp(home: page),
     );
@@ -77,7 +78,8 @@ void main() {
     '私訊對話': const PmChatPage(touid: 1),
     '個人資料': const ProfilePage(uid: 733814),
     '個人空間': const SpacePage(uid: 733814),
-    '回帖紀錄': const HistoryPage(),
+    '相冊': const AlbumPage(uid: 691946, albumId: 5635),
+    '日誌': const BlogPage(uid: 610657, blogId: 148970),
     '我的收藏': const MyListPage(type: 'favorite'),
     '我的主題': const MyListPage(type: 'thread'),
     '簽到': const SignPage(),

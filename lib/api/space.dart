@@ -142,7 +142,9 @@ List<SpaceItem> _blog(dom.Document doc) {
 /// 相冊：封面圖 + `(張數)`
 List<SpaceItem> _album(dom.Document doc) {
   final out = <SpaceItem>[];
-  for (final li in doc.querySelectorAll('.ml li')) {
+  // 相冊清單是 ul.ml.mla
+  final grid = doc.querySelectorAll('.mla li');
+  for (final li in grid.isNotEmpty ? grid : doc.querySelectorAll('.ml li')) {
     final a = li.querySelector('p a') ?? li.querySelector('a');
     if (a == null) continue;
     final href = attr(a, 'href');
@@ -153,6 +155,8 @@ List<SpaceItem> _album(dom.Document doc) {
       meta: txt(li.querySelector('p.ptn')).replaceFirst(txt(a), '').trim(),
       albumId: paramInt(href, 'id'),
       uid: _uidOf(href),
+      // 沒公開的相冊封面會被換成 nopublish.gif
+      locked: attr(li.querySelector('img'), 'src').contains('nopublish'),
     ));
   }
   return out;
@@ -256,3 +260,58 @@ int? _uidOf(String href) =>
 int? _tidOf(String href) =>
     int.tryParse(RegExp(r'thread-(\d+)').firstMatch(href)?.group(1) ?? '') ??
     paramInt(href, 'tid');
+
+
+/// 相冊內頁。縮圖網址後面接了 `.thumb.jpg`，去掉就是原圖
+Future<AlbumData> fetchAlbum(int uid, int albumId, {int page = 1}) async {
+  final q = 'home.php?mod=space&uid=$uid&do=album&id=$albumId'
+      '${page > 1 ? '&page=$page' : ''}';
+  final doc = toDoc(await Api.instance.get(q, desktop: true));
+  return parseAlbum(doc);
+}
+
+AlbumData parseAlbum(dom.Document doc) {
+  final photos = <AlbumPhoto>[];
+  // 照片格是 ul.ml.mlp；只寫 .ml 會連側欄那排小圖一起抓進來
+  final grid = doc.querySelectorAll('.mlp li');
+  for (final li in grid.isNotEmpty ? grid : doc.querySelectorAll('.ml li')) {
+    final img = li.querySelector('img');
+    if (img == null) continue;
+    final thumb = absolute(attr(img, 'src'));
+    if (thumb.isEmpty) continue;
+    photos.add(AlbumPhoto(
+      thumb: thumb,
+      full: thumb.replaceFirst(RegExp(r'\.thumb\.jpg$'), ''),
+      picid: paramInt(attr(li.querySelector('a'), 'href'), 'picid'),
+    ));
+  }
+  final head = txt(doc.querySelector('.tbmu'));
+  return AlbumData(
+    title: RegExp(r'^(.*?)\s*-').firstMatch(txt(doc.querySelector('title')))?.group(1) ??
+        txt(doc.querySelector('title')),
+    count: RegExp(r'共\s*\d+\s*张图片').firstMatch(head)?.group(0) ?? '',
+    photos: photos,
+    pager: parsePager(doc),
+    message: photos.isEmpty ? (noticeMessage(doc) ?? '這本相冊看不到內容') : null,
+  );
+}
+
+/// 日誌內頁
+Future<BlogData> fetchBlog(int uid, int blogId) async {
+  final doc = toDoc(
+      await Api.instance.get('blog-$uid-$blogId.html', desktop: true));
+  return parseBlog(doc);
+}
+
+BlogData parseBlog(dom.Document doc) {
+  final article = doc.querySelector('#blog_article');
+  if (article == null) {
+    return BlogData(message: noticeMessage(doc) ?? '看不到這篇日誌');
+  }
+  return BlogData(
+    title: txt(doc.querySelector('.vw h1.ph') ?? doc.querySelector('h1.ph')),
+    author: txt(doc.querySelector('#pcd h2')),
+    meta: txt(doc.querySelector('.vw .h p.xg2')),
+    html: sanitizeContent(article),
+  );
+}

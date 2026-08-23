@@ -693,6 +693,7 @@ class SpaceItem {
     this.fid,
     this.albumId,
     this.children = const [],
+    this.locked = false,
   });
 
   final String title;
@@ -712,6 +713,9 @@ class SpaceItem {
 
   /// 記錄的回覆，或空間首頁裡一個區塊的內容
   final List<SpaceItem> children;
+
+  /// 相冊沒公開時封面是 nopublish.gif
+  final bool locked;
 }
 
 class SpaceData {
@@ -779,4 +783,190 @@ class RegisterQuiz {
 
   /// 論壇是否關閉註冊
   final bool closed;
+}
+
+/// 版塊列表的篩選條件。Discuz 的 `filter` 只能有一個值，
+/// 但 `specialtype`／`dateline`／`orderby` 可以疊在上面（實測過）
+class ForumQuery {
+  const ForumQuery({
+    this.special = '',
+    this.tab = '',
+    this.orderby = '',
+    this.dateline = 0,
+    this.typeid = 0,
+  });
+
+  /// '' | poll | reward
+  final String special;
+
+  /// '' | lastpost | heat | hot | digest
+  final String tab;
+
+  /// '' | dateline（發帖時間）| replies（回覆數）| views（查看數）
+  final String orderby;
+
+  /// 秒數：86400 一天、604800 一週…
+  final int dateline;
+
+  /// 主題分類
+  final int typeid;
+
+  ForumQuery copyWith({
+    String? special,
+    String? tab,
+    String? orderby,
+    int? dateline,
+    int? typeid,
+  }) =>
+      ForumQuery(
+        special: special ?? this.special,
+        tab: tab ?? this.tab,
+        orderby: orderby ?? this.orderby,
+        dateline: dateline ?? this.dateline,
+        typeid: typeid ?? this.typeid,
+      );
+
+  bool get isDefault =>
+      special.isEmpty &&
+      tab.isEmpty &&
+      orderby.isEmpty &&
+      dateline == 0 &&
+      typeid == 0;
+
+  /// 有沒有動到「更多」裡的東西，決定那顆按鈕要不要亮起來
+  bool get hasExtra => orderby.isNotEmpty || dateline > 0;
+
+  /// 組成 forum.php 的查詢參數
+  Map<String, String> toParams() {
+    final q = <String, String>{};
+
+    if (typeid > 0) {
+      q['filter'] = 'typeid';
+      q['typeid'] = '$typeid';
+    } else if (special.isNotEmpty) {
+      q['filter'] = 'specialtype';
+      q['specialtype'] = special;
+    } else if (dateline > 0) {
+      q['filter'] = 'dateline';
+    } else if (orderby.isNotEmpty) {
+      // 發帖時間走 author，回覆／查看走 reply —— 論壇自己就是這樣分的
+      q['filter'] = orderby == 'dateline' ? 'author' : 'reply';
+    } else if (tab.isNotEmpty) {
+      q['filter'] = tab;
+    }
+
+    if (dateline > 0) q['dateline'] = '$dateline';
+    if (tab == 'digest') q['digest'] = '1';
+
+    final order = orderby.isNotEmpty
+        ? orderby
+        : switch (tab) {
+            'lastpost' => 'lastpost',
+            'heat' => 'heats',
+            _ => '',
+          };
+    if (order.isNotEmpty) q['orderby'] = order;
+
+    return q;
+  }
+}
+
+/// 「更多」裡的排序選項
+const forumOrderOptions = <({String value, String label})>[
+  (value: '', label: '預設'),
+  (value: 'dateline', label: '發帖時間'),
+  (value: 'replies', label: '回覆/查看'),
+  (value: 'views', label: '查看'),
+];
+
+/// 「更多」裡的時間範圍
+const forumDateOptions = <({int value, String label})>[
+  (value: 0, label: '全部時間'),
+  (value: 86400, label: '一天'),
+  (value: 172800, label: '兩天'),
+  (value: 604800, label: '一週'),
+  (value: 2592000, label: '一個月'),
+  (value: 7948800, label: '三個月'),
+];
+
+/// 主題類別
+const forumSpecialOptions = <({String value, String label})>[
+  (value: '', label: '全部主題'),
+  (value: 'poll', label: '投票'),
+  (value: 'reward', label: '懸賞'),
+];
+
+/// 帖子附件。免費的 `url` 直接可下載；要付費的 `price` 有值，`url` 是購買頁
+class Attachment {
+  const Attachment({
+    required this.name,
+    required this.url,
+    this.icon = '',
+    this.info = '',
+    this.price = '',
+  });
+
+  final String name;
+  final String url;
+  final String icon;
+
+  /// 「223 Bytes, 下载次数: 27」
+  final String info;
+
+  /// 「2 枚金币」，免費的話是空字串
+  final String price;
+
+  bool get needsPay => price.isNotEmpty;
+}
+
+/// 帖子頁桌面模板才有的東西：回帖獎勵與附件清單
+class ThreadExtras {
+  const ThreadExtras({this.prize, this.attachments = const []});
+  final ThreadPrize? prize;
+  final List<Attachment> attachments;
+
+  bool get isEmpty => prize == null && attachments.isEmpty;
+}
+
+/// 相冊內頁
+class AlbumData {
+  const AlbumData({
+    this.title = '',
+    this.count = '',
+    this.photos = const [],
+    this.pager = const PageInfo(),
+    this.message,
+  });
+
+  final String title;
+  final String count;
+  final List<AlbumPhoto> photos;
+  final PageInfo pager;
+  final String? message;
+}
+
+class AlbumPhoto {
+  const AlbumPhoto({required this.thumb, required this.full, this.picid});
+  final String thumb;
+  final String full;
+  final int? picid;
+}
+
+/// 日誌內頁
+class BlogData {
+  const BlogData({
+    this.title = '',
+    this.author = '',
+    this.meta = '',
+    this.html = '',
+    this.message,
+  });
+
+  final String title;
+  final String author;
+  final String meta;
+
+  /// 已淨化過的內文 HTML
+  final String html;
+  final String? message;
 }

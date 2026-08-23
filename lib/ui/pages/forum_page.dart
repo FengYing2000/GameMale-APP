@@ -1,11 +1,12 @@
-import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
-import '../../store/session.dart';
 import '../../api/models.dart';
+import '../../i18n/ui.dart';
+import '../../store/replied.dart';
+import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/login_required.dart';
 import '../widgets/pager_bar.dart';
@@ -25,9 +26,17 @@ class _ForumPageState extends State<ForumPage> {
   bool _loading = true;
   String? _err;
   int _page = 1;
-  int _typeid = 0;
-  ForumTab _tab = ForumTab(name: tr('全部'));
+  ForumQuery _q = const ForumQuery();
   final _scroll = ScrollController();
+
+  /// 論壇自己的四個分頁 + 網頁版才有的「熱帖」
+  static const _tabs = <({String value, String label})>[
+    (value: '', label: '全部'),
+    (value: 'lastpost', label: '最新'),
+    (value: 'heat', label: '熱門'),
+    (value: 'hot', label: '熱帖'),
+    (value: 'digest', label: '精華'),
+  ];
 
   @override
   void initState() {
@@ -47,15 +56,12 @@ class _ForumPageState extends State<ForumPage> {
       _err = null;
     });
     try {
-      final d = await api.fetchForum(
-        widget.fid,
-        page: _page,
-        filter: _tab.filter,
-        orderby: _tab.orderby,
-        digest: _tab.digest,
-        typeid: _typeid,
-      );
+      final d = await api.fetchForum(widget.fid, page: _page, query: _q);
       if (mounted) setState(() => _data = d);
+      if (mounted && d.list.isNotEmpty) {
+        // 已回帖標記：背景慢慢問，不擋畫面
+        context.read<RepliedStore>().check([for (final t in d.list) t.tid]);
+      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
@@ -66,78 +72,142 @@ class _ForumPageState extends State<ForumPage> {
     }
   }
 
-  void _pickTab(ForumTab t) {
+  void _apply(ForumQuery q) {
     setState(() {
-      _tab = t;
-      _typeid = 0;
+      _q = q;
       _page = 1;
     });
     _load();
   }
 
-  void _pickType(ThreadType t) {
-    setState(() {
-      _typeid = t.typeid;
-      _tab = ForumTab(name: tr('全部'));
-      _page = 1;
-    });
-    Navigator.of(context).pop();
-    _load();
+  Future<void> _pickSpecial() async {
+    final v = await _sheet<String>(
+      title: tr('主題類別'),
+      options: [
+        for (final o in forumSpecialOptions) (value: o.value, label: tr(o.label))
+      ],
+      current: _q.special,
+    );
+    if (v != null) _apply(_q.copyWith(special: v, typeid: 0));
   }
 
-  void _openMenu() {
+  Future<void> _pickType() async {
     final d = _data;
-    if (d == null) return;
-    showModalBottomSheet(
+    if (d == null || d.types.isEmpty) return;
+    final v = await _sheet<int>(
+      title: tr('主題分類'),
+      options: [
+        (value: 0, label: tr('不分類')),
+        for (final t in d.types)
+          (value: t.typeid, label: t.count.isEmpty ? t.name : '${t.name} ${t.count}'),
+      ],
+      current: _q.typeid,
+    );
+    if (v != null) _apply(_q.copyWith(typeid: v, special: ''));
+  }
+
+  /// 排序與時間放同一張表，跟網頁版的「更多」一致
+  Future<void> _openMore() async {
+    var q = _q;
+    await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (c) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (d.subforums.isNotEmpty) ...[
-                Text(tr('子版塊'), style: TextStyle(fontSize: 12, color: faint(c))),
+      builder: (c) => StatefulBuilder(
+        builder: (c, setSheet) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('排序'),
+                    style: TextStyle(fontSize: 12, color: faint(c))),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final s in d.subforums)
-                      ActionChip(
-                        label: Text(s.name),
-                        onPressed: () {
-                          Navigator.of(c).pop();
-                          context.push('/f/${s.fid}');
-                        },
+                    for (final o in forumOrderOptions)
+                      ChoiceChip(
+                        label: Text(tr(o.label)),
+                        selected: q.orderby == o.value,
+                        onSelected: (_) =>
+                            setSheet(() => q = q.copyWith(orderby: o.value)),
                       ),
                   ],
                 ),
                 const SizedBox(height: 18),
-              ],
-              if (d.types.isNotEmpty) ...[
-                Text(tr('主題分類'), style: TextStyle(fontSize: 12, color: faint(c))),
+                Text(tr('時間'),
+                    style: TextStyle(fontSize: 12, color: faint(c))),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final t in d.types)
-                      FilterChip(
-                        label: Text(t.count.isEmpty ? t.name : '${t.name} ${t.count}'),
-                        selected: _typeid == t.typeid,
-                        onSelected: (_) => _pickType(t),
+                    for (final o in forumDateOptions)
+                      ChoiceChip(
+                        label: Text(tr(o.label)),
+                        selected: q.dateline == o.value,
+                        onSelected: (_) =>
+                            setSheet(() => q = q.copyWith(dateline: o.value)),
                       ),
                   ],
                 ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => setSheet(() =>
+                          q = q.copyWith(orderby: '', dateline: 0)),
+                      child: Text(tr('清除')),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(c),
+                      child: Text(tr('套用')),
+                    ),
+                  ],
+                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
+    if (q.orderby != _q.orderby || q.dateline != _q.dateline) _apply(q);
   }
+
+  Future<T?> _sheet<T>({
+    required String title,
+    required List<({T value, String label})> options,
+    required T current,
+  }) =>
+      showModalBottomSheet<T>(
+        context: context,
+        showDragHandle: true,
+        builder: (c) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(title,
+                    style: TextStyle(fontSize: 12, color: faint(c))),
+              ),
+              for (final o in options)
+                ListTile(
+                  title: Text(o.label, style: const TextStyle(fontSize: 15)),
+                  trailing: o.value == current
+                      ? Icon(Icons.check,
+                          size: 20, color: Theme.of(c).colorScheme.primary)
+                      : null,
+                  onTap: () => Navigator.pop(c, o.value),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -155,8 +225,6 @@ class _ForumPageState extends State<ForumPage> {
               queryParameters: {'name': d?.name ?? ''},
             ).toString()),
           ),
-          if (d != null && (d.subforums.isNotEmpty || d.types.isNotEmpty))
-            IconButton(icon: const Icon(Icons.tune), tooltip: tr('分類'), onPressed: _openMenu),
         ],
       ),
       floatingActionButton: context.watch<SessionStore>().loggedIn
@@ -189,12 +257,12 @@ class _ForumPageState extends State<ForumPage> {
                     for (final m in d.meta)
                       Padding(
                         padding: const EdgeInsets.only(right: 14),
-                        child: Text(m, style: TextStyle(fontSize: 12, color: faint(context))),
+                        child: Text(m,
+                            style: TextStyle(fontSize: 12, color: faint(context))),
                       ),
                   ],
                 ),
               ),
-            // 子板塊直接列出來 —— 原本只藏在右上角選單裡，很難發現
             if (d != null && d.subforums.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
@@ -212,27 +280,7 @@ class _ForumPageState extends State<ForumPage> {
                   ],
                 ),
               ),
-            if (d != null && d.tabs.isNotEmpty)
-              SizedBox(
-                height: 50,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-                  children: [
-                    for (final t in d.tabs)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(t.name),
-                          selected: _typeid == 0 &&
-                              _tab.filter == t.filter &&
-                              _tab.orderby == t.orderby,
-                          onSelected: (_) => _pickTab(t),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            _filterBar(d),
             if (d?.requiresLogin ?? false)
               LoginRequired(message: d?.message)
             else
@@ -249,4 +297,76 @@ class _ForumPageState extends State<ForumPage> {
       ),
     );
   }
+
+  Widget _filterBar(ForumData? d) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final specialLabel = forumSpecialOptions
+        .firstWhere((o) => o.value == _q.special,
+            orElse: () => forumSpecialOptions.first)
+        .label;
+    final typeName = _q.typeid == 0
+        ? null
+        : d?.types
+            .where((t) => t.typeid == _q.typeid)
+            .map((t) => t.name)
+            .firstOrNull;
+
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+        children: [
+          _dropdown(
+            label: typeName ?? tr(specialLabel),
+            active: _q.special.isNotEmpty || _q.typeid > 0,
+            onTap: _pickSpecial,
+          ),
+          if (d != null && d.types.isNotEmpty)
+            _dropdown(
+              label: tr('分類'),
+              active: _q.typeid > 0,
+              onTap: _pickType,
+            ),
+          for (final t in _tabs)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(tr(t.label)),
+                selected: _q.tab == t.value,
+                onSelected: (_) => _apply(_q.copyWith(tab: t.value)),
+              ),
+            ),
+          _dropdown(
+            label: tr('更多'),
+            active: _q.hasExtra,
+            onTap: _openMore,
+            icon: Icons.tune,
+            accent: accent,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dropdown({
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+    IconData icon = Icons.expand_more,
+    Color? accent,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ActionChip(
+          avatar: Icon(icon,
+              size: 16,
+              color: active ? (accent ?? Theme.of(context).colorScheme.primary) : null),
+          label: Text(label),
+          side: active
+              ? BorderSide(color: Theme.of(context).colorScheme.primary)
+              : null,
+          onPressed: onTap,
+        ),
+      );
 }

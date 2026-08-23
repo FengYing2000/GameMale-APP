@@ -11,6 +11,7 @@ import '../../api/parse.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import 'image_actions.dart';
+import 'image_reveal.dart';
 import 'image_viewer.dart';
 import 'external_link.dart';
 
@@ -209,7 +210,7 @@ class _PostImageState extends State<_PostImage> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsStore>();
-    final show = _forced || settings.autoLoadImages;
+    final show = _forced || ImageReveal.of(context) || settings.autoLoadImages;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),

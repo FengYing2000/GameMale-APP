@@ -230,15 +230,70 @@ void main() {
     print('  ${g.map((x) => '${x.name}(${x.items.length})').join('、')}');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
-  test('回帖獎勵：有獎勵的帖子讀得到，沒獎勵的回 null', () async {
-    final has = await api.fetchThreadPrize(194186);
-    expect(has, isNotNull, reason: '這帖有回帖獎勵');
-    expect(has!.pool, isNotEmpty);
-    expect(has.rule, isNotEmpty, reason: '#pl_top 第一列是空的廣告列，不能抓到空字串');
-    final none = await api.fetchThreadPrize(129896);
-    expect(none, isNull);
+  test('桌面頁的額外資訊：回帖獎勵與附件', () async {
+    final prize = await api.fetchThreadExtras(194186);
+    expect(prize.prize, isNotNull, reason: '這帖有回帖獎勵');
+    expect(prize.prize!.pool, isNotEmpty);
+    expect(prize.prize!.rule, isNotEmpty,
+        reason: '#pl_top 第一列是空的廣告列，不能抓到空字串');
+
+    final att = await api.fetchThreadExtras(129896);
+    expect(att.prize, isNull, reason: '這帖沒有回帖獎勵');
+    expect(att.attachments, isNotEmpty, reason: '這帖有一個付費附件');
+    // 檔名那段裡巢了提示框，抓錯會拿到上傳時間而不是檔案大小
+    expect(att.attachments.first.info, contains('下载次数'));
+    expect(att.attachments.first.needsPay, isTrue);
     // ignore: avoid_print
-    print('  獎池 ${has.pool}　${has.rule}');
+    print('  獎池 ${prize.prize!.pool}　附件 ${att.attachments.first.name}'
+        '（${att.attachments.first.price}）');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('相冊內頁與日誌內頁解得出來', () async {
+    final a = await space.fetchAlbum(691946, 5635);
+    expect(a.photos, isNotEmpty);
+    // 照片格是 ul.mlp，只寫 .ml 會把側欄小圖也算進來
+    expect(a.photos.every((p) => p.thumb.startsWith('http')), isTrue);
+    expect(a.photos.every((p) => !p.full.endsWith('.thumb.jpg')), isTrue);
+
+    final b = await space.fetchBlog(610657, 148970);
+    expect(b.title, isNotEmpty);
+    expect(b.html, isNotEmpty);
+    // ignore: avoid_print
+    print('  相冊 ${a.title} ${a.photos.length} 張｜日誌 ${b.title}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('版塊篩選：投票／懸賞／排序／時間都會改變結果', () async {
+    Future<List<int>> ids(ForumQuery q) async =>
+        (await api.fetchForum(150, query: q)).list.map((t) => t.tid).toList();
+
+    final all = await ids(const ForumQuery());
+    final poll = await ids(const ForumQuery(special: 'poll'));
+    final reward = await ids(const ForumQuery(special: 'reward'));
+    final byViews = await ids(const ForumQuery(orderby: 'views'));
+    final week = await ids(const ForumQuery(dateline: 604800));
+
+    expect(all, isNotEmpty);
+    expect(poll, isNotEmpty);
+    expect(reward, isNotEmpty);
+    expect(poll, isNot(equals(all)));
+    expect(reward, isNot(equals(poll)));
+    expect(byViews, isNot(equals(all)));
+    expect(week, isNotEmpty);
+    // ignore: avoid_print
+    print('  全部 ${all.length}｜投票 ${poll.length}｜懸賞 ${reward.length}'
+        '｜依查看 ${byViews.length}｜一週 ${week.length}');
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
+  test('authorid 判斷有沒有回過帖', () async {
+    // 回過的帖會正常回內容，沒回過的論壇直接給「未定义操作」
+    Future<bool> replied(int tid) async {
+      final html = await Api.instance
+          .get('forum.php?mod=viewthread&tid=$tid&authorid=677863');
+      return !(html.contains('未定义操作') || html.contains('未定義操作'));
+    }
+
+    expect(await replied(194186), isTrue, reason: '這帖回過');
+    expect(await replied(194170), isFalse, reason: '這帖沒回過');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，

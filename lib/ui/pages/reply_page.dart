@@ -1,5 +1,5 @@
 import '../../i18n/ui.dart';
-import '../../store/history.dart';
+import '../../store/replied.dart';
 import '../../store/session.dart';
 import '../widgets/composer_toolbar.dart';
 import '../widgets/require_login.dart';
@@ -82,13 +82,8 @@ class _ReplyPageState extends State<ReplyPage> {
       final rule = await api.consumeCreditRule();
       if (!mounted) return;
 
-      await context.read<ReplyHistory>().add(ReplyRecord(
-            tid: widget.tid,
-            title: widget.threadTitle,
-            excerpt: text.length > 80 ? '${text.substring(0, 80)}…' : text,
-            at: DateTime.now(),
-          ));
-      if (!mounted) return;
+      // 剛回完就直接標起來，不用再去問論壇一次
+      context.read<RepliedStore>().markReplied(widget.tid);
       toast(context, _creditToast(r.message, rule, credits));
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {

@@ -129,20 +129,11 @@ SignInfo? parseSignWidget(dom.Document doc) {
 Future<ForumData> fetchForum(
   int fid, {
   int page = 1,
-  String filter = '',
-  String orderby = '',
-  int typeid = 0,
-  bool digest = false,
+  ForumQuery query = const ForumQuery(),
 }) async {
   final q = <String, String>{'mod': 'forumdisplay', 'fid': '$fid'};
   if (page > 1) q['page'] = '$page';
-  if (filter.isNotEmpty) q['filter'] = filter;
-  if (orderby.isNotEmpty) q['orderby'] = orderby;
-  if (typeid > 0) {
-    q['filter'] = 'typeid';
-    q['typeid'] = '$typeid';
-  }
-  if (digest) q['digest'] = '1';
+  q.addAll(query.toParams());
 
   final doc = await _page('forum.php?${_qs(q)}');
   return parseForumFromDoc(doc, fid);
@@ -892,14 +883,18 @@ bool _within(dom.Element node, dom.Element ancestor) {
   return false;
 }
 
-/// 回帖獎勵橫幅。這段只在桌面模板有（`#pl_top`），手機版整塊被拿掉了，
-/// 所以要另外抓一次桌面頁 —— 大約 90 KB，故由設定決定要不要抓。
-Future<ThreadPrize?> fetchThreadPrize(int tid, {int page = 1}) async {
+/// 回帖獎勵與附件都只在桌面模板有（手機版整塊被拿掉），所以另外抓一次桌面頁。
+/// 一次抓齊，不要為了兩件事各請求一遍。
+Future<ThreadExtras> fetchThreadExtras(int tid, {int page = 1}) async {
   final html = await Api.instance.get(
     'forum.php?mod=viewthread&tid=$tid&page=$page',
     desktop: true,
   );
-  return parseThreadPrize(toDoc(html));
+  final doc = toDoc(html);
+  return ThreadExtras(
+    prize: parseThreadPrize(doc),
+    attachments: parseAttachments(doc),
+  );
 }
 
 ThreadPrize? parseThreadPrize(dom.Document doc) {
@@ -910,11 +905,49 @@ ThreadPrize? parseThreadPrize(dom.Document doc) {
   final pool = txt(top.querySelector('strong'));
   // #pl_top 第一列是空的廣告列，規則在後面那個有字的 td.plc
   final rule = top
-          .querySelectorAll('td.plc')
-          .map(txt)
-          .firstWhere((t) => t.isNotEmpty, orElse: () => '');
+      .querySelectorAll('td.plc')
+      .map(txt)
+      .firstWhere((t) => t.isNotEmpty, orElse: () => '');
   if (pool.isEmpty && rule.isEmpty) return null;
   return ThreadPrize(pool: pool, rule: rule);
+}
+
+/// `.pattl dl.tattl` —— `dt` 是檔案類型圖示，`dd` 裡第一段是檔名連結，
+/// 後面接大小／下載次數，付費附件多一段「售价」
+List<Attachment> parseAttachments(dom.Document doc) {
+  final out = <Attachment>[];
+  for (final dl in doc.querySelectorAll('dl.tattl')) {
+    final a = dl.querySelector('p.attnm a') ?? dl.querySelector('a');
+    if (a == null) continue;
+    final name = txt(a);
+    if (name.isEmpty) continue;
+
+    var info = '';
+    var price = '';
+    // 只看 dd 的直接子 p —— 檔名那段裡還巢了一個提示框，
+    // 用 querySelectorAll 會先抓到提示框裡的上傳時間
+    for (final dd in dl.children.where((e) => e.localName == 'dd')) {
+      for (final p in dd.children.where((e) => e.localName == 'p')) {
+        if (p.classes.contains('attnm')) continue;
+        final t = txt(p);
+        if (t.isEmpty) continue;
+        if (t.contains('售价') || t.contains('售價')) {
+          price = txt(p.querySelector('strong'));
+        } else if (info.isEmpty) {
+          info = t;
+        }
+      }
+    }
+
+    out.add(Attachment(
+      name: name,
+      url: absolute(attr(a, 'href')),
+      icon: absolute(attr(dl.querySelector('dt img'), 'src')),
+      info: info,
+      price: price,
+    ));
+  }
+  return out;
 }
 
 /// 加好友（論壇會回一個確認表單頁，成功與否看回應訊息）

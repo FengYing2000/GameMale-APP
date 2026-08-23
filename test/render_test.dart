@@ -9,12 +9,16 @@ import 'package:gamemale/api/models.dart';
 import 'package:gamemale/api/parse.dart';
 import 'package:gamemale/ui/widgets/post_body.dart';
 import 'package:gamemale/ui/widgets/state_box.dart';
+import 'package:gamemale/store/replied.dart';
 import 'package:gamemale/store/settings.dart';
 import 'package:gamemale/ui/widgets/thread_tile.dart';
 import 'package:provider/provider.dart';
 
-Widget _wrap(Widget child) => ChangeNotifierProvider(
-      create: (_) => SettingsStore(),
+Widget _wrap(Widget child) => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsStore()),
+        ChangeNotifierProvider(create: (_) => RepliedStore()),
+      ],
       child: MaterialApp(
         home: Scaffold(body: SingleChildScrollView(child: child)),
       ),
