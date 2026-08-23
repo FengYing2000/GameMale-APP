@@ -13,10 +13,16 @@ class S2T {
 
   Map<String, String> _chars = const {};
   Map<String, String> _phrases = const {};
+  Map<String, String> _taiwan = const {};
   int _maxPhrase = 0;
   bool _ready = false;
 
   bool get ready => _ready;
+
+  /// 要不要把用詞也換成台灣說法（软件→軟體）。
+  /// 這會改掉論壇原本的用字，帖子標題就跟網頁版對不起來，所以預設關閉；
+  /// 字形轉換（简→繁）不受影響，一直都是開的。
+  bool useTaiwanWords = false;
 
   Future<void> load() async {
     if (_ready) return;
@@ -25,7 +31,8 @@ class S2T {
       final data = jsonDecode(raw) as Map<String, dynamic>;
       _chars = (data['chars'] as Map).cast<String, String>();
       _phrases = (data['phrases'] as Map).cast<String, String>();
-      for (final k in _phrases.keys) {
+      _taiwan = (data['taiwan'] as Map? ?? const {}).cast<String, String>();
+      for (final k in [..._phrases.keys, ..._taiwan.keys]) {
         if (k.length > _maxPhrase) _maxPhrase = k.length;
       }
       _ready = true;
@@ -46,7 +53,7 @@ class S2T {
       final maxLen = (i + _maxPhrase > input.length) ? input.length - i : _maxPhrase;
       for (var len = maxLen; len >= 2; len--) {
         final slice = input.substring(i, i + len);
-        final hit = _phrases[slice];
+        final hit = _phrases[slice] ?? (useTaiwanWords ? _taiwan[slice] : null);
         if (hit != null) {
           buf.write(hit);
           i += len;

@@ -81,16 +81,39 @@ class _ThreadPageState extends State<ThreadPage> {
     }
   }
 
+  /// 再按一次就取消收藏。取消要 favid，那是收藏清單才有的東西
   Future<void> _fav() async {
     if (!await requireLogin(context, action: tr('收藏主題'))) return;
     if (!mounted) return;
+    final store = context.read<FavoriteStore>();
+
     try {
+      if (store.contains(widget.tid)) {
+        final favid = store.favidOf(widget.tid) ?? 0;
+        if (favid == 0) {
+          // 清單過期時可能只記得 tid，重抓一次才拿得到 favid
+          await store.refresh(force: true);
+        }
+        final id = store.favidOf(widget.tid) ?? 0;
+        if (id == 0) {
+          if (mounted) toast(context, tr('找不到這筆收藏，請下拉重整收藏清單'));
+          return;
+        }
+        final r = await api.unfavorite(id);
+        if (!mounted) return;
+        toast(context, r.message);
+        if (r.ok) await store.remove(widget.tid);
+        return;
+      }
+
       final r = await api.favoriteThread(widget.tid);
       if (!mounted) return;
-      toast(context, r.message);
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
       // 「已收藏过本主题」也代表已收藏，一樣要記起來
       if (r.ok || r.message.contains('已收藏')) {
-        await context.read<FavoriteStore>().add(widget.tid);
+        await store.add(widget.tid);
+        // favid 只有清單裡才有，補抓一次，之後才取消得掉
+        await store.refresh(force: true);
       }
     } on DiscuzException catch (e) {
       if (mounted) toast(context, tr('收藏失敗：${e.message}'));
@@ -142,7 +165,7 @@ class _ThreadPageState extends State<ThreadPage> {
               return IconButton(
                 icon: Icon(faved ? Icons.star : Icons.star_border),
                 color: faved ? const Color(0xFFF6B93B) : null,
-                tooltip: faved ? tr('已收藏') : tr('收藏'),
+                tooltip: faved ? tr('取消收藏') : tr('收藏'),
                 onPressed: _fav,
               );
             }),
@@ -206,37 +229,48 @@ class _ThreadPageState extends State<ThreadPage> {
                         fontSize: 19, fontWeight: FontWeight.w700, height: 1.4),
                   ),
                 ),
-              if (d.poll case final poll?)
-                PollCard(poll: poll, onVoted: _load),
-              if (_extras.attachments.isNotEmpty)
-                _AttachmentCard(items: _extras.attachments),
-              for (final p in d.posts)
+              // 投票與附件都是樓主帖的一部分，排在第一樓底下才合理
+              for (var i = 0; i < d.posts.length; i++) ...[
                 _PostCard(
-                  post: p,
-                  onReply: session.loggedIn ? () => _reply(p) : null,
-                  onRate: (!session.loggedIn || p.pid == null || d.fid == null)
+                  post: d.posts[i],
+                  onReply:
+                      session.loggedIn ? () => _reply(d.posts[i]) : null,
+                  onRate: (!session.loggedIn ||
+                          d.posts[i].pid == null ||
+                          d.fid == null)
                       ? null
                       : () async {
                           final ok = await showRateSheet(context,
-                              fid: d.fid!, tid: widget.tid, pid: p.pid!);
+                              fid: d.fid!,
+                              tid: widget.tid,
+                              pid: d.posts[i].pid!);
                           if (ok) _load();
                         },
-                  onShowRatings: p.pid == null
+                  onShowRatings: d.posts[i].pid == null
                       ? null
-                      : () => showRatings(context, tid: widget.tid, pid: p.pid!),
-                  onEdit: (p.pid == null ||
+                      : () => showRatings(context,
+                          tid: widget.tid, pid: d.posts[i].pid!),
+                  onEdit: (d.posts[i].pid == null ||
                           d.fid == null ||
-                          p.uid == null ||
-                          p.uid != context.read<SessionStore>().uid)
+                          d.posts[i].uid == null ||
+                          d.posts[i].uid != context.read<SessionStore>().uid)
                       ? null
                       : () async {
                           final ok = await context.push<bool>(Uri(
-                            path: '/t/${widget.tid}/edit/${p.pid}',
+                            path: '/t/${widget.tid}/edit/${d.posts[i].pid}',
                             queryParameters: {'fid': '${d.fid}'},
                           ).toString());
                           if (ok == true) _load();
                         },
                 ),
+                // 投票與附件屬於樓主帖，排在第一樓底下才合理
+                if (i == 0) ...[
+                  if (d.poll case final poll?)
+                    PollCard(poll: poll, onVoted: _load),
+                  if (_extras.attachments.isNotEmpty)
+                    _AttachmentCard(items: _extras.attachments),
+                ],
+              ],
             ],
           ],
         ),

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'api/parse.dart' as parse;
 import 'i18n/s2t.dart';
+import 'api/http.dart';
 import 'store/favorites.dart';
 import 'store/replied.dart';
 import 'store/session.dart';
@@ -25,7 +26,10 @@ import 'ui/pages/pm_chat_page.dart';
 import 'ui/pages/profile_page.dart';
 import 'ui/pages/album_page.dart';
 import 'ui/pages/blog_page.dart';
+import 'ui/pages/group_page.dart';
+import 'ui/pages/groups_page.dart';
 import 'ui/pages/register_page.dart';
+import 'ui/pages/web_page.dart';
 import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
 import 'ui/pages/settings_page.dart';
@@ -75,8 +79,10 @@ class _GameMaleAppState extends State<GameMaleApp> {
   void _applyLang() {
     final want = _settings.toTraditional;
     final changed = parse.convertToTraditional != want ||
-        UiLang.instance.simplified == want;
+        UiLang.instance.simplified == want ||
+        S2T.instance.useTaiwanWords != (want && _settings.taiwanWords);
     parse.convertToTraditional = want;       // 論壇內容
+    S2T.instance.useTaiwanWords = want && _settings.taiwanWords;
     UiLang.instance.simplified = !want;      // 介面文字
     if (changed && mounted) setState(() {});
   }
@@ -147,7 +153,16 @@ GoRouter _buildRouter(SessionStore session) {
         ),
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
+      GoRoute(path: '/groups', builder: (c, s) => const GroupsPage()),
+      GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
+      GoRoute(
+        path: '/web',
+        builder: (c, s) => WebPage(
+          url: s.uri.queryParameters['url'] ?? kOrigin,
+          title: s.uri.queryParameters['title'] ?? '',
+        ),
+      ),
       GoRoute(
         path: '/album/:uid/:id',
         builder: (c, s) =>

@@ -10,6 +10,8 @@ import 'package:gamemale/store/session.dart';
 import 'package:gamemale/store/settings.dart';
 import 'package:gamemale/ui/pages/edit_post_page.dart';
 import 'package:gamemale/ui/pages/forum_page.dart';
+import 'package:gamemale/ui/pages/group_page.dart';
+import 'package:gamemale/ui/pages/groups_page.dart';
 import 'package:gamemale/ui/pages/guide_page.dart';
 import 'package:gamemale/ui/pages/album_page.dart';
 import 'package:gamemale/ui/pages/blog_page.dart';
@@ -82,6 +84,8 @@ void main() {
     '個人空間': const SpacePage(uid: 733814),
     '相冊': const AlbumPage(uid: 691946, albumId: 5635),
     '日誌': const BlogPage(uid: 610657, blogId: 148970),
+    '群組': const GroupPage(fid: 116),
+    '群組列表': const GroupsPage(),
     '我的收藏': const MyListPage(type: 'favorite'),
     '我的主題': const MyListPage(type: 'thread'),
     '簽到': const SignPage(),

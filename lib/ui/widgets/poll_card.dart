@@ -59,11 +59,16 @@ class _PollCardState extends State<PollCard> {
             if (p.deadline.isNotEmpty)
               Text(p.deadline, style: TextStyle(fontSize: 12, color: faint(context))),
             const SizedBox(height: 8),
-            if (!p.votable)
+            // 已經投過票的話論壇不給表單，改成把結果攤出來
+            if (p.voted)
+              for (final o in p.options) _result(context, o, p)
+            else if (!p.votable)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(tr('這個投票目前不開放作答'),
-                    style: TextStyle(fontSize: 13, color: subtle(context))),
+                child: Text(
+                  p.status.isNotEmpty ? p.status : tr('這個投票目前不開放作答'),
+                  style: TextStyle(fontSize: 13, color: subtle(context)),
+                ),
               )
             else if (p.multiple)
               for (final o in p.options)
@@ -103,6 +108,20 @@ class _PollCardState extends State<PollCard> {
                   ],
                 ),
               ),
+            if (p.voted && p.status.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.how_to_vote_outlined,
+                      size: 16, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(p.status,
+                        style: TextStyle(fontSize: 12.5, color: subtle(context))),
+                  ),
+                ],
+              ),
+            ],
             if (p.votable) ...[
               const SizedBox(height: 6),
               SizedBox(
@@ -115,6 +134,46 @@ class _PollCardState extends State<PollCard> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// 一列結果：選項名 + 進度條 + 百分比與票數
+  Widget _result(BuildContext context, PollOption o, Poll p) {
+    final pct = double.tryParse(o.percent.replaceAll('%', '')) ?? 0;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(o.text,
+                    style: const TextStyle(fontSize: 14, height: 1.35)),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                o.percent.isEmpty ? '' : '${o.percent}　${o.votes}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: subtle(context)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct / 100,
+              minHeight: 6,
+              backgroundColor: scheme.onSurface.withValues(alpha: .08),
+            ),
+          ),
+        ],
       ),
     );
   }

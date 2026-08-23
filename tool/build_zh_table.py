@@ -52,20 +52,25 @@ def main():
     def by_char(s):
         return ''.join(chars.get(c, c) for c in s)
 
-    # 詞表只留「逐字轉會不一樣」的，其餘是冗餘
-    phrases = {}
-    for src, dst in {**DISAMBIGUATE, **TAIWAN}.items():
-        if by_char(src) != dst:
-            phrases[src] = dst
+    # 詞表只留「逐字轉會不一樣」的，其餘是冗餘。
+    # 消歧義與台灣用語分開存 —— 前者是正確性（这里→這裡），後者是換詞
+    # （软件→軟體），換詞會讓帖子標題跟論壇原文對不起來，所以要能關掉。
+    def trim(d):
+        return {src: dst for src, dst in d.items() if by_char(src) != dst}
+
+    phrases = trim(DISAMBIGUATE)
+    taiwan = {src: dst for src, dst in trim(TAIWAN).items()
+              if src not in phrases}
 
     io.open(OUT, 'w', encoding='utf-8').write(
-        json.dumps({'chars': chars, 'phrases': phrases},
+        json.dumps({'chars': chars, 'phrases': phrases, 'taiwan': taiwan},
                    ensure_ascii=False, separators=(',', ':')))
 
     print('單字表   : %d（其中一對多 %d 個由 zh_rules.CHAR 決定）' % (len(chars), ambiguous))
     print('排除轉換 : %d 個字 → %s' % (len(EXCLUDE), ' '.join(sorted(EXCLUDE))))
-    print('詞表     : %d 條（消歧義 %d + 台灣用語 %d，去除冗餘後）'
-          % (len(phrases), len(DISAMBIGUATE), len(TAIWAN)))
+    print('消歧義詞 : %d 條（原始 %d）' % (len(phrases), len(DISAMBIGUATE)))
+    print('台灣用語 : %d 條（原始 %d，可在 App 設定裡關掉）'
+          % (len(taiwan), len(TAIWAN)))
     print('輸出     : %s (%d KB)' % (OUT, os.path.getsize(OUT) // 1024))
 
 

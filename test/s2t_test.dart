@@ -75,7 +75,10 @@ void main() {
     });
   });
 
-  group('台灣用語', () {
+  group('台灣用語（要開了才會換詞）', () {
+    setUp(() => S2T.instance.useTaiwanWords = true);
+    tearDown(() => S2T.instance.useTaiwanWords = false);
+
     test('電腦網路', () {
       expect(c('软件'), '軟體');
       expect(c('硬盘'), '硬碟');
@@ -95,6 +98,26 @@ void main() {
       expect(c('举报'), '檢舉');
       expect(c('屏蔽'), '封鎖');
       expect(c('点赞'), '按讚');
+    });
+  });
+
+  group('關掉台灣用語時只做字形轉換', () {
+    // 換詞會改掉論壇原本的用字，帖子標題就跟網頁版對不起來
+    test('用詞維持原樣', () {
+      expect(c('软件'), '軟件');
+      expect(c('视频'), '視頻');
+      expect(c('默认'), '默認');
+    });
+    test('字形照樣轉，消歧義也還在', () {
+      expect(c('发表回复'), '發表回覆');
+      expect(c('头发'), '頭髮');
+      expect(c('这里'), '這裡');
+    });
+    test('汉化不會變成中文化 —— 台灣也講漢化，換掉只會對不上論壇原文', () {
+      expect(c('汉化'), '漢化');
+      S2T.instance.useTaiwanWords = true;
+      expect(c('汉化'), '漢化');
+      S2T.instance.useTaiwanWords = false;
     });
   });
 

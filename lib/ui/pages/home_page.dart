@@ -151,12 +151,15 @@ class _HomePageState extends State<HomePage> {
     final data = _data;
 
     return Scaffold(
+      drawer: const QuickDrawer(),
       appBar: AppBar(
         title: const Text('GameMale'),
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Avatar(session.avatar,
-              size: 30, onTap: () => showQuickMenu(context)),
+        leading: Builder(
+          builder: (c) => Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Avatar(session.avatar,
+                size: 30, onTap: () => Scaffold.of(c).openDrawer()),
+          ),
         ),
         actions: [
           IconButton(

@@ -383,5 +383,29 @@ BlogData parseBlog(dom.Document doc) {
         : txt(doc.querySelector('#click_div ~ h3')),
     comments: comments,
     otherPosts: others,
+    formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
   );
+}
+
+/// 日誌留言。跟留言板同一支端點，只是 idtype 換成 blogid
+Future<SubmitResult> postBlogComment(
+  int blogId,
+  String message,
+  String formhash,
+) async {
+  final html = await Api.instance.post(
+    'home.php?mod=spacecp&ac=comment&commentsubmit=yes'
+    '&handlekey=commentbloghk_$blogId&inajax=1',
+    {
+      'formhash': formhash,
+      'message': message,
+      'id': '$blogId',
+      'idtype': 'blogid',
+      'commentsubmit': 'true',
+      'quickcomment': 'true',
+      'handlekey': 'commentbloghk_$blogId',
+    },
+    desktop: true,
+  );
+  return submitResult(html, '留言');
 }

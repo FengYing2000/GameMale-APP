@@ -21,13 +21,15 @@ class FavoriteStore extends ChangeNotifier {
   /// 收藏很多的人清單會很長，設個上限免得無止境翻頁
   static const _maxPages = 30;
 
-  Set<int> _tids = <int>{};
+  /// tid → favid。取消收藏要 favid，只記 tid 的話就只能加不能減
+  Map<int, int> _favids = <int, int>{};
   int? _uid;
   bool _loading = false;
 
-  bool contains(int tid) => _tids.contains(tid);
+  bool contains(int tid) => _favids.containsKey(tid);
+  int? favidOf(int tid) => _favids[tid];
   bool get loading => _loading;
-  int get count => _tids.length;
+  int get count => _favids.length;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -35,9 +37,14 @@ class FavoriteStore extends ChangeNotifier {
     final raw = prefs.getString(_key);
     if (raw == null) return;
     try {
-      final list = jsonDecode(raw);
-      if (list is List) {
-        _tids = list.whereType<int>().toSet();
+      final map = jsonDecode(raw);
+      if (map is Map) {
+        _favids = <int, int>{};
+        for (final e in map.entries) {
+          final t = int.tryParse('${e.key}');
+          if (t == null) continue;
+          _favids[t] = e.value is int ? e.value as int : 0;
+        }
         notifyListeners();
       }
     } catch (_) {
@@ -49,7 +56,7 @@ class FavoriteStore extends ChangeNotifier {
   Future<void> setUser(int? uid) async {
     if (_uid == uid) return;
     _uid = uid;
-    _tids = <int>{};
+    _favids = <int, int>{};
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     if (uid == null) {
@@ -70,25 +77,28 @@ class FavoriteStore extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final at = prefs.getInt(_stampKey) ?? 0;
     final age = DateTime.now().millisecondsSinceEpoch - at;
-    if (!force && _tids.isNotEmpty && age < const Duration(days: 1).inMilliseconds) {
+    if (!force &&
+        _favids.isNotEmpty &&
+        age < const Duration(days: 1).inMilliseconds) {
       return;
     }
 
     _loading = true;
     notifyListeners();
     try {
-      final found = <int>{};
+      final found = <int, int>{};
       for (var page = 1; page <= _maxPages; page++) {
         final r = await api.fetchFavorites(uid, page: page);
         if (r.list.isEmpty) break;
-        found.addAll(r.list.map((t) => t.tid));
+        for (final t in r.list) {
+          found[t.tid] = t.favid ?? 0;
+        }
         if (page >= r.pager.total) break;
       }
       if (found.isNotEmpty) {
-        _tids = found;
-        await prefs.setString(_key, jsonEncode(found.toList()));
-        await prefs.setInt(
-            _stampKey, DateTime.now().millisecondsSinceEpoch);
+        _favids = found;
+        await _save();
+        await prefs.setInt(_stampKey, DateTime.now().millisecondsSinceEpoch);
       }
     } on DiscuzException {
       // 抓不到就沿用舊的，總比整排變空心好
@@ -98,17 +108,22 @@ class FavoriteStore extends ChangeNotifier {
     }
   }
 
-  Future<void> add(int tid) async {
-    if (!_tids.add(tid)) return;
+  Future<void> add(int tid, {int favid = 0}) async {
+    if (_favids[tid] == favid && _favids.containsKey(tid)) return;
+    _favids[tid] = favid;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(_tids.toList()));
+    await _save();
   }
 
   Future<void> remove(int tid) async {
-    if (!_tids.remove(tid)) return;
+    if (_favids.remove(tid) == null) return;
     notifyListeners();
+    await _save();
+  }
+
+  Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(_tids.toList()));
+    await prefs.setString(
+        _key, jsonEncode({for (final e in _favids.entries) '${e.key}': e.value}));
   }
 }

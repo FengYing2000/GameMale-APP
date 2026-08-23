@@ -45,6 +45,7 @@ class SettingsStore extends ChangeNotifier {
   static const _kTheme = 'gm.theme';
   static const _kAccent = 'gm.accent';
   static const _kReplied = 'gm.replied';
+  static const _kTwWords = 'gm.twWords';
 
   ImagePolicy imagePolicy = ImagePolicy.always;
   AppLang lang = AppLang.auto;
@@ -53,6 +54,10 @@ class SettingsStore extends ChangeNotifier {
 
   /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇
   bool markReplied = true;
+
+  /// 把論壇內容的用詞也換成台灣說法（软件→軟體）。
+  /// 會改掉帖子原本的字，跟網頁版對不起來，所以預設關閉
+  bool taiwanWords = false;
 
   bool _onWifi = true;
   bool get onWifi => _onWifi;
@@ -100,6 +105,7 @@ class SettingsStore extends ChangeNotifier {
       orElse: () => Accent.blue,
     );
     markReplied = prefs.getBool(_kReplied) ?? true;
+    taiwanWords = prefs.getBool(_kTwWords) ?? false;
 
     await _refreshNetwork();
     Connectivity().onConnectivityChanged.listen((_) => _refreshNetwork());
@@ -141,6 +147,13 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kAccent, v.name);
+  }
+
+  Future<void> setTaiwanWords(bool v) async {
+    taiwanWords = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kTwWords, v);
   }
 
   Future<void> setMarkReplied(bool v) async {

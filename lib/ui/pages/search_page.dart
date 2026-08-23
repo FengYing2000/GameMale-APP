@@ -180,7 +180,8 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
     if (hit.fid != null) {
-      context.push('/f/${hit.fid}');
+      context.push(
+          _scope == SearchScope.group ? '/g/${hit.fid}' : '/f/${hit.fid}');
       return;
     }
     if (hit.uid != null && _scope == SearchScope.user) {

@@ -444,9 +444,22 @@ class NewThreadMeta {
 }
 
 class SignResult {
+  const SignResult({
+    this.html = '',
+    this.signed = false,
+    this.level = '',
+    this.stats = const [],
+  });
+
+  /// 論壇給的整段 HTML，只在解不出結構化欄位時當備案
   final String html;
   final bool signed;
-  const SignResult({this.html = '', this.signed = false});
+
+  /// 「簽到等級 Lv 12」
+  final String level;
+
+  /// 今日排名／連續簽到／累計簽到
+  final List<({String label, String value})> stats;
 }
 
 class NoticeResult {
@@ -508,7 +521,12 @@ class DoingPage {
 class PollOption {
   final String id;
   final String text;
-  const PollOption(this.id, this.text);
+
+  /// 已經投過票時論壇會把結果一起給出來
+  final String percent;
+  final int votes;
+
+  const PollOption(this.id, this.text, {this.percent = '', this.votes = 0});
 }
 
 class Poll {
@@ -520,13 +538,20 @@ class Poll {
   final String formhash;
   final String action;
 
-  /// 已經投過或結果已公開時，論壇不再給選項
-  bool get votable => options.isNotEmpty;
+  /// 論壇給的狀態句，例如「您已经投过票，谢谢您的参与」
+  final String status;
+
+  /// 有沒有可以送出的表單。已經投過票時論壇只給結果，不給 radio
+  bool get votable => options.any((o) => o.id.isNotEmpty);
+
+  /// 已經投過票（論壇改成顯示百分比與票數）
+  bool get voted => !votable && options.isNotEmpty;
 
   const Poll({
     this.title = '',
     this.info = '',
     this.deadline = '',
+    this.status = '',
     this.options = const [],
     this.multiple = false,
     this.formhash = '',
@@ -1018,6 +1043,7 @@ class BlogData {
     this.reactedCount = '',
     this.comments = const [],
     this.otherPosts = const [],
+    this.formhash = '',
     this.message,
   });
 
@@ -1039,6 +1065,7 @@ class BlogData {
   /// 作者的其他最新日誌
   final List<SpaceItem> otherPosts;
 
+  final String formhash;
   final String? message;
 }
 
@@ -1157,3 +1184,43 @@ const searchSpecialOptions = <({int value, String label})>[
   (value: 4, label: '活動'),
   (value: 5, label: '辯論'),
 ];
+
+/// 群組列表的一項
+class GroupItem {
+  const GroupItem({required this.fid, required this.name, this.icon = ''});
+  final int fid;
+  final String name;
+  final String icon;
+}
+
+/// 群組內頁
+class GroupData {
+  const GroupData({
+    this.fid = 0,
+    this.name = '',
+    this.icon = '',
+    this.desc = '',
+    this.meta = '',
+    this.threads = const [],
+    this.pager = const PageInfo(),
+    this.canJoin = false,
+    this.needsLogin = false,
+    this.message,
+  });
+
+  final int fid;
+  final String name;
+  final String icon;
+  final String desc;
+
+  /// 群組等級、積分、群主
+  final String meta;
+
+  final List<ThreadItem> threads;
+  final PageInfo pager;
+
+  /// 還沒加入，論壇只給介紹跟一顆「加入群組」
+  final bool canJoin;
+  final bool needsLogin;
+  final String? message;
+}

@@ -9,7 +9,9 @@ import '../../i18n/ui.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_body.dart';
+import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
+import '../widgets/toast.dart';
 
 /// 日誌內頁：內文、表態、表態過的人、評論、作者的其他日誌
 class BlogPage extends StatefulWidget {
@@ -47,11 +49,56 @@ class _BlogPageState extends State<BlogPage> {
     }
   }
 
+  Future<void> _comment() async {
+    final d = _data;
+    if (d == null) return;
+    if (!await requireLogin(context, action: tr('留言'))) return;
+    if (!mounted) return;
+
+    final ctrl = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('發表評論')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 4,
+          decoration: InputDecoration(hintText: tr('寫點什麼…')),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: Text(tr('送出'))),
+        ],
+      ),
+    );
+    if (text == null || text.isEmpty || !mounted) return;
+
+    try {
+      final r = await api.postBlogComment(widget.blogId, text, d.formhash);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, tr('留言失敗：${e.message}'));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
 
     return Scaffold(
+      floatingActionButton: d == null || d.html.isEmpty
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _comment,
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(tr('評論')),
+            ),
       appBar: AppBar(
         title: Text(
           d?.title.isNotEmpty == true ? d!.title : tr('日誌'),
@@ -63,7 +110,7 @@ class _BlogPageState extends State<BlogPage> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 28),
+          padding: const EdgeInsets.only(bottom: 90),
           children: [
             ?StateBox.maybe(
               loading: _loading,

@@ -221,6 +221,17 @@ class Api {
       };
 
   /// 讀出名稱以某段字尾結束的 cookie（Discuz 的 cookie 都有站台專屬前綴）
+  /// 內建瀏覽器要用同一組 UA，不然論壇會給不一樣的模板
+  static String get userAgent => _ua;
+
+  /// 論壇目前的全部 cookie。內建瀏覽器要靠這個帶著登入狀態，
+  /// 不然開出來是未登入的頁面，等於要再登入一次
+  Future<List<({String name, String value})>> allCookies() async {
+    await init();
+    final cookies = await _jar.loadForRequest(Uri.parse(kOrigin));
+    return [for (final c in cookies) (name: c.name, value: c.value)];
+  }
+
   Future<String?> cookieEndingWith(String suffix) async {
     await init();
     final cookies = await _jar.loadForRequest(Uri.parse(kOrigin));

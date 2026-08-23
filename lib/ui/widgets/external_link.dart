@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../api/http.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import 'toast.dart';
@@ -62,7 +64,25 @@ Future<void> confirmExternal(
     ),
   );
 
-  if (go == true) {
+  if (go != true) return;
+  if (!context.mounted) return;
+
+  // 論壇自己的頁面用內建瀏覽器開，才帶得到登入狀態；
+  // 站外連結交給系統瀏覽器
+  if (url.startsWith(kOrigin)) {
+    context.push(Uri(
+      path: '/web',
+      queryParameters: {'url': url, 'title': ?title},
+    ).toString());
+  } else {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
+}
+
+/// 論壇自己的頁面，不必問，直接用內建瀏覽器開
+void openInApp(BuildContext context, String url, {String title = ''}) {
+  context.push(Uri(
+    path: '/web',
+    queryParameters: {'url': url, if (title.isNotEmpty) 'title': title},
+  ).toString());
 }

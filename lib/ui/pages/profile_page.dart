@@ -354,8 +354,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   label:
                       Text(l.name, style: const TextStyle(fontSize: 12.5)),
                   visualDensity: VisualDensity.compact,
-                  onPressed:
-                      l.fid == null ? null : () => context.push('/f/${l.fid}'),
+                  onPressed: l.fid == null
+                      ? null
+                      // 群組跟版塊是兩套頁面，網址裡看得出來
+                      : () => context.push(l.url.contains('group-')
+                          ? '/g/${l.fid}'
+                          : '/f/${l.fid}'),
                 ),
             ],
           ),

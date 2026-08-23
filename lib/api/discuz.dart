@@ -381,10 +381,34 @@ Poll? _parsePoll(dom.Document doc) {
     ));
   }
 
+  // 已經投過票的話論壇不給 radio，改成每個選項附一條百分比長條
+  if (options.isEmpty) {
+    for (final label in box.querySelectorAll('label')) {
+      final count = label.querySelector('.voteCount');
+      if (count == null) continue;
+      final em = txt(count.querySelector('em'));
+      final text = txt(label)
+          .replaceFirst(em, '')
+          .replaceFirst(RegExp(r'^\d+[.、]\s*'), '')
+          .trim();
+      if (text.isEmpty) continue;
+      options.add(PollOption(
+        '',
+        text,
+        percent: RegExp(r'[\d.]+%').firstMatch(em)?.group(0) ?? '',
+        votes: int.tryParse(txt(count.querySelector('strong'))
+                .replaceAll(RegExp(r'\D'), '')) ??
+            0,
+      ));
+    }
+  }
+
   return Poll(
     title: txt(box.querySelector('.pollTit h3')),
     info: txt(box.querySelector('.pollUser')),
     deadline: txt(box.querySelector('.pollTime')),
+    // 「您已经投过票，谢谢您的参与」就在這顆灰按鈕裡
+    status: txt(box.querySelector('.btn_pn_grey')),
     options: options,
     multiple: multiple,
     formhash: attr(box.querySelector('input[name="formhash"]'), 'value'),
@@ -635,9 +659,32 @@ Future<SubmitResult> doSign() async {
 
 Future<SignResult> fetchSignPage() async {
   final doc = await _page('plugin.php?id=k_misign:sign');
+
+  // 簽到外掛的資料是結構化的，直接把整頁 HTML 倒出來會連頁尾、
+  // 側邊導覽一起畫進去，所以拆成欄位自己排版
+  final stats = <({String label, String value})>[];
+  for (final item in doc.querySelectorAll('.info .item')) {
+    final rows = item.children.where((e) => e.localName == 'div').toList();
+    if (rows.length < 2) continue;
+    final label = txt(rows[0]);
+    final value = txt(rows[1]);
+    if (label.isNotEmpty && value.isNotEmpty) {
+      stats.add((label: label, value: value));
+    }
+  }
+
+  final header = txt(doc.querySelector('.k_misign_header'));
+  final level = RegExp(r'[签簽]到等[级級]\s*Lv\s*\d+').firstMatch(header)?.group(0) ?? '';
+
   return SignResult(
-    html: sanitizeContent(doc.querySelector('.container') ?? doc.body),
-    signed: RegExp('已签到').hasMatch(doc.body?.text ?? ''),
+    html: stats.isEmpty
+        ? sanitizeContent(doc.querySelector('.k_misign_header') ??
+            doc.querySelector('.container'))
+        : '',
+    signed: doc.querySelector('.btn_visited') != null ||
+        RegExp('已签到|已簽到').hasMatch(header),
+    level: level,
+    stats: stats,
   );
 }
 
@@ -1014,6 +1061,11 @@ List<Attachment> parseAttachments(dom.Document doc) {
     final name = txt(a);
     if (name.isEmpty) continue;
 
+    // 圖片附件已經在內文裡顯示了，不用再列一次。
+    // 論壇用 dt 那顆檔案類型圖示分辨，image_s.gif 就是圖片
+    final icon = attr(dl.querySelector('dt img'), 'src');
+    if (RegExp(r'filetype/image').hasMatch(icon)) continue;
+
     var info = '';
     var price = '';
     // 只看 dd 的直接子 p —— 檔名那段裡還巢了一個提示框，
@@ -1034,7 +1086,7 @@ List<Attachment> parseAttachments(dom.Document doc) {
     out.add(Attachment(
       name: name,
       url: absolute(attr(a, 'href')),
-      icon: absolute(attr(dl.querySelector('dt img'), 'src')),
+      icon: absolute(icon),
       info: info,
       price: price,
     ));

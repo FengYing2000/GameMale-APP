@@ -99,6 +99,9 @@ class PostBody extends StatelessWidget {
     final tid = paramInt(url, 'tid') ??
         paramInt(url, 'ptid') ??
         int.tryParse(RegExp(r'thread-(\d+)').firstMatch(url)?.group(1) ?? '');
+    // 群組是另一套頁面，不能丟給版塊頁（會顯示「沒有主題」）
+    final gid = int.tryParse(
+        RegExp(r'group-(\d+)').firstMatch(url)?.group(1) ?? '');
     final fid = paramInt(url, 'fid') ??
         int.tryParse(RegExp(r'forum-(\d+)').firstMatch(url)?.group(1) ?? '');
     final uid = paramInt(url, 'uid') ??
@@ -106,6 +109,8 @@ class PostBody extends StatelessWidget {
 
     if (tid != null) {
       context.push('/t/$tid');
+    } else if (gid != null) {
+      context.push('/g/$gid');
     } else if (fid != null) {
       context.push('/f/$fid');
     } else if (uid != null) {

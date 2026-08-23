@@ -10,7 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
-[![Tests](https://img.shields.io/badge/测试-224%20项-4CAF50)](#测试策略)
+[![Tests](https://img.shields.io/badge/测试-229%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -64,6 +64,9 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 | **收藏状态要自己记** | 帖子页的收藏链接永远写着「收藏本帖」，按下去才知道收过没有，所以把收藏列表抓回本地比对 |
 | **勋章 tip 按结构拆** | 等级和名字之间没有空白，正则会粘成「Max黑暗之魂系列」；`<b>` 是等级、`<h4>` 其余是名字 |
 | **深色底的灰字要明写颜色** | 回 `null` 等于不覆写，元素上的 `color="#333"` 还是会生效 |
+| **论坛页面用内建浏览器** | 丢给系统浏览器那边没有登录状态，所以把 App 的 cookie 灌进 WebView |
+| **台湾用语替换默认关闭** | 换词会改掉帖子原本的字（`汉化`→`中文化`），标题就跟网页版对不起来 |
+| **群组是另一套页面** | `group-<fid>-1.html` 只有桌面模板，用 `/f/<fid>` 进去会显示「没有主题」 |
 | **繁简转换自定规则** | OpenCC 的第一候选常常不合语境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -76,7 +79,7 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 <tr><td><b>社区</b></td><td>私信（气泡对话）· 通知（两层分类）· 个人资料（角色组／勋章／管理版块／已加入群组）· 个人空间七个子页 · 加好友 · 打招呼 · 记录广场</td></tr>
 <tr><td><b>搜索</b></td><td>帖子 · 日志 · 相册 · 群组 · 用户 · 本版搜索 · 高级搜索（全文／作者／主题范围／特殊主题／时间／排序）</td></tr>
 <tr><td><b>账号</b></td><td>账密登录（图形验证码／安全提问）· 注册问答 · 登出 · 每日签到 · 我的收藏／主题／回复 · 回帖记录</td></tr>
-<tr><td><b>体验</b></td><td>深／浅色 · 六色强调色 · RPG 风格提示气泡 · 繁简切换 · 流量控制 · 表情选择器 · 外部链接跳转提示 · 回帖奖励横幅 · 已回帖标记 · 图片长按菜单 · 楼中楼 · 固定分页栏 · 下拉刷新</td></tr>
+<tr><td><b>体验</b></td><td>深／浅色 · 六色强调色 · RPG 风格提示气泡 · 繁简切换 · 流量控制 · 表情选择器 · 外部链接跳转提示 · 回帖奖励横幅 · 已回帖标记 · 内建浏览器（带登录状态）· 图片长按菜单 · 楼中楼 · 固定分页栏 · 下拉刷新</td></tr>
 </table>
 
 ### 游客与会员
@@ -128,13 +131,13 @@ tool/
 | 文件 | 内容 | 数量 |
 |---|---|---|
 | `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 169 |
-| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 25 |
+| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 29 |
 | `s2t_test.dart` | 繁简转换的每一类判断 | 18 |
 | `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
-| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 28 |
+| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 33 |
 
 ```bash
-flutter test                        # 224 项离线测试
+flutter test                        # 229 项离线测试
 flutter analyze                     # 零问题
 ```
 

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/api/discuz.dart' as api;
 import 'package:gamemale/api/http.dart';
 import 'package:gamemale/api/models.dart';
+import 'package:gamemale/api/group.dart' as group;
 import 'package:gamemale/api/register.dart' as register;
 import 'package:gamemale/api/search.dart' as search;
 import 'package:gamemale/api/smilies.dart' as smilies;
@@ -332,6 +333,66 @@ void main() {
     // ignore: avoid_print
     print('  ${map.length} 個版塊有子版塊；勳章公會 → '
         '${map[128]!.map((s) => s.name).join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('投票投過之後要顯示結果，不是「不開放作答」', () async {
+    final t = await api.fetchThread(189088);
+    final p = t.poll;
+    expect(p, isNotNull);
+    expect(p!.voted, isTrue, reason: '這帖已經投過了');
+    expect(p.votable, isFalse);
+    expect(p.status, contains('投过票'));
+    expect(p.options, isNotEmpty);
+    expect(p.options.every((o) => o.percent.isNotEmpty), isTrue);
+    expect(p.options.any((o) => o.votes > 0), isTrue);
+    // ignore: avoid_print
+    print('  ${p.status}｜${p.options.length} 個選項，'
+        '例如 ${p.options.first.text} ${p.options.first.percent}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('附件不列圖片，只列真正的檔案', () async {
+    final e = await api.fetchThreadExtras(129896);
+    expect(e.attachments, isNotEmpty);
+    // 圖片已經在內文顯示了，不該再列一次
+    expect(e.attachments.every((a) => !a.icon.contains('filetype/image')), isTrue);
+    // ignore: avoid_print
+    print('  ${e.attachments.map((a) => a.name).join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('群組只有桌面模板，走 /f/ 會是空的', () async {
+    final open = await group.fetchGroup(116);
+    expect(open.name, isNotEmpty);
+    expect(open.threads, isNotEmpty, reason: '這個群組看得到主題');
+
+    final closed = await group.fetchGroup(61);
+    expect(closed.name, isNotEmpty, reason: '沒加入也該讀得到群組名');
+    expect(closed.threads, isEmpty);
+    expect(closed.message, isNotNull);
+
+    final list = await group.fetchGroups();
+    expect(list.length, greaterThan(10));
+    // ignore: avoid_print
+    print('  ${open.name} ${open.threads.length} 篇｜清單 ${list.length} 個群組');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('簽到頁解得出等級與統計', () async {
+    final d = await api.fetchSignPage();
+    expect(d.stats, isNotEmpty, reason: '今日排名／連續／累計');
+    expect(d.stats.every((s) => s.label.isNotEmpty && s.value.isNotEmpty), isTrue);
+    expect(d.level, isNotEmpty);
+    // 有結構化欄位就不該再倒整段 HTML（會把頁尾與側邊導覽畫進去）
+    expect(d.html, isEmpty);
+    // ignore: avoid_print
+    print('  ${d.level}｜${d.stats.map((s) => '${s.label} ${s.value}').join('　')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('收藏清單帶得回 favid，才取消得掉', () async {
+    final r = await api.fetchFavorites(677863);
+    expect(r.list, isNotEmpty);
+    expect(r.list.every((t) => t.favid != null && t.favid! > 0), isTrue,
+        reason: '沒有 favid 就只能加不能減');
+    // ignore: avoid_print
+    print('  第一筆 tid=${r.list.first.tid} favid=${r.list.first.favid}');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，

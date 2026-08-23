@@ -112,6 +112,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   onChanged: settings.setMarkReplied,
                 ),
+                const Divider(indent: 56, endIndent: 14),
+                SwitchListTile(
+                  value: settings.taiwanWords,
+                  secondary: const Icon(Icons.translate),
+                  title: Text(tr('台灣用語替換')),
+                  subtitle: Text(
+                    tr('把論壇內容的用詞換成台灣說法（软件→軟體）。'
+                        '這會改掉帖子原本的字，標題就跟網頁版對不起來；'
+                        '關掉只做簡繁字形轉換'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onChanged: settings.setTaiwanWords,
+                ),
               ],
             ),
           ),
