@@ -17,6 +17,8 @@ ThemeData _base(Brightness b, [Color seed = brand]) {
   ).copyWith(
     primary: primary,
     surface: dark ? const Color(0xFF191C22) : Colors.white,
+    // fromSeed 的淺色 onSurface 會帶一層主色調，看起來偏灰；壓成近黑比較好讀
+    onSurface: dark ? null : const Color(0xFF15171C),
   );
 
   final bg = dark ? const Color(0xFF0F1115) : const Color(0xFFF2F3F7);
@@ -81,8 +83,18 @@ final lightTheme = _base(Brightness.light);
 final darkTheme = _base(Brightness.dark);
 
 /// 次要文字色，列表的作者、時間、板塊簡介都用這個
-Color subtle(BuildContext c) =>
-    Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.55);
+/// 次要文字。淺色底下要壓得比深色底更實 —— 同樣的透明度，
+/// 白底上的灰是「看不清楚」，深底上的灰卻剛好
+Color subtle(BuildContext c) {
+  final s = Theme.of(c).colorScheme;
+  return s.onSurface
+      .withValues(alpha: s.brightness == Brightness.dark ? 0.62 : 0.78);
+}
 
-Color faint(BuildContext c) =>
-    Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.38);
+/// 更次要的文字（時間、計數）。淺色模式原本 0.38 在白底上只有 2.8:1，
+/// 小字幾乎讀不到，拉到 0.60 才過得去
+Color faint(BuildContext c) {
+  final s = Theme.of(c).colorScheme;
+  return s.onSurface
+      .withValues(alpha: s.brightness == Brightness.dark ? 0.46 : 0.60);
+}

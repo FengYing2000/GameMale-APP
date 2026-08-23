@@ -50,6 +50,9 @@ class ForumItem {
   final String posts;
   final String desc;
 
+  /// 首頁的子版塊藏在簡介裡（「子版块>>」後面那幾個連結）
+  final List<SubForum> subforums;
+
   const ForumItem({
     required this.fid,
     required this.name,
@@ -57,6 +60,7 @@ class ForumItem {
     this.threads = '',
     this.posts = '',
     this.desc = '',
+    this.subforums = const [],
   });
 }
 
@@ -970,3 +974,112 @@ class BlogData {
   final String html;
   final String? message;
 }
+
+/// 帖子高級搜索的完整選項，對應 search.php?mod=forum&adv=yes
+class AdvancedSearch {
+  const AdvancedSearch({
+    this.fulltext = false,
+    this.author = '',
+    this.scope = 'all',
+    this.special = const {},
+    this.srchfrom = 0,
+    this.before = false,
+    this.orderby = 'lastpost',
+    this.ascending = false,
+  });
+
+  /// 勾了就連內文一起搜，不只標題
+  final bool fulltext;
+
+  /// 只搜這個作者
+  final String author;
+
+  /// all / digest / top
+  final String scope;
+
+  /// 特殊主題：1 投票、2 商品、3 懸賞、4 活動、5 辯論
+  final Set<int> special;
+
+  /// 秒數，0 = 全部時間
+  final int srchfrom;
+
+  /// true = 該時間「以前」，false = 「以內」
+  final bool before;
+
+  /// lastpost / dateline / replies / views
+  final String orderby;
+  final bool ascending;
+
+  AdvancedSearch copyWith({
+    bool? fulltext,
+    String? author,
+    String? scope,
+    Set<int>? special,
+    int? srchfrom,
+    bool? before,
+    String? orderby,
+    bool? ascending,
+  }) =>
+      AdvancedSearch(
+        fulltext: fulltext ?? this.fulltext,
+        author: author ?? this.author,
+        scope: scope ?? this.scope,
+        special: special ?? this.special,
+        srchfrom: srchfrom ?? this.srchfrom,
+        before: before ?? this.before,
+        orderby: orderby ?? this.orderby,
+        ascending: ascending ?? this.ascending,
+      );
+
+  bool get isDefault =>
+      !fulltext &&
+      author.isEmpty &&
+      scope == 'all' &&
+      special.isEmpty &&
+      srchfrom == 0 &&
+      orderby == 'lastpost' &&
+      !ascending;
+
+  /// 論壇的表單欄位名。special 是陣列，交給呼叫端展開
+  Map<String, String> toParams() => {
+        if (fulltext) 'srchtype': 'fulltext',
+        if (author.isNotEmpty) 'srchuname': author,
+        'srchfilter': scope,
+        if (srchfrom > 0) 'srchfrom': '$srchfrom',
+        if (srchfrom > 0) 'before': before ? '1' : '',
+        'orderby': orderby,
+        'ascdesc': ascending ? 'asc' : 'desc',
+      };
+}
+
+const searchTimeOptions = <({int value, String label})>[
+  (value: 0, label: '全部時間'),
+  (value: 86400, label: '一天'),
+  (value: 172800, label: '兩天'),
+  (value: 604800, label: '一週'),
+  (value: 2592000, label: '一個月'),
+  (value: 7776000, label: '三個月'),
+  (value: 15552000, label: '半年'),
+  (value: 31536000, label: '一年'),
+];
+
+const searchOrderOptions = <({String value, String label})>[
+  (value: 'lastpost', label: '回覆時間'),
+  (value: 'dateline', label: '發表時間'),
+  (value: 'replies', label: '回覆數量'),
+  (value: 'views', label: '瀏覽次數'),
+];
+
+const searchScopeOptions = <({String value, String label})>[
+  (value: 'all', label: '全部主題'),
+  (value: 'digest', label: '精華主題'),
+  (value: 'top', label: '置頂主題'),
+];
+
+const searchSpecialOptions = <({int value, String label})>[
+  (value: 1, label: '投票'),
+  (value: 2, label: '商品'),
+  (value: 3, label: '懸賞'),
+  (value: 4, label: '活動'),
+  (value: 5, label: '辯論'),
+];

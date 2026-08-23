@@ -23,10 +23,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   IndexData? _data;
+  List<SubForum> _favForums = const [];
   bool _loading = true;
   bool _signing = false;
   String? _err;
   final _open = <int, bool>{};
+
+  /// 哪些版塊的子版塊被展開了
+  final _openSubs = <int, bool>{};
 
 
   int _rev = -1;
@@ -76,6 +80,23 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    _loadFavorites();
+  }
+
+  /// 收藏的版塊是另一支端點（約 8 KB），登入了才有意義
+  Future<void> _loadFavorites() async {
+    if (!mounted) return;
+    final uid = context.read<SessionStore>().uid;
+    if (uid == null) {
+      if (_favForums.isNotEmpty) setState(() => _favForums = const []);
+      return;
+    }
+    try {
+      final f = await api.fetchFavoriteForums(uid);
+      if (mounted) setState(() => _favForums = f);
+    } on DiscuzException {
+      // 抓不到就不顯示，不用打擾使用者
+    }
   }
 
   Future<void> _sign() async {
@@ -123,6 +144,7 @@ class _HomePageState extends State<HomePage> {
             if (data != null) ...[
               if (data.sign case final sign?) _SignCard(
                   sign: sign, busy: _signing, onSign: _sign),
+              if (_favForums.isNotEmpty) _FavoriteForums(items: _favForums),
               for (var i = 0; i < data.groups.length; i++) ...[
                 _GroupHeader(
                   name: data.groups[i].name,
@@ -135,7 +157,18 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       children: [
                         for (var j = 0; j < data.groups[i].forums.length; j++) ...[
-                          _ForumRow(item: data.groups[i].forums[j]),
+                          _ForumRow(
+                            item: data.groups[i].forums[j],
+                            expanded:
+                                _openSubs[data.groups[i].forums[j].fid] ?? false,
+                            onToggle: () => setState(() {
+                              final fid = data.groups[i].forums[j].fid;
+                              _openSubs[fid] = !(_openSubs[fid] ?? false);
+                            }),
+                          ),
+                          if (_openSubs[data.groups[i].forums[j].fid] ?? false)
+                            for (final sub in data.groups[i].forums[j].subforums)
+                              _SubForumRow(item: sub),
                           if (j != data.groups[i].forums.length - 1)
                             const Divider(indent: 66, endIndent: 14),
                         ],
@@ -232,9 +265,80 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
+/// 收藏的版塊擺在最前面，一排橫向捷徑
+class _FavoriteForums extends StatelessWidget {
+  const _FavoriteForums({required this.items});
+  final List<SubForum> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
+          child: Text(tr('我收藏的版塊'),
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: faint(context))),
+        ),
+        SizedBox(
+          height: 38,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              for (final f in items)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ActionChip(
+                    avatar: const Icon(Icons.star, size: 15),
+                    label: Text(f.name, style: const TextStyle(fontSize: 13)),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => context.push('/f/${f.fid}'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 展開後列在母版塊底下
+class _SubForumRow extends StatelessWidget {
+  const _SubForumRow({required this.item});
+  final SubForum item;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.push('/f/${item.fid}'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(66, 9, 14, 9),
+        child: Row(
+          children: [
+            Icon(Icons.subdirectory_arrow_right, size: 15, color: faint(context)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(item.name,
+                  style: TextStyle(fontSize: 14, color: subtle(context))),
+            ),
+            Icon(Icons.chevron_right, size: 16, color: faint(context)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ForumRow extends StatelessWidget {
-  const _ForumRow({required this.item});
+  const _ForumRow({required this.item, this.expanded = false, this.onToggle});
   final ForumItem item;
+  final bool expanded;
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -285,7 +389,18 @@ class _ForumRow extends StatelessWidget {
                 Text(tr('主題'), style: TextStyle(fontSize: 10.5, color: faint(context))),
               ],
             ),
-            Icon(Icons.chevron_right, size: 18, color: faint(context)),
+            // 有子版塊就變成展開/收合，沒有就維持一個指向內頁的箭頭
+            if (item.subforums.isEmpty)
+              Icon(Icons.chevron_right, size: 18, color: faint(context))
+            else
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: expanded ? tr('收合子版塊') : tr('展開子版塊'),
+                icon: Icon(
+                    expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 20),
+                onPressed: onToggle,
+              ),
           ],
         ),
       ),

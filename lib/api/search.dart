@@ -12,7 +12,7 @@ Future<SearchResult> search(
   SearchScope scope = SearchScope.forum,
   int page = 1,
   int fid = 0,
-  Map<String, String> advanced = const {},
+  AdvancedSearch? advanced,
 }) async {
   final hash = discuz.formhash;
 
@@ -24,12 +24,21 @@ Future<SearchResult> search(
     'formhash': hash ?? '',
     'searchsubmit': 'yes',
     if (scope == SearchScope.forum && fid > 0) 'srchfid[]': '$fid',
-    ...advanced,
+    // 高級搜索只有帖子搜尋吃得下
+    if (scope == SearchScope.forum && advanced != null) ...advanced.toParams(),
   };
   if (page > 1) q['page'] = '$page';
 
+  final parts = [
+    for (final e in q.entries)
+      '${e.key}=${Uri.encodeQueryComponent(e.value)}',
+    // special[] 是陣列，同一個名字要重複出現，Map 帶不過去
+    if (scope == SearchScope.forum && advanced != null)
+      for (final s in advanced.special) 'special%5B%5D=$s',
+  ];
+
   final base = scope == SearchScope.user ? 'home.php' : 'search.php';
-  final url = '$base?${q.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&')}';
+  final url = '$base?${parts.join('&')}';
   final html = await Api.instance.get(url);
   final doc = toDoc(html);
 

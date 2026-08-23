@@ -10,7 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
-[![Tests](https://img.shields.io/badge/测试-210%20项-4CAF50)](#测试策略)
+[![Tests](https://img.shields.io/badge/测试-224%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -60,6 +60,7 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 | **桌面模板要明写 `mobile=no`** | 只是不带 `mobile=2` 没用 —— Discuz 会依 iPhone UA 自动转手机版 |
 | **POST 的跳转要自己跟** | Dart 的 HttpClient 只自动跟随 GET/HEAD，POST 收到 302 会拿到空 body |
 | **积分变化要用 ID 定位** | `creditnotice` cookie 第 0 格是总积分，第 1～8 格按积分 ID 排列；按名称表顺序数会整串位移一格 |
+| **已回帖用 `authorid` 反问** | 论坛没有现成列表，但带 `authorid=<自己>` 开帖时没发言过会回「未定义操作」（约 4.7 KB） |
 | **繁简转换自定规则** | OpenCC 的第一候选常常不合语境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -67,12 +68,12 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 ## 功能
 
 <table>
-<tr><td width="90"><b>浏览</b></td><td>版块列表 · 主题列表（全部／最新／热门／精华）· 主题分类 · 子版块 · 帖子内页 · 分页</td></tr>
+<tr><td width="90"><b>浏览</b></td><td>版块列表（收藏的版块／子版块展开）· 主题列表（全部／最新／热门／热帖／精华）· 投票与悬赏筛选 · 排序与时间范围 · 主题分类 · 帖子内页 · 附件 · 分页</td></tr>
 <tr><td><b>互动</b></td><td>回复 · 引用回复 · 发表主题 · 编辑自己的帖子 · 收藏 · 评分（快速评分／自动跳过缺项）· 投票</td></tr>
 <tr><td><b>社区</b></td><td>私信（气泡对话）· 通知（两层分类）· 个人资料（角色组／勋章／管理版块／已加入群组）· 个人空间七个子页 · 加好友 · 打招呼 · 记录广场</td></tr>
-<tr><td><b>搜索</b></td><td>帖子 · 日志 · 相册 · 群组 · 用户 · 本版搜索 · 高级搜索</td></tr>
+<tr><td><b>搜索</b></td><td>帖子 · 日志 · 相册 · 群组 · 用户 · 本版搜索 · 高级搜索（全文／作者／主题范围／特殊主题／时间／排序）</td></tr>
 <tr><td><b>账号</b></td><td>账密登录（图形验证码／安全提问）· 注册问答 · 登出 · 每日签到 · 我的收藏／主题／回复 · 回帖记录</td></tr>
-<tr><td><b>体验</b></td><td>深／浅色 · 六色强调色 · 繁简切换 · 流量控制 · 表情选择器 · 外部链接跳转提示 · 回帖奖励横幅 · 图片长按菜单 · 楼中楼 · 固定分页栏 · 下拉刷新</td></tr>
+<tr><td><b>体验</b></td><td>深／浅色 · 六色强调色 · 繁简切换 · 流量控制 · 表情选择器 · 外部链接跳转提示 · 回帖奖励横幅 · 已回帖标记 · 图片长按菜单 · 楼中楼 · 固定分页栏 · 下拉刷新</td></tr>
 </table>
 
 ### 游客与会员
@@ -123,14 +124,14 @@ tool/
 
 | 文件 | 内容 | 数量 |
 |---|---|---|
-| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 156 |
-| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 24 |
+| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 169 |
+| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 25 |
 | `s2t_test.dart` | 繁简转换的每一类判断 | 18 |
 | `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
-| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 21 |
+| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 24 |
 
 ```bash
-flutter test                        # 210 项离线测试
+flutter test                        # 224 项离线测试
 flutter analyze                     # 零问题
 ```
 
@@ -226,8 +227,8 @@ gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
 ## 目前没做的部分
 
 - **发帖上传图片／附件** — Discuz 的 `swfupload` 是 multipart 端点，没有真机无法验证
+- **下载附件** — 点了交给浏览器；App 沙箱存不了任意文件，付费附件也要在论坛页面上完成交易
 - **注册最后一步** — 答题通过后的账号／邮箱／验证码表单交给浏览器。论坛目前关闭注册，这条路径无法验证，宁可不写没把握的代码
-- **相册内页** — 只有桌面模板，点开交给浏览器
 - **推送通知** — 需要自建推送服务器与 APNs 证书，自签 App 拿不到
 
 ---

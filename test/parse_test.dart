@@ -801,6 +801,77 @@ void main() {
     });
   });
 
+  group('版塊篩選參數', () {
+    test('預設什麼都不帶', () {
+      expect(const ForumQuery().toParams(), isEmpty);
+      expect(const ForumQuery().isDefault, isTrue);
+    });
+    test('投票／懸賞走 specialtype', () {
+      expect(const ForumQuery(special: 'poll').toParams(),
+          {'filter': 'specialtype', 'specialtype': 'poll'});
+      expect(const ForumQuery(special: 'reward').toParams()['specialtype'], 'reward');
+    });
+    test('最新與熱門會自己帶上 orderby', () {
+      expect(const ForumQuery(tab: 'lastpost').toParams(),
+          {'filter': 'lastpost', 'orderby': 'lastpost'});
+      // 熱門的 orderby 是 heats，不是 heat
+      expect(const ForumQuery(tab: 'heat').toParams()['orderby'], 'heats');
+    });
+    test('精華要多帶 digest=1', () {
+      expect(const ForumQuery(tab: 'digest').toParams()['digest'], '1');
+    });
+    test('排序：發帖時間走 author，回覆與查看走 reply', () {
+      expect(const ForumQuery(orderby: 'dateline').toParams()['filter'], 'author');
+      expect(const ForumQuery(orderby: 'replies').toParams()['filter'], 'reply');
+      expect(const ForumQuery(orderby: 'views').toParams()['filter'], 'reply');
+    });
+    test('時間可以疊在 specialtype 上（實測過會再篩一次）', () {
+      final q = const ForumQuery(special: 'reward', dateline: 604800).toParams();
+      expect(q['filter'], 'specialtype');
+      expect(q['specialtype'], 'reward');
+      expect(q['dateline'], '604800');
+    });
+    test('主題分類優先於其他篩選', () {
+      final q = const ForumQuery(typeid: 9, special: 'poll').toParams();
+      expect(q['filter'], 'typeid');
+      expect(q['typeid'], '9');
+      expect(q.containsKey('specialtype'), isFalse);
+    });
+    test('hasExtra 只認排序與時間', () {
+      expect(const ForumQuery(tab: 'digest').hasExtra, isFalse);
+      expect(const ForumQuery(orderby: 'views').hasExtra, isTrue);
+      expect(const ForumQuery(dateline: 86400).hasExtra, isTrue);
+    });
+  });
+
+  group('高級搜索參數', () {
+    test('預設只帶範圍與排序', () {
+      final p = const AdvancedSearch().toParams();
+      expect(p['srchfilter'], 'all');
+      expect(p['orderby'], 'lastpost');
+      expect(p['ascdesc'], 'desc');
+      expect(p.containsKey('srchtype'), isFalse);
+      expect(const AdvancedSearch().isDefault, isTrue);
+    });
+    test('全文搜尋帶 srchtype=fulltext', () {
+      expect(const AdvancedSearch(fulltext: true).toParams()['srchtype'], 'fulltext');
+    });
+    test('作者帶 srchuname', () {
+      expect(const AdvancedSearch(author: 'cdcai').toParams()['srchuname'], 'cdcai');
+    });
+    test('時間為 0 時不帶 srchfrom 與 before', () {
+      final p = const AdvancedSearch().toParams();
+      expect(p.containsKey('srchfrom'), isFalse);
+      expect(p.containsKey('before'), isFalse);
+    });
+    test('「以前」才會把 before 設成 1', () {
+      expect(const AdvancedSearch(srchfrom: 86400).toParams()['before'], '');
+      expect(
+          const AdvancedSearch(srchfrom: 86400, before: true).toParams()['before'],
+          '1');
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

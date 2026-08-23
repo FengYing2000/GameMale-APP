@@ -59,7 +59,12 @@ class _MePageState extends State<MePage> {
 
   Future<void> _load() async {
     final uid = context.read<SessionStore>().uid;
-    if (uid == null) return;
+    // 登出後一定要把舊資料清掉 —— 只是 return 的話畫面會一直留著
+    // 上一個帳號的名字與等級，直到重開 App
+    if (uid == null) {
+      if (_me != null && mounted) setState(() => _me = null);
+      return;
+    }
     try {
       final m = await api.fetchMe(uid);
       if (mounted) setState(() => _me = m);

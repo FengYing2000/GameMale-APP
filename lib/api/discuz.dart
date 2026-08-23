@@ -66,7 +66,22 @@ IndexData parseIndex(dom.Document doc) {
       final h3 = a.querySelector('h3');
       final name = h3 == null ? '' : txt(h3).replaceAll(txt(count), '').trim();
       // 簡介的 <p> 內有巢狀 <a>，HTML 解析時會被踢出 a.forum_a，所以從 li 找
-      final desc = txt(li.querySelector('p'));
+      final p = li.querySelector('p');
+      final desc = txt(p);
+
+      // 子版塊寫在簡介裡：「子版块>>」後面接 forum-<fid>-1.html
+      final subs = <SubForum>[];
+      for (final link in p?.querySelectorAll('a[href*="forum-"]') ??
+          const <dom.Element>[]) {
+        final sid = int.tryParse(
+            RegExp(r'forum-(\d+)').firstMatch(attr(link, 'href'))?.group(1) ?? '');
+        if (sid == null) continue;
+        final label = txt(link).replaceAll(RegExp(r'^\[|\]$'), '').trim();
+        if (label.isEmpty) continue;
+        if (subs.any((x) => x.fid == sid)) continue;
+        subs.add(SubForum(fid: sid, name: label));
+      }
+
       forums.add(ForumItem(
         fid: paramInt(attr(a, 'href'), 'fid') ?? 0,
         name: name,
@@ -76,6 +91,7 @@ IndexData parseIndex(dom.Document doc) {
             ? attr(count?.querySelector('span[title]'), 'title')
             : (nums.length > 1 ? nums[1] : ''),
         desc: desc.length > 90 ? desc.substring(0, 90) : desc,
+        subforums: subs,
       ));
     }
     if (forums.isNotEmpty) {

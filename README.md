@@ -10,7 +10,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Tests](https://img.shields.io/badge/測試-210%20項-4CAF50)](#測試策略)
+[![Tests](https://img.shields.io/badge/測試-224%20項-4CAF50)](#測試策略)
 [![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -60,6 +60,7 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 | **桌面模板要明寫 `mobile=no`** | 只是不帶 `mobile=2` 沒用 —— Discuz 會依 iPhone UA 自動轉手機版 |
 | **POST 的轉址要自己跟** | Dart 的 HttpClient 只自動跟隨 GET/HEAD，POST 收到 302 會拿到空 body |
 | **積分變化要用 ID 定位** | `creditnotice` cookie 第 0 格是總積分，第 1～8 格照積分 ID 擺；照名稱表順序數會整串位移一格 |
+| **已回帖用 `authorid` 反問** | 論壇沒有現成清單，但帶 `authorid=<自己>` 開帖時沒發言過會回「未定义操作」（約 4.7 KB） |
 | **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -67,12 +68,12 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 ## 功能
 
 <table>
-<tr><td width="90"><b>瀏覽</b></td><td>板塊列表 · 主題列表（全部／最新／熱門／精華）· 主題分類 · 子版塊 · 帖子內頁 · 分頁</td></tr>
+<tr><td width="90"><b>瀏覽</b></td><td>板塊列表（收藏的版塊／子版塊展開）· 主題列表（全部／最新／熱門／熱帖／精華）· 投票與懸賞篩選 · 排序與時間範圍 · 主題分類 · 帖子內頁 · 附件 · 分頁</td></tr>
 <tr><td><b>互動</b></td><td>回覆 · 引用回覆 · 發表主題 · 編輯自己的帖子 · 收藏 · 評分（快速評分／自動跳過缺項）· 投票</td></tr>
 <tr><td><b>社群</b></td><td>私訊（氣泡對話）· 通知（兩層分類）· 個人資料（角色組／勳章／管理版塊／已加入群組）· 個人空間七個子頁 · 加好友 · 打招呼 · 記錄廣場</td></tr>
-<tr><td><b>搜尋</b></td><td>帖子 · 日誌 · 相冊 · 群組 · 用戶 · 本版搜尋 · 高級搜索</td></tr>
+<tr><td><b>搜尋</b></td><td>帖子 · 日誌 · 相冊 · 群組 · 用戶 · 本版搜尋 · 高級搜索（全文／作者／主題範圍／特殊主題／時間／排序）</td></tr>
 <tr><td><b>帳號</b></td><td>帳密登入（圖形驗證碼／安全提問）· 註冊問答 · 登出 · 每日簽到 · 我的收藏／主題／回覆 · 回帖紀錄</td></tr>
-<tr><td><b>體驗</b></td><td>深／淺色 · 六色強調色 · 繁簡切換 · 流量控制 · 表情選擇器 · 外部連結跳轉提示 · 回帖獎勵橫幅 · 圖片長按選單 · 樓中樓 · 固定分頁列 · 下拉重新整理</td></tr>
+<tr><td><b>體驗</b></td><td>深／淺色 · 六色強調色 · 繁簡切換 · 流量控制 · 表情選擇器 · 外部連結跳轉提示 · 回帖獎勵橫幅 · 已回帖標記 · 圖片長按選單 · 樓中樓 · 固定分頁列 · 下拉重新整理</td></tr>
 </table>
 
 ### 訪客與會員
@@ -123,14 +124,14 @@ tool/
 
 | 檔案 | 內容 | 數量 |
 |---|---|---|
-| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 156 |
-| `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 24 |
+| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 169 |
+| `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 25 |
 | `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
 | `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
-| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 21 |
+| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 24 |
 
 ```bash
-flutter test                        # 210 項離線測試
+flutter test                        # 224 項離線測試
 flutter analyze                     # 零問題
 ```
 
@@ -226,8 +227,8 @@ gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
 ## 目前沒做的部分
 
 - **發文上傳圖片／附件** — Discuz 的 `swfupload` 是 multipart 端點，沒有實機無法驗證
+- **下載附件** — 點了交給瀏覽器；App 沙箱存不了任意檔案，付費附件也要在論壇頁面上完成交易
 - **註冊最後一步** — 答題通過後的帳號／信箱／驗證碼表單交給瀏覽器。論壇目前關閉註冊，這條路徑無法驗證，寧可不寫沒把握的程式碼
-- **相冊內頁** — 只有桌面模板，點開交給瀏覽器
 - **推播通知** — 需要自架推播伺服器與 APNs 憑證，自簽 App 拿不到
 
 ---

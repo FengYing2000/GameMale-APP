@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/http.dart';
 import '../../api/models.dart';
+import '../../api/parse.dart';
 import '../../api/search.dart' as api;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
@@ -26,6 +27,7 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final _ctrl = TextEditingController();
+  final _authorCtrl = TextEditingController();
   SearchScope _scope = SearchScope.forum;
   bool _thisForumOnly = false;
   SearchResult? _data;
@@ -34,11 +36,8 @@ class _SearchPageState extends State<SearchPage> {
   String? _err;
   int _page = 1;
 
-  // 高級搜索
-  bool _advanced = false;
-  bool _titleOnly = false;
-  String _within = '';
-  String _orderBy = '';
+  bool _showAdvanced = false;
+  AdvancedSearch _adv = const AdvancedSearch();
 
   @override
   void initState() {
@@ -49,6 +48,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void dispose() {
     _ctrl.dispose();
+    _authorCtrl.dispose();
     super.dispose();
   }
 
@@ -56,6 +56,7 @@ class _SearchPageState extends State<SearchPage> {
     final kw = _ctrl.text.trim();
     if (kw.characters.length < 2) return toast(context, tr('關鍵字至少 2 個字'));
 
+    FocusScope.of(context).unfocus();
     setState(() {
       _page = page;
       _loading = true;
@@ -67,11 +68,7 @@ class _SearchPageState extends State<SearchPage> {
         scope: _scope,
         page: page,
         fid: (_scope == SearchScope.forum && _thisForumOnly) ? widget.fid : 0,
-        advanced: {
-          if (_titleOnly) 'srchtype': 'title',
-          if (_within.isNotEmpty) 'before': _within,
-          if (_orderBy.isNotEmpty) 'orderby': _orderBy,
-        },
+        advanced: _scope == SearchScope.forum ? _adv : null,
       );
       if (!mounted) return;
       setState(() {
@@ -98,6 +95,19 @@ class _SearchPageState extends State<SearchPage> {
       context.push('/u/${hit.uid}');
       return;
     }
+    // 日誌與相冊的搜尋結果，網址裡就帶著 uid 與內容 id
+    final blog = RegExp(r'blog-(\d+)-(\d+)').firstMatch(hit.url);
+    if (blog != null) {
+      context.push('/blog/${blog.group(1)}/${blog.group(2)}');
+      return;
+    }
+    if (hit.url.contains('do=album') && hit.uid != null) {
+      final id = paramInt(hit.url, 'id');
+      if (id != null) {
+        context.push('/album/${hit.uid}/$id');
+        return;
+      }
+    }
     if (hit.url.isNotEmpty) {
       launchUrl(Uri.parse(hit.url), mode: LaunchMode.externalApplication);
     }
@@ -111,167 +121,259 @@ class _SearchPageState extends State<SearchPage> {
       appBar: AppBar(
         title: Text(tr('搜尋')),
         actions: [
-          IconButton(
-            icon: Icon(_advanced ? Icons.tune : Icons.tune_outlined),
-            tooltip: tr('高級搜索'),
-            onPressed: () => setState(() => _advanced = !_advanced),
-          ),
+          if (_scope == SearchScope.forum)
+            IconButton(
+              icon: Icon(_showAdvanced ? Icons.tune : Icons.tune_outlined),
+              color:
+                  _adv.isDefault ? null : Theme.of(context).colorScheme.primary,
+              tooltip: tr('高級搜索'),
+              onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+            ),
         ],
       ),
       bottomNavigationBar: d == null || d.hits.isEmpty
           ? null
           : StickyPager(pager: d.pager, onGo: _run),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _run(1),
-                      decoration: InputDecoration(
-                        hintText: tr('輸入關鍵字'),
-                        border: InputBorder.none,
-                        isDense: true,
+      // 點空白處收鍵盤 —— 鍵盤擋著結果很難看
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _run(1),
+                        decoration: InputDecoration(
+                          hintText: tr('輸入關鍵字'),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(onPressed: () => _run(1), child: Text(tr('搜尋'))),
-                ],
-              ),
-            ),
-          ),
-
-          // 分類
-          SizedBox(
-            height: 50,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-              children: [
-                if (widget.fid > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      avatar: const Icon(Icons.folder_outlined, size: 15),
-                      label: Text(tr('本版')),
-                      selected: _scope == SearchScope.forum && _thisForumOnly,
-                      onSelected: (_) => setState(() {
-                        _scope = SearchScope.forum;
-                        _thisForumOnly = true;
-                      }),
-                    ),
-                  ),
-                for (final s in SearchScope.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(tr(s.label)),
-                      selected: _scope == s &&
-                          !(s == SearchScope.forum && _thisForumOnly),
-                      onSelected: (_) => setState(() {
-                        _scope = s;
-                        _thisForumOnly = false;
-                      }),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          if (_advanced) _advancedPanel(context),
-
-          ?StateBox.maybe(
-            loading: _loading,
-            error: _err,
-            empty: _done && !_loading && _err == null && (d?.hits.isEmpty ?? false),
-            emptyText: d?.message ?? tr('找不到符合的內容'),
-            onRetry: () => _run(_page),
-          ),
-
-          if (d != null && d.summary.isNotEmpty && d.hits.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 10, 22, 0),
-              child: Text(d.summary,
-                  style: TextStyle(fontSize: 12.5, color: faint(context))),
-            ),
-
-          if (d != null && d.hits.isNotEmpty)
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var i = 0; i < d.hits.length; i++) ...[
-                    _HitTile(hit: d.hits[i], onTap: () => _open(d.hits[i])),
-                    if (i != d.hits.length - 1)
-                      const Divider(indent: 14, endIndent: 14),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                        onPressed: () => _run(1), child: Text(tr('搜尋'))),
                   ],
+                ),
+              ),
+            ),
+
+            // 分類
+            SizedBox(
+              height: 50,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+                children: [
+                  if (widget.fid > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        avatar: const Icon(Icons.folder_outlined, size: 15),
+                        label: Text(tr('本版')),
+                        selected: _scope == SearchScope.forum && _thisForumOnly,
+                        onSelected: (_) => setState(() {
+                          _scope = SearchScope.forum;
+                          _thisForumOnly = true;
+                        }),
+                      ),
+                    ),
+                  for (final s in SearchScope.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(tr(s.label)),
+                        selected: _scope == s &&
+                            !(s == SearchScope.forum && _thisForumOnly),
+                        onSelected: (_) => setState(() {
+                          _scope = s;
+                          _thisForumOnly = false;
+                        }),
+                      ),
+                    ),
                 ],
               ),
             ),
 
-          if (!_done && !_loading)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(30, 50, 30, 0),
-              child: Text(
-                tr('論壇搜尋有頻率限制，短時間內連續搜尋會被暫時擋下。'),
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, height: 1.6, color: faint(context)),
-              ),
+            if (_showAdvanced && _scope == SearchScope.forum)
+              _advancedPanel(context),
+
+            ?StateBox.maybe(
+              loading: _loading,
+              error: _err,
+              empty:
+                  _done && !_loading && _err == null && (d?.hits.isEmpty ?? false),
+              emptyText: d?.message ?? tr('找不到符合的內容'),
+              onRetry: () => _run(_page),
             ),
-        ],
+
+            if (d != null && d.summary.isNotEmpty && d.hits.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 10, 22, 0),
+                child: Text(d.summary,
+                    style: TextStyle(fontSize: 12.5, color: faint(context))),
+              ),
+
+            if (d != null && d.hits.isNotEmpty)
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < d.hits.length; i++) ...[
+                      _HitTile(hit: d.hits[i], onTap: () => _open(d.hits[i])),
+                      if (i != d.hits.length - 1)
+                        const Divider(indent: 14, endIndent: 14),
+                    ],
+                  ],
+                ),
+              ),
+
+            if (!_done && !_loading)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 50, 30, 0),
+                child: Text(
+                  tr('論壇搜尋有頻率限制，短時間內連續搜尋會被暫時擋下。'),
+                  textAlign: TextAlign.center,
+                  style:
+                      TextStyle(fontSize: 13, height: 1.6, color: faint(context)),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
+  /// 對應論壇的 search.php?mod=forum&adv=yes，欄位一個不少
   Widget _advancedPanel(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tr('高級搜索'),
-                style: TextStyle(fontSize: 12.5, color: faint(context))),
-            SwitchListTile(
-              value: _titleOnly,
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(tr('只搜尋標題'), style: const TextStyle(fontSize: 14)),
-              onChanged: (v) => setState(() => _titleOnly = v),
-            ),
-            const SizedBox(height: 4),
-            Text(tr('發表時間'), style: TextStyle(fontSize: 12, color: faint(context))),
-            Wrap(
-              spacing: 8,
+            Row(
               children: [
-                for (final e in const [('', '不限'), ('1', '一天內'), ('7', '一週內'), ('30', '一個月內')])
-                  ChoiceChip(
-                    label: Text(tr(e.$2), style: const TextStyle(fontSize: 12.5)),
-                    selected: _within == e.$1,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (_) => setState(() => _within = e.$1),
+                Text(tr('高級搜索'),
+                    style: TextStyle(fontSize: 12.5, color: faint(context))),
+                const Spacer(),
+                if (!_adv.isDefault)
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _adv = const AdvancedSearch();
+                      _authorCtrl.clear();
+                    }),
+                    child: Text(tr('重設')),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(tr('排序'), style: TextStyle(fontSize: 12, color: faint(context))),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final e in const [('', '相關度'), ('dateline', '發表時間'), ('lastpost', '最後回覆'), ('views', '瀏覽數')])
-                  ChoiceChip(
-                    label: Text(tr(e.$2), style: const TextStyle(fontSize: 12.5)),
-                    selected: _orderBy == e.$1,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (_) => setState(() => _orderBy = e.$1),
+            SwitchListTile(
+              value: _adv.fulltext,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(tr('搜尋全文'), style: const TextStyle(fontSize: 14)),
+              subtitle: Text(tr('預設只比對標題'),
+                  style: TextStyle(fontSize: 11.5, color: faint(context))),
+              onChanged: (v) =>
+                  setState(() => _adv = _adv.copyWith(fulltext: v)),
+            ),
+            TextField(
+              controller: _authorCtrl,
+              decoration: InputDecoration(
+                labelText: tr('作者'),
+                hintText: tr('只搜這個人發的主題'),
+                isDense: true,
+              ),
+              onChanged: (v) => _adv = _adv.copyWith(author: v.trim()),
+            ),
+            const SizedBox(height: 16),
+            _label(tr('主題範圍')),
+            _chips(
+              options: [
+                for (final o in searchScopeOptions)
+                  (selected: _adv.scope == o.value, label: tr(o.label), onTap: () {
+                    setState(() => _adv = _adv.copyWith(scope: o.value));
+                  })
+              ],
+            ),
+            const SizedBox(height: 12),
+            _label(tr('特殊主題')),
+            _chips(
+              options: [
+                for (final o in searchSpecialOptions)
+                  (
+                    selected: _adv.special.contains(o.value),
+                    label: tr(o.label),
+                    onTap: () => setState(() {
+                      final next = {..._adv.special};
+                      if (next.contains(o.value)) {
+                        next.remove(o.value);
+                      } else {
+                        next.add(o.value);
+                      }
+                      _adv = _adv.copyWith(special: next);
+                    }),
+                  )
+              ],
+            ),
+            const SizedBox(height: 12),
+            _label(tr('搜尋時間')),
+            _chips(
+              options: [
+                for (final o in searchTimeOptions)
+                  (
+                    selected: _adv.srchfrom == o.value,
+                    label: tr(o.label),
+                    onTap: () =>
+                        setState(() => _adv = _adv.copyWith(srchfrom: o.value)),
+                  )
+              ],
+            ),
+            if (_adv.srchfrom > 0) ...[
+              const SizedBox(height: 8),
+              _chips(
+                options: [
+                  (
+                    selected: !_adv.before,
+                    label: tr('以內'),
+                    onTap: () =>
+                        setState(() => _adv = _adv.copyWith(before: false)),
                   ),
+                  (
+                    selected: _adv.before,
+                    label: tr('以前'),
+                    onTap: () =>
+                        setState(() => _adv = _adv.copyWith(before: true)),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            _label(tr('排序')),
+            _chips(
+              options: [
+                for (final o in searchOrderOptions)
+                  (
+                    selected: _adv.orderby == o.value,
+                    label: tr(o.label),
+                    onTap: () =>
+                        setState(() => _adv = _adv.copyWith(orderby: o.value)),
+                  ),
+                (
+                  selected: _adv.ascending,
+                  label: tr('由舊到新'),
+                  onTap: () => setState(
+                      () => _adv = _adv.copyWith(ascending: !_adv.ascending)),
+                ),
               ],
             ),
           ],
@@ -279,6 +381,29 @@ class _SearchPageState extends State<SearchPage> {
       ),
     );
   }
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child:
+            Text(text, style: TextStyle(fontSize: 12, color: faint(context))),
+      );
+
+  Widget _chips({
+    required List<({bool selected, String label, VoidCallback onTap})> options,
+  }) =>
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final o in options)
+            ChoiceChip(
+              label: Text(o.label, style: const TextStyle(fontSize: 12.5)),
+              selected: o.selected,
+              visualDensity: VisualDensity.compact,
+              onSelected: (_) => o.onTap(),
+            ),
+        ],
+      );
 }
 
 class _HitTile extends StatelessWidget {
