@@ -11,6 +11,7 @@ import '../../api/models.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/quick_menu.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -31,6 +32,9 @@ class _HomePageState extends State<HomePage> {
 
   /// 哪些版塊的子版塊被展開了
   final _openSubs = <int, bool>{};
+
+  /// fid → 子版塊，來自桌面首頁
+  Map<int, List<SubForum>> _subforums = const {};
 
 
   int _rev = -1;
@@ -81,6 +85,19 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => _loading = false);
     }
     _loadFavorites();
+    _loadSubforums();
+  }
+
+  /// 手機模板的子版塊列不齊（勳章公會的「勳章博物館」就漏了），
+  /// 桌面首頁才完整。gzip 約 35 KB，一個 App 生命週期只抓一次
+  Future<void> _loadSubforums() async {
+    try {
+      final map = await api.fetchIndexSubforums();
+      if (!mounted || map.isEmpty) return;
+      setState(() => _subforums = map);
+    } on DiscuzException {
+      // 抓不到就用手機版列到的那些
+    }
   }
 
   /// 收藏的版塊是另一支端點（約 8 KB），登入了才有意義
@@ -115,6 +132,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// 兩邊都可能漏：手機首頁少了勳章公會那種，桌面首頁只展開部分分類。
+  /// 取聯集才齊全
+  List<SubForum> _subsOf(ForumItem f) {
+    final extra = _subforums[f.fid];
+    if (extra == null || extra.isEmpty) return f.subforums;
+    final out = [...f.subforums];
+    for (final s in extra) {
+      if (out.any((x) => x.fid == s.fid)) continue;
+      out.add(s);
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionStore>();
@@ -125,7 +155,8 @@ class _HomePageState extends State<HomePage> {
         title: const Text('GameMale'),
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
-          child: Avatar(session.avatar, size: 30, onTap: () => context.go('/me')),
+          child: Avatar(session.avatar,
+              size: 30, onTap: () => showQuickMenu(context)),
         ),
         actions: [
           IconButton(
@@ -159,6 +190,7 @@ class _HomePageState extends State<HomePage> {
                         for (var j = 0; j < data.groups[i].forums.length; j++) ...[
                           _ForumRow(
                             item: data.groups[i].forums[j],
+                            subforums: _subsOf(data.groups[i].forums[j]),
                             expanded:
                                 _openSubs[data.groups[i].forums[j].fid] ?? false,
                             onToggle: () => setState(() {
@@ -167,7 +199,7 @@ class _HomePageState extends State<HomePage> {
                             }),
                           ),
                           if (_openSubs[data.groups[i].forums[j].fid] ?? false)
-                            for (final sub in data.groups[i].forums[j].subforums)
+                            for (final sub in _subsOf(data.groups[i].forums[j]))
                               _SubForumRow(item: sub),
                           if (j != data.groups[i].forums.length - 1)
                             const Divider(indent: 66, endIndent: 14),
@@ -335,8 +367,14 @@ class _SubForumRow extends StatelessWidget {
 }
 
 class _ForumRow extends StatelessWidget {
-  const _ForumRow({required this.item, this.expanded = false, this.onToggle});
+  const _ForumRow({
+    required this.item,
+    this.subforums = const [],
+    this.expanded = false,
+    this.onToggle,
+  });
   final ForumItem item;
+  final List<SubForum> subforums;
   final bool expanded;
   final VoidCallback? onToggle;
 
@@ -390,7 +428,7 @@ class _ForumRow extends StatelessWidget {
               ],
             ),
             // 有子版塊就變成展開/收合，沒有就維持一個指向內頁的箭頭
-            if (item.subforums.isEmpty)
+            if (subforums.isEmpty)
               Icon(Icons.chevron_right, size: 18, color: faint(context))
             else
               IconButton(

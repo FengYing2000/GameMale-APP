@@ -102,6 +102,48 @@ IndexData parseIndex(dom.Document doc) {
   return IndexData(groups: groups, user: parseHeaderUser(doc), sign: parseSignWidget(doc));
 }
 
+/// 首頁的子版塊。手機模板只列出一部分（勳章公會的「勳章博物館」就漏了），
+/// 桌面模板才完整。gzip 後約 35 KB，一個 App 生命週期抓一次就好。
+Map<int, List<SubForum>>? _subforumCache;
+
+Future<Map<int, List<SubForum>>> fetchIndexSubforums({bool force = false}) async {
+  if (!force && _subforumCache != null) return _subforumCache!;
+  final doc = toDoc(await Api.instance.get('forum.php', desktop: true));
+  final map = parseIndexSubforums(doc);
+  if (map.isNotEmpty) _subforumCache = map;
+  return map;
+}
+
+Map<int, List<SubForum>> parseIndexSubforums(dom.Document doc) {
+  final out = <int, List<SubForum>>{};
+  // 桌面首頁的版塊列有兩種殼：分類展開的 tr.fl_row，跟卡片式的 .fl_g
+  final rows = [
+    ...doc.querySelectorAll('.fl_row'),
+    ...doc.querySelectorAll('.fl_g'),
+  ];
+  for (final row in rows) {
+    final head = row.querySelector('h2 a') ?? row.querySelector('dt a');
+    final fid = _fidOf(attr(head, 'href'));
+    if (fid == null) continue;
+
+    final subs = <SubForum>[];
+    for (final a in row.querySelectorAll('a[href*="forum-"]')) {
+      final sid = _fidOf(attr(a, 'href'));
+      if (sid == null || sid == fid) continue;
+      final name = txt(a).replaceAll(RegExp(r'^\[|\]$'), '').trim();
+      if (name.isEmpty) continue;
+      if (subs.any((x) => x.fid == sid)) continue;
+      subs.add(SubForum(fid: sid, name: name));
+    }
+    if (subs.isNotEmpty) out[fid] = subs;
+  }
+  return out;
+}
+
+int? _fidOf(String href) =>
+    int.tryParse(RegExp(r'forum-(\d+)').firstMatch(href)?.group(1) ?? '') ??
+    paramInt(href, 'fid');
+
 SessionUser parseHeaderUser(dom.Document doc) {
   final a = doc.querySelector('.topLogin') ?? doc.querySelector('a[href*="mycenter=1"]');
   final uid = paramInt(attr(a, 'href'), 'uid');
@@ -847,11 +889,7 @@ ProfileData parseProfile(dom.Document doc, int uid) {
       for (final img in box.querySelectorAll('img')) {
         final src = absolute(attr(img, 'src'));
         if (src.isEmpty) continue;
-        medals.add(Medal(
-          image: src,
-          name: zh(attr(img, 'alt')),
-          desc: plainText(attr(img, 'tip')),
-        ));
+        medals.add(parseMedal(src, attr(img, 'alt'), attr(img, 'tip')));
       }
       continue;
     }
@@ -888,6 +926,44 @@ ProfileData parseProfile(dom.Document doc, int uid) {
     sections: sections,
     medals: medals,
     stats: stats,
+  );
+}
+
+/// 勳章的 `tip` 是一段被跳脫過的 HTML：
+/// `<h4><b>等级 Max</b>黑暗之魂系列</h4><p>說明…</p><div class='wode_shuxing'><p>回帖 血液 +1</p></div>`
+///
+/// 等級和名字之間沒有空白，用正則硬切會把「Max黑暗之魂系列」黏成一塊，
+/// 所以照結構拆：`<b>` 是等級、`<h4>` 剩下的是名字、`<p>` 是說明。
+Medal parseMedal(String image, String alt, String tip) {
+  if (tip.isEmpty) return Medal(image: image, name: zh(alt));
+
+  final doc = toDoc('<div>$tip</div>');
+  final h4 = doc.querySelector('h4');
+  final b = h4?.querySelector('b');
+  final level = txt(b).replaceFirst(RegExp(r'^等[级級]\s*'), '').trim();
+  final name = h4 == null
+      ? zh(alt)
+      : txt(h4).replaceFirst(txt(b), '').trim();
+
+  final effects = <String>[];
+  for (final p in doc.querySelectorAll('.wode_shuxing p')) {
+    final t = txt(p);
+    if (t.isNotEmpty) effects.add(t);
+  }
+
+  final desc = <String>[];
+  for (final p in doc.querySelectorAll('p')) {
+    if (_within(p, doc.querySelector('.wode_shuxing') ?? p)) continue;
+    final t = txt(p);
+    if (t.isNotEmpty) desc.add(t);
+  }
+
+  return Medal(
+    image: image,
+    name: name.isEmpty ? zh(alt) : name,
+    level: level,
+    desc: desc.join('\n'),
+    effects: effects,
   );
 }
 

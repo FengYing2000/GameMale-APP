@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../i18n/ui.dart';
-import '../../store/replied.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/login_required.dart';
@@ -58,10 +57,6 @@ class _ForumPageState extends State<ForumPage> {
     try {
       final d = await api.fetchForum(widget.fid, page: _page, query: _q);
       if (mounted) setState(() => _data = d);
-      if (mounted && d.list.isNotEmpty) {
-        // 已回帖標記：背景慢慢問，不擋畫面
-        context.read<RepliedStore>().check([for (final t in d.list) t.tid]);
-      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {

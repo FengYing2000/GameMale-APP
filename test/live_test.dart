@@ -296,6 +296,44 @@ void main() {
     expect(await replied(194170), isFalse, reason: '這帖沒回過');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
+  test('勳章的等級、名稱、說明、加成要分得開', () async {
+    final p = await api.fetchProfile(678084);
+    expect(p.medals, isNotEmpty);
+    // tip 裡等級和名字之間沒有空白，硬切正則會黏成「Max黑暗之魂系列」
+    expect(p.medals.every((m) => !m.name.startsWith('等')), isTrue);
+    expect(p.medals.any((m) => m.level.isNotEmpty), isTrue);
+    expect(p.medals.every((m) => !m.name.contains(m.level) || m.level.isEmpty),
+        isTrue);
+    expect(p.medals.any((m) => m.effects.isNotEmpty), isTrue,
+        reason: '萨菲罗斯那張有「回帖 血液 +1」');
+    // ignore: avoid_print
+    print('  ${p.medals.map((m) => '[${m.level}]${m.name}').join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('日誌內頁有表態、表態者、評論、作者其他日誌', () async {
+    final b = await space.fetchBlog(610657, 148970);
+    expect(b.reactions, isNotEmpty);
+    expect(b.reactions.every((r) => r.name.isNotEmpty), isTrue);
+    expect(b.reactedBy, isNotEmpty);
+    expect(b.comments, isNotEmpty);
+    expect(b.comments.every((c) => c.author.isNotEmpty), isTrue);
+    expect(b.otherPosts, isNotEmpty);
+    // ignore: avoid_print
+    print('  表態 ${b.reactions.length} 種｜表態者 ${b.reactedBy.length}'
+        '｜評論 ${b.comments.length}｜其他日誌 ${b.otherPosts.length}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('桌面首頁補得到手機版漏掉的子版塊', () async {
+    final map = await api.fetchIndexSubforums();
+    expect(map, isNotEmpty);
+    // 勳章公會(128) 的「勳章博物館」(138) 手機模板整條沒有
+    expect(map[128], isNotNull, reason: '勳章公會應該要有子版塊');
+    expect(map[128]!.any((s) => s.fid == 138), isTrue);
+    // ignore: avoid_print
+    print('  ${map.length} 個版塊有子版塊；勳章公會 → '
+        '${map[128]!.map((s) => s.name).join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {
@@ -326,5 +364,22 @@ void main() {
     expect(next.questions, isNotEmpty, reason: '答錯應該退回重新出題的考卷');
     // ignore: avoid_print
     print('  ${q.questions.length} 題｜公告：${q.notice}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  // 訪客看不到的東西要說清楚原因，這題也得排在登出之後
+  test('訪客看鎖住的空間會拿到明確原因', () async {
+    final album = await space.fetchSpace(691946, SpaceTab.album);
+    expect(album.restricted, isTrue, reason: '相冊被隱私設定擋住');
+    expect(album.message, contains('隐私'));
+
+    final thread = await space.fetchSpace(691946, SpaceTab.thread);
+    expect(thread.needsLogin, isTrue, reason: '主題會被轉去登入頁');
+    // 轉址頁那句「如果您的浏览器没有自动跳转」不該直接丟給使用者看
+    expect(thread.message, isNot(contains('跳轉')));
+    expect(thread.message, isNot(contains('跳转')));
+    // ignore: avoid_print
+    print('  相冊：${album.message}');
+    // ignore: avoid_print
+    print('  主題：${thread.message}');
   }, timeout: const Timeout(Duration(seconds: 60)));
 }

@@ -23,7 +23,10 @@ Future<SearchResult> search(
     if (scope == SearchScope.user) 'username': keyword else 'srchtxt': keyword,
     'formhash': hash ?? '',
     'searchsubmit': 'yes',
-    if (scope == SearchScope.forum && fid > 0) 'srchfid[]': '$fid',
+    if (scope == SearchScope.forum &&
+        fid > 0 &&
+        (advanced?.forums.isEmpty ?? true))
+      'srchfid[]': '$fid',
     // 高級搜索只有帖子搜尋吃得下
     if (scope == SearchScope.forum && advanced != null) ...advanced.toParams(),
   };
@@ -32,9 +35,12 @@ Future<SearchResult> search(
   final parts = [
     for (final e in q.entries)
       '${e.key}=${Uri.encodeQueryComponent(e.value)}',
-    // special[] 是陣列，同一個名字要重複出現，Map 帶不過去
-    if (scope == SearchScope.forum && advanced != null)
+    // special[] 與 srchfid[] 都是陣列，同一個名字要重複出現，Map 帶不過去
+    if (scope == SearchScope.forum && advanced != null) ...[
       for (final s in advanced.special) 'special%5B%5D=$s',
+      // 高級搜索指定的版塊，會蓋掉「本版」那個 fid
+      for (final f in advanced.forums) 'srchfid%5B%5D=$f',
+    ],
   ];
 
   final base = scope == SearchScope.user ? 'home.php' : 'search.php';

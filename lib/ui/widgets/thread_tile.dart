@@ -21,7 +21,11 @@ class ThreadTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meta = TextStyle(fontSize: 12, color: faint(context));
-    final replied = context.watch<RepliedStore>().statusOf(item.tid);
+    final repliedStore = context.watch<RepliedStore>();
+    final replied = repliedStore.statusOf(item.tid);
+    // 由每一列自己排隊查，這樣首頁、搜尋、收藏各種列表都會標，
+    // 設定一打開也會因為重繪而自動補查
+    if (replied == null) repliedStore.check([item.tid]);
 
     return InkWell(
       onTap: () => context.push('/t/${item.tid}'),

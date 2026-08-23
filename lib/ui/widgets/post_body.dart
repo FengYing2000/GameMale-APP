@@ -70,7 +70,11 @@ class PostBody extends StatelessWidget {
                 ?.group(1);
           }
         }
-        final fixed = _readable(raw, isDark);
+        final fixed = _readable(
+          raw,
+          isDark,
+          Theme.of(context).colorScheme.onSurface,
+        );
         if (fixed != null) styles['color'] = fixed;
 
         return styles.isEmpty ? null : styles;
@@ -117,23 +121,27 @@ class PostBody extends StatelessWidget {
 
 /// 論壇很愛用 `<font color="#8b0000">` 這種深色標重點，配深色底幾乎看不見。
 /// 直接拿掉顏色會失去語意，所以保留色相、只把亮度拉進可讀區間。
-String? _readable(String? raw, bool isDark) {
+String? _readable(String? raw, bool isDark, Color fallback) {
   if (raw == null) return null;
   final c = _parseColor(raw.trim());
   if (c == null) return null;
 
   final hsl = HSLColor.fromColor(c);
-  // 深色底要夠亮、淺色底要夠暗，門檻留一點餘裕避免過度校正
-  final l = isDark ? (hsl.lightness < 0.55 ? 0.68 : hsl.lightness)
-                   : (hsl.lightness > 0.72 ? 0.42 : hsl.lightness);
-  if (l == hsl.lightness) return null;   // 本來就夠讀就不要動
+  final tooDark = isDark && hsl.lightness < 0.58;
+  final tooLight = !isDark && hsl.lightness > 0.70;
+  if (!tooDark && !tooLight) return null; // 本來就夠讀就不要動
 
-  // 灰階（低飽和）直接交還給主題預設色，硬拉亮度只會變成髒灰
-  if (hsl.saturation < 0.12) return null;
+  // 灰階（低飽和）拉亮度只會變成髒灰，直接換成主題的文字色。
+  // 這裡一定要明講顏色 —— 回 null 等於放著不管，元素上的
+  // color="#333333" 還是會生效，深色底下就看不見了
+  if (hsl.saturation < 0.15) return _hex(fallback);
 
-  final out = hsl.withLightness(l).toColor();
-  return '#${(out.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+  final out = hsl.withLightness(isDark ? 0.70 : 0.40).toColor();
+  return _hex(out);
 }
+
+String _hex(Color c) =>
+    '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
 
 const _named = {
   'red': 0xFFFF0000, 'darkred': 0xFF8B0000, 'blue': 0xFF0000FF,

@@ -93,19 +93,33 @@ class _SettingsPageState extends State<SettingsPage> {
                       ? (settings.onWifi ? tr('目前：Wi-Fi') : tr('目前：行動網路'))
                       : null,
                 ),
-                const Divider(indent: 56, endIndent: 14),
+              ],
+            ),
+          ),
+          _section(context, tr('增強功能')),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
                 SwitchListTile(
                   value: settings.markReplied,
                   secondary: const Icon(Icons.reply_all_outlined),
                   title: Text(tr('標記已回過的帖')),
                   subtitle: Text(
-                    tr('主題列表會標出自己回過的帖。每個主題都要單獨問論壇一次，'
-                        '列表載入後會慢慢補上'),
+                    tr('主題列表會在標題前標「已回」。每個主題都要單獨問論壇一次，'
+                        '列表出來後會慢慢補上'),
                     style: const TextStyle(fontSize: 12),
                   ),
                   onChanged: settings.setMarkReplied,
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(26, 8, 26, 0),
+            child: Text(
+              tr('這一區放的是論壇網頁版沒有、App 自己加的功能。'),
+              style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
             ),
           ),
           Padding(

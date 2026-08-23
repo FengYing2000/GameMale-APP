@@ -84,7 +84,12 @@ class _ReplyPageState extends State<ReplyPage> {
 
       // 剛回完就直接標起來，不用再去問論壇一次
       context.read<RepliedStore>().markReplied(widget.tid);
-      toast(context, _creditToast(r.message, rule, credits));
+      toastCredits(
+        context,
+        message: r.message,
+        rule: rule,
+        credits: credits,
+      );
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
       if (mounted) toast(context, tr('回覆失敗：${e.message}'));
@@ -95,46 +100,105 @@ class _ReplyPageState extends State<ReplyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.to.isEmpty ? tr('回覆主題') : tr('回覆 ${widget.to}')),
-        actions: [
-          TextButton(
-            onPressed: _busy ? null : _submit,
-            child: Text(_busy ? tr('送出中') : tr('送出')),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(tr('回覆主題'))),
       body: Column(
         children: [
+          // 回覆對象獨立一列，之前跟輸入框擠在標題上看不出來在回誰
+          if (widget.to.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+              color: scheme.primary.withValues(alpha: .08),
+              child: Row(
+                children: [
+                  Icon(Icons.reply, size: 16, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${tr('回覆')} ${widget.to}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: TextField(
-                  controller: _ctrl,
-                  focusNode: _focus,
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: InputDecoration(
-                    hintText: tr('說點什麼…'),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+              child: TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                style: const TextStyle(fontSize: 15.5, height: 1.6),
+                decoration: InputDecoration(
+                  hintText: tr('說點什麼…'),
+                  filled: true,
+                  fillColor: scheme.surface,
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: scheme.primary, width: 1.4),
                   ),
                 ),
               ),
             ),
           ),
-          ComposerToolbar(controller: _ctrl, focus: _focus),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: Text(
-                tr('支援 Discuz BBCode。[hide] 需要板塊開放回覆可見權限才有效。'),
-                style: TextStyle(fontSize: 12, color: faint(context)),
+          Container(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              border: Border(
+                  top: BorderSide(color: Theme.of(context).dividerColor)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  ComposerToolbar(controller: _ctrl, focus: _focus),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            tr('支援 Discuz BBCode，[hide] 需要板塊開放權限'),
+                            style: TextStyle(
+                                fontSize: 11.5, color: faint(context)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          onPressed: _busy ? null : _submit,
+                          icon: _busy
+                              ? const SizedBox(
+                                  width: 15,
+                                  height: 15,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.send, size: 17),
+                          label: Text(_busy ? tr('送出中') : tr('送出')),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -144,9 +208,3 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 }
 
-/// 「回覆成功　发表回复　金币+2　血液+1」
-String _creditToast(String base, String rule, List<CreditChange> credits) {
-  if (credits.isEmpty) return base;
-  return [base, if (rule.isNotEmpty) rule, ...credits.map((c) => c.toString())]
-      .join('　');
-}

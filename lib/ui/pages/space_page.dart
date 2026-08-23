@@ -148,13 +148,6 @@ class _SpacePageState extends State<SpacePage>
     return Scaffold(
       appBar: AppBar(
         title: Text(owner.isEmpty ? tr('個人空間') : '$owner${tr('的空間')}'),
-        actions: [
-          IconButton(
-            tooltip: tr('個人資料'),
-            icon: const Icon(Icons.badge_outlined),
-            onPressed: () => context.push('/u/${widget.uid}'),
-          ),
-        ],
         bottom: TabBar(
           controller: _tabs,
           isScrollable: true,
@@ -177,13 +170,14 @@ class _SpacePageState extends State<SpacePage>
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            ?StateBox.maybe(
-              loading: _loading,
-              error: _err,
-              empty: !_loading && _err == null && (d?.items.isEmpty ?? false),
-              emptyText: d?.message ?? '',
-              onRetry: _load,
-            ),
+            if (d != null && d.items.isEmpty && !_loading && _err == null)
+              _EmptyReason(data: d)
+            else
+              ?StateBox.maybe(
+                loading: _loading,
+                error: _err,
+                onRetry: _load,
+              ),
             if (d != null && d.items.isNotEmpty) ..._body(d),
           ],
         ),
@@ -413,4 +407,48 @@ class _SpacePageState extends State<SpacePage>
                 ),
               ),
       );
+}
+
+/// 空的原因分三種：要登入、被隱私設定擋住、真的沒東西。
+/// 全部混成「沒有相冊」會讓人以為對方真的沒有
+class _EmptyReason extends StatelessWidget {
+  const _EmptyReason({required this.data});
+  final SpaceData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, title) = data.needsLogin
+        ? (Icons.lock_outline, tr('要登入才看得到'))
+        : data.restricted
+            ? (Icons.visibility_off_outlined, tr('對方設了隱私限制'))
+            : (Icons.inbox_outlined, '${tr('沒有')}${tr(data.tab.label)}');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(36, 60, 36, 20),
+      child: Column(
+        children: [
+          Icon(icon, size: 34, color: faint(context)),
+          const SizedBox(height: 14),
+          Text(title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          if (data.message != null && data.message!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              data.message!,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, height: 1.7, color: faint(context)),
+            ),
+          ],
+          if (data.needsLogin) ...[
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => context.push('/login'),
+              child: Text(tr('前往登入')),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

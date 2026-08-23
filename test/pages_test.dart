@@ -4,6 +4,7 @@
 // 這正好順便驗證「論壇連不上時 App 不會白畫面或崩潰」。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gamemale/store/favorites.dart';
 import 'package:gamemale/store/replied.dart';
 import 'package:gamemale/store/session.dart';
 import 'package:gamemale/store/settings.dart';
@@ -37,6 +38,7 @@ Widget _host(Widget page) => MultiProvider(
         ChangeNotifierProvider(create: (_) => SessionStore()),
         ChangeNotifierProvider(create: (_) => SettingsStore()),
         ChangeNotifierProvider(create: (_) => RepliedStore()),
+        ChangeNotifierProvider(create: (_) => FavoriteStore()),
       ],
       child: MaterialApp(home: page),
     );

@@ -84,12 +84,11 @@ class _NewThreadPageState extends State<NewThreadPage> {
       final credits = await api.consumeCreditNotice(uid: uid);
       final rule = await api.consumeCreditRule();
       if (!mounted) return;
-      toast(
+      toastCredits(
         context,
-        credits.isEmpty
-            ? r.message
-            : [r.message, if (rule.isNotEmpty) rule, ...credits.map((c) => '$c')]
-                .join('　'),
+        message: r.message,
+        rule: rule,
+        credits: credits,
       );
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {

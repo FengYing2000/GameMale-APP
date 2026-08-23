@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'api/parse.dart' as parse;
 import 'i18n/s2t.dart';
+import 'store/favorites.dart';
 import 'store/replied.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
@@ -43,6 +44,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
   late final SessionStore _session;
   late final SettingsStore _settings;
   late final RepliedStore _replied;
+  late final FavoriteStore _favorites;
   late final GoRouter _router;
 
   @override
@@ -51,6 +53,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     _session = SessionStore();
     _settings = SettingsStore();
     _replied = RepliedStore();
+    _favorites = FavoriteStore();
     _router = _buildRouter(_session);
     _boot();
   }
@@ -64,6 +67,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     _settings.addListener(_applyReplied);
     _session.addListener(_applyReplied);
     _applyReplied();
+    await _favorites.load();
     await _session.restore();
   }
 
@@ -81,6 +85,8 @@ class _GameMaleAppState extends State<GameMaleApp> {
   void _applyReplied() {
     _replied.setUser(_session.uid);
     _replied.setEnabled(_settings.markReplied && _session.loggedIn);
+    // 收藏清單也是綁帳號的，換人就整份丟掉再抓
+    _favorites.setUser(_session.uid).then((_) => _favorites.refresh());
   }
 
   @override
@@ -90,6 +96,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     _session.removeListener(_applyReplied);
     _session.dispose();
     _replied.dispose();
+    _favorites.dispose();
     _settings.dispose();
     super.dispose();
   }
@@ -101,6 +108,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
         ChangeNotifierProvider.value(value: _session),
         ChangeNotifierProvider.value(value: _settings),
         ChangeNotifierProvider.value(value: _replied),
+        ChangeNotifierProvider.value(value: _favorites),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp.router(

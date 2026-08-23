@@ -15,8 +15,14 @@ Future<SpaceData> fetchSpace(int uid, SpaceTab tab, {int page = 1}) async {
   final html = await Api.instance.get(q.toString(), desktop: true);
   final doc = toDoc(html);
 
-  if (isLoginWall(doc)) {
-    return SpaceData(tab: tab, message: '需要先登入才能看${tab.label}');
+  if (isLoginWall(doc) || isRedirectToLogin(doc, html)) {
+    return SpaceData(tab: tab, message: '要先登入才看得到${tab.label}', needsLogin: true);
+  }
+
+  // 空間可以設成只給好友或只給自己看
+  final privacy = privacyMessage(doc);
+  if (privacy != null) {
+    return SpaceData(tab: tab, message: privacy, restricted: true);
   }
 
   return parseSpace(doc, tab);
@@ -306,12 +312,76 @@ Future<BlogData> fetchBlog(int uid, int blogId) async {
 BlogData parseBlog(dom.Document doc) {
   final article = doc.querySelector('#blog_article');
   if (article == null) {
-    return BlogData(message: noticeMessage(doc) ?? '看不到這篇日誌');
+    return BlogData(
+        message: privacyMessage(doc) ?? noticeMessage(doc) ?? '看不到這篇日誌');
   }
+
+  // 表態：`#click_div td a` 裡有計數 <em>、圖示 <img> 與名稱
+  final reactions = <BlogReaction>[];
+  for (final a in doc.querySelectorAll('#click_div td a')) {
+    final name = txt(a).replaceAll(RegExp(r'^\d+\s*'), '').trim();
+    if (name.isEmpty) continue;
+    reactions.add(BlogReaction(
+      name: name,
+      count: int.tryParse(txt(a.querySelector('em'))) ?? 0,
+      icon: absolute(attr(a.querySelector('img'), 'src')),
+    ));
+  }
+
+  final reactedBy = <SpaceItem>[];
+  for (final li in doc.querySelectorAll('#trace_ul li')) {
+    final link = li.querySelector('p a') ?? li.querySelector('a');
+    if (link == null) continue;
+    final uid = _uidOf(attr(link, 'href'));
+    reactedBy.add(SpaceItem(
+      title: txt(link),
+      uid: uid,
+      avatar: uid == null ? '' : avatarUrl(uid),
+      // 頭像的 title 就是他按了哪個表態
+      meta: attr(li.querySelector('.avt a'), 'title'),
+    ));
+  }
+
+  final comments = <BlogComment>[];
+  for (final dl in doc.querySelectorAll('#comment_ul dl')) {
+    final who = dl.querySelector('dt a[href*="space-uid"]');
+    dom.Element? body;
+    for (final dd in dl.querySelectorAll('dd')) {
+      if (attr(dd, 'id').startsWith('comment_') && dd.classes.isEmpty) body = dd;
+    }
+    if (body == null && who == null) continue;
+    final quote = body?.querySelector('.quote');
+    final quoteText = txt(quote);
+    comments.add(BlogComment(
+      author: txt(who),
+      uid: _uidOf(attr(who, 'href')),
+      avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
+      date: txt(dl.querySelector('dt span.xg1')),
+      text: quoteText.isEmpty
+          ? txt(body)
+          : txt(body).replaceFirst(quoteText, '').trim(),
+      quote: quoteText,
+    ));
+  }
+
+  final others = <SpaceItem>[];
+  for (final li in doc.querySelectorAll('.ct_vw_sd li')) {
+    final a = li.querySelector('a[href*="blog-"]');
+    if (a == null) continue;
+    others.add(SpaceItem(title: txt(a), url: absolute(attr(a, 'href'))));
+  }
+
   return BlogData(
     title: txt(doc.querySelector('.vw h1.ph') ?? doc.querySelector('h1.ph')),
     author: txt(doc.querySelector('#pcd h2')),
     meta: txt(doc.querySelector('.vw .h p.xg2')),
     html: sanitizeContent(article),
+    reactions: reactions,
+    reactedBy: reactedBy,
+    reactedCount: txt(doc.querySelector('#click_div ~ h3')).isEmpty
+        ? txt(doc.querySelector('h3.mbm'))
+        : txt(doc.querySelector('#click_div ~ h3')),
+    comments: comments,
+    otherPosts: others,
   );
 }

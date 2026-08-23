@@ -307,10 +307,23 @@ class CreditItem {
 /// 個人資料裡的一個欄位（網名暱稱、生日、居住地…）
 /// 勳章。`alt` 是名稱，`tip` 是一段 HTML 說明（含等級與加成效果）
 class Medal {
-  const Medal({required this.image, this.name = '', this.desc = ''});
+  const Medal({
+    required this.image,
+    this.name = '',
+    this.level = '',
+    this.desc = '',
+    this.effects = const [],
+  });
+
   final String image;
   final String name;
+
+  /// 「Max」「1」…
+  final String level;
   final String desc;
+
+  /// 加成效果，例如「回帖 血液 +1」
+  final List<String> effects;
 }
 
 class ProfileField {
@@ -730,6 +743,8 @@ class SpaceData {
     this.pager = const PageInfo(),
     this.formhash = '',
     this.message,
+    this.needsLogin = false,
+    this.restricted = false,
   });
 
   final SpaceTab tab;
@@ -740,6 +755,12 @@ class SpaceData {
 
   /// 空的時候要說明為什麼空（沒東西／被鎖／要登入）
   final String? message;
+
+  /// 論壇把我們轉去登入頁了
+  final bool needsLogin;
+
+  /// 對方的隱私設定擋住了
+  final bool restricted;
 }
 
 /// 回帖獎勵：`pool` 是獎池餘額（13783 枚金幣），`rule` 是規則說明
@@ -956,6 +977,35 @@ class AlbumPhoto {
   final int? picid;
 }
 
+/// 日誌的表態按鈕（震驚／感謝／關心／加油／有愛）
+class BlogReaction {
+  const BlogReaction({required this.name, required this.count, this.icon = ''});
+  final String name;
+  final int count;
+  final String icon;
+}
+
+/// 日誌的一則評論
+class BlogComment {
+  const BlogComment({
+    required this.author,
+    this.uid,
+    this.avatar = '',
+    this.date = '',
+    this.text = '',
+    this.quote = '',
+  });
+
+  final String author;
+  final int? uid;
+  final String avatar;
+  final String date;
+  final String text;
+
+  /// 回覆別人時引用的那段
+  final String quote;
+}
+
 /// 日誌內頁
 class BlogData {
   const BlogData({
@@ -963,6 +1013,11 @@ class BlogData {
     this.author = '',
     this.meta = '',
     this.html = '',
+    this.reactions = const [],
+    this.reactedBy = const [],
+    this.reactedCount = '',
+    this.comments = const [],
+    this.otherPosts = const [],
     this.message,
   });
 
@@ -972,6 +1027,18 @@ class BlogData {
 
   /// 已淨化過的內文 HTML
   final String html;
+
+  final List<BlogReaction> reactions;
+
+  /// 剛表態過的朋友
+  final List<SpaceItem> reactedBy;
+  final String reactedCount;
+
+  final List<BlogComment> comments;
+
+  /// 作者的其他最新日誌
+  final List<SpaceItem> otherPosts;
+
   final String? message;
 }
 
@@ -986,6 +1053,7 @@ class AdvancedSearch {
     this.before = false,
     this.orderby = 'lastpost',
     this.ascending = false,
+    this.forums = const {},
   });
 
   /// 勾了就連內文一起搜，不只標題
@@ -1010,6 +1078,9 @@ class AdvancedSearch {
   final String orderby;
   final bool ascending;
 
+  /// 搜尋範圍：要搜哪幾個版塊，空的代表全部版塊
+  final Set<int> forums;
+
   AdvancedSearch copyWith({
     bool? fulltext,
     String? author,
@@ -1019,6 +1090,7 @@ class AdvancedSearch {
     bool? before,
     String? orderby,
     bool? ascending,
+    Set<int>? forums,
   }) =>
       AdvancedSearch(
         fulltext: fulltext ?? this.fulltext,
@@ -1029,6 +1101,7 @@ class AdvancedSearch {
         before: before ?? this.before,
         orderby: orderby ?? this.orderby,
         ascending: ascending ?? this.ascending,
+        forums: forums ?? this.forums,
       );
 
   bool get isDefault =>
@@ -1038,7 +1111,8 @@ class AdvancedSearch {
       special.isEmpty &&
       srchfrom == 0 &&
       orderby == 'lastpost' &&
-      !ascending;
+      !ascending &&
+      forums.isEmpty;
 
   /// 論壇的表單欄位名。special 是陣列，交給呼叫端展開
   Map<String, String> toParams() => {

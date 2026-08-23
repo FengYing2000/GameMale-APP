@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
+import '../../store/favorites.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
@@ -31,7 +32,6 @@ class ThreadPage extends StatefulWidget {
 class _ThreadPageState extends State<ThreadPage> {
   ThreadData? _data;
   ThreadExtras _extras = const ThreadExtras();
-  bool _faved = false;
   final _revealImages = ValueNotifier<bool>(false);
   bool _loading = true;
   String? _err;
@@ -88,10 +88,10 @@ class _ThreadPageState extends State<ThreadPage> {
       final r = await api.favoriteThread(widget.tid);
       if (!mounted) return;
       toast(context, r.message);
-      // 論壇不會在帖子頁告訴你收過沒有，只有送出時才知道。
-      // 「已收藏过本主题」也代表已收藏，星星一樣要亮起來
-      final already = r.message.contains('已收藏');
-      if (r.ok || already) setState(() => _faved = true);
+      // 「已收藏过本主题」也代表已收藏，一樣要記起來
+      if (r.ok || r.message.contains('已收藏')) {
+        await context.read<FavoriteStore>().add(widget.tid);
+      }
     } on DiscuzException catch (e) {
       if (mounted) toast(context, tr('收藏失敗：${e.message}'));
     }
@@ -117,7 +117,12 @@ class _ThreadPageState extends State<ThreadPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(d?.forumName ?? tr('主題')),
+        title: Text(
+          d?.title.isNotEmpty == true ? d!.title : (d?.forumName ?? tr('主題')),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 16),
+        ),
         actions: [
           ValueListenableBuilder<bool>(
             valueListenable: _revealImages,
@@ -132,12 +137,15 @@ class _ThreadPageState extends State<ThreadPage> {
                   ),
           ),
           if (session.loggedIn)
-            IconButton(
-              icon: Icon(_faved ? Icons.star : Icons.star_border),
-              color: _faved ? const Color(0xFFF6B93B) : null,
-              tooltip: _faved ? tr('已收藏') : tr('收藏'),
-              onPressed: _fav,
-            ),
+            Builder(builder: (c) {
+              final faved = c.watch<FavoriteStore>().contains(widget.tid);
+              return IconButton(
+                icon: Icon(faved ? Icons.star : Icons.star_border),
+                color: faved ? const Color(0xFFF6B93B) : null,
+                tooltip: faved ? tr('已收藏') : tr('收藏'),
+                onPressed: _fav,
+              );
+            }),
         ],
       ),
       floatingActionButton: session.loggedIn

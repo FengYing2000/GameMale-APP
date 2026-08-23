@@ -220,3 +220,16 @@ String plainText(String html) {
   final t = txt(dom.Element.html('<div>$html</div>'));
   return t.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
+
+
+/// 空間的隱私牆：「抱歉！由于 XXX 的隐私设置，您不能访问当前内容」
+String? privacyMessage(dom.Document doc) {
+  final h = doc.querySelector('.nfl h2');
+  final t = txt(h);
+  return t.isEmpty ? null : t;
+}
+
+/// 論壇把訪客轉去登入頁時，回來的是一頁只有「如果您的浏览器没有自动跳转」的轉址頁
+bool isRedirectToLogin(dom.Document doc, String html) =>
+    html.contains('mod=logging') &&
+    (html.contains('没有自动跳转') || html.contains('沒有自動跳轉'));

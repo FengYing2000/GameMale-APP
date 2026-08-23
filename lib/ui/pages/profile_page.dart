@@ -64,54 +64,42 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _openMedal(Medal m) {
-    // tip 裡是「等级 X」＋一段說明，後面可能再接加成效果，拆開來排比較好讀
-    final desc = m.desc;
-    final level = RegExp(r'等[级級]\s*(\S+)').firstMatch(desc)?.group(1) ?? '';
-    final body = desc.replaceFirst(RegExp(r'^等[级級]\s*\S+\s*'), '').trim();
-    final effects = RegExp(r'([^\s]+\s*[+-]\d+)').allMatches(body).map((x) => x.group(1)!).toList();
-    final text = effects.isEmpty
-        ? body
-        : body.replaceAll(RegExp(r'\s*[^\s]+\s*[+-]\d+'), '').trim();
-
     showDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
         content: SizedBox(
           width: 320,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 CachedNetworkImage(
                   imageUrl: m.image,
                   httpHeaders: Api.imageHeaders,
-                  height: 56,
+                  height: 58,
                   errorWidget: (c, _, _) =>
                       const Icon(Icons.military_tech_outlined, size: 40),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Text(
                   m.name,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 17, fontWeight: FontWeight.w700, height: 1.35),
                 ),
-                if (level.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                if (m.level.isNotEmpty) ...[
+                  const SizedBox(height: 8),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        const EdgeInsets.symmetric(horizontal: 11, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Theme.of(c)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: .13),
+                      color:
+                          Theme.of(c).colorScheme.primary.withValues(alpha: .13),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '${tr('等級')} $level',
+                      '${tr('等級')} ${m.level}',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -119,20 +107,23 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ],
-                if (effects.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                if (m.effects.isNotEmpty) ...[
+                  const SizedBox(height: 14),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
                     alignment: WrapAlignment.center,
                     children: [
-                      for (final e in effects)
+                      for (final e in m.effects)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                              horizontal: 9, vertical: 4),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Theme.of(c).dividerColor),
+                            color: const Color(0xFF4CAF50).withValues(alpha: .12),
                             borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: const Color(0xFF4CAF50)
+                                    .withValues(alpha: .35)),
                           ),
                           child: Text(e,
                               style: const TextStyle(
@@ -141,12 +132,20 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                 ],
-                if (text.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    text,
-                    style: TextStyle(
-                        fontSize: 13.5, height: 1.75, color: subtle(c)),
+                if (m.desc.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(c).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      m.desc,
+                      style: TextStyle(
+                          fontSize: 13.5, height: 1.8, color: subtle(c)),
+                    ),
                   ),
                 ],
               ],

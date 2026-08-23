@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/http.dart';
+import '../../api/discuz.dart' as discuz;
 import '../../api/models.dart';
 import '../../api/parse.dart';
 import '../../api/search.dart' as api;
@@ -38,6 +39,9 @@ class _SearchPageState extends State<SearchPage> {
 
   bool _showAdvanced = false;
   AdvancedSearch _adv = const AdvancedSearch();
+
+  /// 搜尋範圍要用的版塊清單，第一次打開高級搜索時才抓
+  List<ForumGroup> _forumTree = const [];
 
   @override
   void initState() {
@@ -80,6 +84,94 @@ class _SearchPageState extends State<SearchPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadForums() async {
+    try {
+      final idx = await discuz.fetchIndex();
+      if (mounted) setState(() => _forumTree = idx.groups);
+    } on DiscuzException {
+      // 抓不到就不顯示範圍選擇，其他欄位照樣能用
+    }
+  }
+
+  Future<void> _pickForums() async {
+    final picked = {..._adv.forums};
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setSheet) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(c).size.height * .7,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 12, 4),
+                  child: Row(
+                    children: [
+                      Text(tr('搜尋範圍'),
+                          style: TextStyle(fontSize: 12, color: faint(c))),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => setSheet(picked.clear),
+                        child: Text(tr('全部版塊')),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final g in _forumTree) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                          child: Text(g.name,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: faint(c))),
+                        ),
+                        for (final f in g.forums)
+                          CheckboxListTile(
+                            dense: true,
+                            value: picked.contains(f.fid),
+                            title: Text(f.name,
+                                style: const TextStyle(fontSize: 14)),
+                            onChanged: (on) => setSheet(() {
+                              if (on == true) {
+                                picked.add(f.fid);
+                              } else {
+                                picked.remove(f.fid);
+                              }
+                            }),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(c),
+                      child: Text(picked.isEmpty
+                          ? tr('全部版塊')
+                          : '${tr('已選')} ${picked.length}'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (mounted) setState(() => _adv = _adv.copyWith(forums: picked));
   }
 
   void _open(SearchHit hit) {
@@ -127,7 +219,10 @@ class _SearchPageState extends State<SearchPage> {
               color:
                   _adv.isDefault ? null : Theme.of(context).colorScheme.primary,
               tooltip: tr('高級搜索'),
-              onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+              onPressed: () {
+                setState(() => _showAdvanced = !_showAdvanced);
+                if (_showAdvanced && _forumTree.isEmpty) _loadForums();
+              },
             ),
         ],
       ),
@@ -357,6 +452,17 @@ class _SearchPageState extends State<SearchPage> {
                 ],
               ),
             ],
+            const SizedBox(height: 12),
+            _label(tr('搜尋範圍')),
+            OutlinedButton.icon(
+              onPressed: _forumTree.isEmpty ? null : _pickForums,
+              icon: const Icon(Icons.checklist, size: 17),
+              label: Text(
+                _adv.forums.isEmpty
+                    ? tr('全部版塊')
+                    : '${tr('已選')} ${_adv.forums.length} ${tr('個版塊')}',
+              ),
+            ),
             const SizedBox(height: 12),
             _label(tr('排序')),
             _chips(

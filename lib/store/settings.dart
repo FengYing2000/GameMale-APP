@@ -51,8 +51,8 @@ class SettingsStore extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   Accent accent = Accent.blue;
 
-  /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇，預設關閉
-  bool markReplied = false;
+  /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇
+  bool markReplied = true;
 
   bool _onWifi = true;
   bool get onWifi => _onWifi;
@@ -99,7 +99,7 @@ class SettingsStore extends ChangeNotifier {
       (e) => e.name == prefs.getString(_kAccent),
       orElse: () => Accent.blue,
     );
-    markReplied = prefs.getBool(_kReplied) ?? false;
+    markReplied = prefs.getBool(_kReplied) ?? true;
 
     await _refreshNetwork();
     Connectivity().onConnectivityChanged.listen((_) => _refreshNetwork());
