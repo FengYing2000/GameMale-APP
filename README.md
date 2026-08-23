@@ -10,7 +10,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Tests](https://img.shields.io/badge/測試-204%20項-4CAF50)](#測試策略)
+[![Tests](https://img.shields.io/badge/測試-210%20項-4CAF50)](#測試策略)
 [![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -59,6 +59,7 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 | **發文走桌面端點** | 論壇處理邏輯相同，但外掛（勳章積分）掛在桌面流程上 |
 | **桌面模板要明寫 `mobile=no`** | 只是不帶 `mobile=2` 沒用 —— Discuz 會依 iPhone UA 自動轉手機版 |
 | **POST 的轉址要自己跟** | Dart 的 HttpClient 只自動跟隨 GET/HEAD，POST 收到 302 會拿到空 body |
+| **積分變化要用 ID 定位** | `creditnotice` cookie 第 0 格是總積分，第 1～8 格照積分 ID 擺；照名稱表順序數會整串位移一格 |
 | **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -122,14 +123,14 @@ tool/
 
 | 檔案 | 內容 | 數量 |
 |---|---|---|
-| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 150 |
+| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 156 |
 | `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 24 |
 | `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
 | `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
 | `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 21 |
 
 ```bash
-flutter test                        # 204 項離線測試
+flutter test                        # 210 項離線測試
 flutter analyze                     # 零問題
 ```
 

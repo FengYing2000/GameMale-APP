@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import '../../store/history.dart';
+import '../../store/session.dart';
 import '../widgets/composer_toolbar.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
@@ -74,8 +75,11 @@ class _ReplyPageState extends State<ReplyPage> {
       }
 
       // 發文成功後論壇會把積分變化寫進 cookie（勳章觸發也走這套），
-      // 網頁版是用彈窗顯示，這裡也顯示出來，才看得出到底有沒有加到分
-      final credits = await api.consumeCreditNotice();
+      // 網頁版是用彈窗顯示，這裡也顯示出來，才看得出到底有沒有加到分。
+      // 帶 uid 是因為 cookie 最後一格記著它是給誰的，對不上就不能用
+      final uid = context.read<SessionStore>().uid;
+      final credits = await api.consumeCreditNotice(uid: uid);
+      final rule = await api.consumeCreditRule();
       if (!mounted) return;
 
       await context.read<ReplyHistory>().add(ReplyRecord(
@@ -85,8 +89,7 @@ class _ReplyPageState extends State<ReplyPage> {
             at: DateTime.now(),
           ));
       if (!mounted) return;
-      toast(context,
-          credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');
+      toast(context, _creditToast(r.message, rule, credits));
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
       if (mounted) toast(context, tr('回覆失敗：${e.message}'));
@@ -144,4 +147,11 @@ class _ReplyPageState extends State<ReplyPage> {
       ),
     );
   }
+}
+
+/// 「回覆成功　发表回复　金币+2　血液+1」
+String _creditToast(String base, String rule, List<CreditChange> credits) {
+  if (credits.isEmpty) return base;
+  return [base, if (rule.isNotEmpty) rule, ...credits.map((c) => c.toString())]
+      .join('　');
 }

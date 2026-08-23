@@ -1033,37 +1033,77 @@ Future<SubmitResult> unfavorite(int favid) async {
 /// 論壇會在頁面裡輸出權威對照，例如
 /// creditnotice = '1|旅程|里,2|金币|枚,3|血液|滴,...'
 /// 注意順序和積分頁上的排列不同，照畫面順序猜會標錯名稱。
-List<({String name, String unit})> _creditNames = const [];
+/// 積分名稱表。**key 是論壇給的積分 ID，不是順序** —— cookie 也是照 ID 定位的
+Map<int, ({String name, String unit})> _creditNames = const {};
 
 void _captureCreditNames(String html) {
+  // creditnotice = '1|旅程|里,2|金币|枚,3|血液|滴,…'
   final m = RegExp(r"creditnotice\s*=\s*'([^']+)'").firstMatch(html);
   if (m == null) return;
-  final out = <({String name, String unit})>[];
+  final out = <int, ({String name, String unit})>{};
   for (final part in m.group(1)!.split(',')) {
     final f = part.split('|');
-    if (f.length >= 3) out.add((name: f[1], unit: f[2]));
+    if (f.length < 3) continue;
+    final id = int.tryParse(f[0]);
+    if (id == null) continue;
+    out[id] = (name: f[1], unit: f[2]);
   }
   if (out.isNotEmpty) _creditNames = out;
 }
 
+/// 只給測試用：目前解出來的積分名稱表
+List<String> get creditNamesDebug =>
+    [for (final e in _creditNames.entries) '${e.key}=${e.value.name}(${e.value.unit})'];
+
 /// 讀 `<cookiepre>_creditnotice`，解出這次操作得到的積分。
 ///
-/// cookie 是「每項變化量」以 D 相連，最後接 uid。前 N 項對應上面那份名稱表，
-/// 多出來的一項是總積分，論壇自己的 JS 也不顯示它。
-Future<List<CreditChange>> consumeCreditNotice() async {
+/// cookie 是 `總積分D變化1D變化2…D變化8D uid`，一共十格。
+/// **要用積分 ID 定位，不是照名稱表的順序數過去** —— 論壇自己的
+/// `creditShow()` 就是 `for(i=1;i<=8;i++) notice[i]`，第 0 格是總積分。
+/// 照順序數會整串位移一格（金幣的變化被標成血液、血液被標成追隨…）。
+///
+/// 最後一格必須等於自己的 uid，否則這份 cookie 不是給這個帳號的，直接丟掉。
+Future<List<CreditChange>> consumeCreditNotice({int? uid}) async {
   final raw = await Api.instance.cookieEndingWith('_creditnotice');
-  if (raw == null || raw.isEmpty || _creditNames.isEmpty) return const [];
+  if (raw == null || raw.isEmpty) return const [];
+  return parseCreditNotice(raw, uid: uid);
+}
+
+/// 純解析，測試直接餵 cookie 字串用
+List<CreditChange> parseCreditNotice(String raw, {int? uid}) {
+  if (_creditNames.isEmpty) return const [];
 
   final parts = raw.split('D');
   if (parts.length < 2) return const [];
-  final values = parts.sublist(0, parts.length - 1);   // 去掉結尾的 uid
+  if (uid != null && int.tryParse(parts.last) != uid) return const [];
 
   final out = <CreditChange>[];
-  for (var i = 0; i < _creditNames.length && i < values.length; i++) {
-    final v = int.tryParse(values[i]) ?? 0;
-    if (v != 0) out.add(CreditChange(_creditNames[i].name, v, _creditNames[i].unit));
+  for (final entry in _creditNames.entries) {
+    final id = entry.key;
+    if (id < 0 || id >= parts.length - 1) continue;
+    final v = int.tryParse(parts[id]) ?? 0;
+    if (v != 0) out.add(CreditChange(entry.value.name, v, entry.value.unit));
   }
   return out;
+}
+
+/// 只給測試用：直接餵 creditnotice 那串名稱表
+void captureCreditNamesForTest(String spec) =>
+    _captureCreditNames("creditnotice = '$spec'");
+
+/// 這次積分是哪個動作給的（「发表回复」「每天登录」…）。
+/// 論壇顯示在積分變化前面，跟 creditnotice 是同一批 cookie。
+Future<String> consumeCreditRule() async {
+  final raw = await Api.instance.cookieEndingWith('_creditrule');
+  if (raw == null || raw.isEmpty) return '';
+  // cookie 是 URL 編碼過的，規則之間用 tab 分隔
+  try {
+    return zh(Uri.decodeComponent(raw.replaceAll('+', ' '))
+        .replaceAll('\t', ' ')
+        .trim());
+  } catch (_) {
+    return '';
+  }
 }
 
 /* ─────────────── 記錄廣場 ─────────────── */

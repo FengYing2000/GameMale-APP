@@ -1,10 +1,12 @@
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../theme.dart';
+import '../../store/session.dart';
 import '../widgets/composer_toolbar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -78,10 +80,17 @@ class _NewThreadPageState extends State<NewThreadPage> {
         toast(context, r.message);
         return;
       }
-      final credits = await api.consumeCreditNotice();
+      final uid = context.read<SessionStore>().uid;
+      final credits = await api.consumeCreditNotice(uid: uid);
+      final rule = await api.consumeCreditRule();
       if (!mounted) return;
-      toast(context,
-          credits.isEmpty ? r.message : '${r.message}　${credits.join('　')}');
+      toast(
+        context,
+        credits.isEmpty
+            ? r.message
+            : [r.message, if (rule.isNotEmpty) rule, ...credits.map((c) => '$c')]
+                .join('　'),
+      );
       Navigator.of(context).pop(true);
     } on DiscuzException catch (e) {
       if (mounted) toast(context, tr('發表失敗：${e.message}'));

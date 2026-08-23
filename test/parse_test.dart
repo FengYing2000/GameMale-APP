@@ -757,6 +757,50 @@ void main() {
     });
   });
 
+  group('積分變化 cookie', () {
+    // 真實案例：回覆一帖後金幣 827→830、血液 4097→4101、咒術 64→65，
+    // 其餘不變。App 一度顯示成「血液+3 追隨+4 知識+1」—— 整串位移一格。
+    setUp(() {
+      api.captureCreditNamesForTest(
+          '1|旅程|里,2|金币|枚,3|血液|滴,4|追随|人,5|咒术|卷,6|知识|点,7|灵魂|隻,8|堕落|黑');
+    });
+
+    // cookie 是 `總積分D變化1…D變化8D uid`，共十格
+    const cookie = '3D0D3D4D0D1D0D0D0D677863';
+
+    test('依積分 ID 定位，不是照順序數', () {
+      final out = api.parseCreditNotice(cookie, uid: 677863);
+      expect(out.map((c) => c.toString()).toList(),
+          ['金币 +3枚', '血液 +4滴', '咒术 +1卷']);
+    });
+
+    test('不會把變化套到下一個名稱上', () {
+      final names = api.parseCreditNotice(cookie, uid: 677863).map((c) => c.name);
+      expect(names, isNot(contains('追随')), reason: '追随這次沒有變動');
+      expect(names, isNot(contains('知识')));
+      expect(names, isNot(contains('旅程')));
+    });
+
+    test('第 0 格是總積分，不能被當成第一項', () {
+      // 總積分 3 若被誤讀，就會多出一筆「旅程 +3」
+      expect(api.parseCreditNotice(cookie, uid: 677863).length, 3);
+    });
+
+    test('uid 對不上就整份丟掉', () {
+      expect(api.parseCreditNotice(cookie, uid: 123456), isEmpty);
+    });
+
+    test('沒有變化時回空', () {
+      expect(api.parseCreditNotice('0D0D0D0D0D0D0D0D0D677863', uid: 677863),
+          isEmpty);
+    });
+
+    test('負值也讀得出來', () {
+      final out = api.parseCreditNotice('-5D0D-5D0D0D0D0D0D0D677863', uid: 677863);
+      expect(out.single.toString(), '金币 -5枚');
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

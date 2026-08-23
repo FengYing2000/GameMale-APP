@@ -10,7 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
-[![Tests](https://img.shields.io/badge/测试-204%20项-4CAF50)](#测试策略)
+[![Tests](https://img.shields.io/badge/测试-210%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -59,6 +59,7 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 | **发帖走桌面端点** | 论坛处理逻辑相同，但插件（勋章积分）挂在桌面流程上 |
 | **桌面模板要明写 `mobile=no`** | 只是不带 `mobile=2` 没用 —— Discuz 会依 iPhone UA 自动转手机版 |
 | **POST 的跳转要自己跟** | Dart 的 HttpClient 只自动跟随 GET/HEAD，POST 收到 302 会拿到空 body |
+| **积分变化要用 ID 定位** | `creditnotice` cookie 第 0 格是总积分，第 1～8 格按积分 ID 排列；按名称表顺序数会整串位移一格 |
 | **繁简转换自定规则** | OpenCC 的第一候选常常不合语境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
 ---
@@ -122,14 +123,14 @@ tool/
 
 | 文件 | 内容 | 数量 |
 |---|---|---|
-| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 150 |
+| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 156 |
 | `pages_test.dart` | 每页 pump 起来 + 离线行为 | 24 |
 | `s2t_test.dart` | 繁简转换的每一类判断 | 18 |
 | `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
 | `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 21 |
 
 ```bash
-flutter test                        # 204 项离线测试
+flutter test                        # 210 项离线测试
 flutter analyze                     # 零问题
 ```
 
