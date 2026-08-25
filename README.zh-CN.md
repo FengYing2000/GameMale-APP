@@ -10,7 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
-[![Tests](https://img.shields.io/badge/测试-232%20项-4CAF50)](#测试策略)
+[![Tests](https://img.shields.io/badge/测试-237%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -68,6 +68,7 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 | **论坛内容一律保留原文** | 转过的标题跟网页版对不起来，所以简繁转换改成帖子页上逐篇按 |
 | **取消收藏是两步骤** | 先 GET 拿确认表单（formhash 跟页面上的不同），再 POST `deletesubmit=true` 才真的删 |
 | **ajax 响应要抽消息** | 整包只是一段 `<script>`，直接当文字会把 JavaScript 念出来 |
+| **图片有三种来源** | 一般网址、`data:` 内嵌、jsdelivr 的 `.svg` emoji；后两种要各自的解码路径，否则整片「加载失败」 |
 | **群组是另一套页面** | `group-<fid>-1.html` 只有桌面模板，用 `/f/<fid>` 进去会显示「没有主题」 |
 | **繁简转换自定规则** | OpenCC 的第一候选常常不合语境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
@@ -132,14 +133,14 @@ tool/
 
 | 文件 | 内容 | 数量 |
 |---|---|---|
-| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 172 |
-| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 29 |
+| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 177 |
+| `pages_test.dart` | 每页 pump 起来 + 离线行为 | 30 |
 | `s2t_test.dart` | 繁简转换的每一类判断 | 18 |
 | `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
-| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 33 |
+| `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 36 |
 
 ```bash
-flutter test                        # 232 项离线测试
+flutter test                        # 237 项离线测试
 flutter analyze                     # 零问题
 ```
 

@@ -25,6 +25,7 @@ import 'ui/pages/notice_page.dart';
 import 'ui/pages/pm_chat_page.dart';
 import 'ui/pages/profile_page.dart';
 import 'ui/pages/album_page.dart';
+import 'ui/pages/blog_list_page.dart';
 import 'ui/pages/blog_page.dart';
 import 'ui/pages/group_page.dart';
 import 'ui/pages/groups_page.dart';
@@ -81,10 +82,9 @@ class _GameMaleAppState extends State<GameMaleApp> {
   /// 想看繁體的話在帖子頁上按「翻譯」，那是逐篇的，不會動到列表與標題。
   void _applyLang() {
     final want = _settings.toTraditional;
-    final changed = UiLang.instance.simplified == want ||
-        S2T.instance.useTaiwanWords != _settings.taiwanWords;
+    final changed = UiLang.instance.simplified == want;
     parse.convertToTraditional = false;
-    S2T.instance.useTaiwanWords = _settings.taiwanWords;
+    S2T.instance.useTaiwanWords = true;
     UiLang.instance.simplified = !want;      // 介面文字
     if (changed && mounted) setState(() {});
   }
@@ -156,6 +156,7 @@ GoRouter _buildRouter(SessionStore session) {
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/settings/tools', builder: (c, s) => const ToolsPage()),
+      GoRoute(path: '/blogs', builder: (c, s) => const BlogListPageView()),
       GoRoute(path: '/groups', builder: (c, s) => const GroupsPage()),
       GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),

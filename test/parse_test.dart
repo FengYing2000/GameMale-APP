@@ -12,6 +12,7 @@ import 'package:gamemale/api/register.dart' as register;
 import 'package:gamemale/api/smilies.dart' as smilies;
 import 'package:gamemale/api/space.dart' as space;
 import 'package:gamemale/i18n/s2t.dart';
+import 'package:gamemale/ui/widgets/smart_image.dart';
 
 File _f(String name) => File('test/fixtures/$name');
 
@@ -895,6 +896,42 @@ void main() {
       const body = "<root><![CDATA[<script>showDialog('您需要先登录才能继续本操作', "
           "'alert');</script>]]></root>";
       expect(api.submitResult(body, '取消收藏').ok, isFalse);
+    });
+  });
+
+  group('圖片來源判斷', () {
+    // 帖子裡的 emoji 走 jsdelivr 的 SVG，日誌裡常見內嵌的 data: URI，
+    // 兩種都不是一般的 png/jpg，走錯解碼路徑就整片「圖片載入失敗」
+    test('認得出 data: URI', () {
+      expect(SmartImage.isData('data:image/png;base64,iVBORw0KGgo='), isTrue);
+      expect(SmartImage.isData('https://x.com/a.png'), isFalse);
+    });
+    test('認得出 SVG', () {
+      expect(
+          SmartImage.isSvg(
+              'https://gcore.jsdelivr.net/gh/googlefonts/noto-emoji/svg/emoji_u1f60d.svg'),
+          isTrue);
+      expect(SmartImage.isSvg('data:image/svg+xml,%3Csvg%3E'), isTrue);
+      expect(SmartImage.isSvg('https://img.gamemale.com/a.jpg'), isFalse);
+    });
+    test('data: URI 解得出位元組', () {
+      // 1x1 透明 PNG
+      const png = 'data:image/png;base64,'
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+      final bytes = SmartImage.decodeData(png);
+      expect(bytes, isNotNull);
+      expect(bytes!.length, greaterThan(20));
+      // PNG 檔頭
+      expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+    });
+    test('base64 夾雜換行也要解得開', () {
+      const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA\n'
+          'AAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+      expect(SmartImage.decodeData(png), isNotNull);
+    });
+    test('壞掉的 data: URI 回 null，不會炸掉', () {
+      expect(SmartImage.decodeData('data:image/png;base64,@@@@'), isNull);
+      expect(SmartImage.decodeData('data:image/png'), isNull);
     });
   });
 

@@ -395,6 +395,46 @@ void main() {
     print('  第一筆 tid=${r.list.first.tid} favid=${r.list.first.favid}');
   }, timeout: const Timeout(Duration(seconds: 40)));
 
+  test('日誌廣場三種視角都拿得到內容', () async {
+    for (final v in blogViews) {
+      final d = await space.fetchBlogList(v.key);
+      expect(d.items, isNotEmpty, reason: '${v.name} 沒有內容：${d.message}');
+      expect(d.items.every((i) => i.title.isNotEmpty), isTrue);
+      // ignore: avoid_print
+      print('  ${v.name} ${d.items.length} 篇');
+    }
+    // 隨便看看那頁論壇會列出分類
+    final all = await space.fetchBlogList('all');
+    expect(all.categories, isNotEmpty);
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
+  test('日誌的表態按鈕帶得到連結', () async {
+    final b = await space.fetchBlog(610657, 148970);
+    expect(b.reactions, isNotEmpty);
+    // 沒有連結就按不下去
+    expect(b.reactions.every((r) => r.url.contains('ac=click')), isTrue);
+    expect(b.reactions.every((r) => r.url.contains('hash=')), isTrue);
+    // ignore: avoid_print
+    print('  ${b.reactions.map((r) => r.name).join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 40)));
+
+  test('購買附件的確認表單讀得到售價與餘額', () async {
+    final e = await api.fetchThreadExtras(194170);
+    final paid = e.attachments.where((a) => a.needsPay).firstOrNull;
+    expect(paid, isNotNull);
+    expect(paid!.aid, isNotNull, reason: '沒有 aid 就買不了');
+
+    // 只讀表單，不送出 —— 送出會真的扣金幣
+    final pay = await api.fetchAttachPay(paid.aid!, 194170);
+    expect(pay.ready, isTrue);
+    expect(pay.name, isNotEmpty);
+    expect(pay.rows, isNotEmpty);
+    expect(pay.rows.any((r) => r.label.contains('售价')), isTrue);
+    expect(pay.rows.any((r) => r.label.contains('余额')), isTrue);
+    // ignore: avoid_print
+    print('  ${pay.name}｜${pay.rows.map((r) => '${r.label} ${r.value}').join('　')}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

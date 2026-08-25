@@ -129,6 +129,8 @@ List<SpaceItem> _blog(dom.Document doc) {
   for (final dl in doc.querySelectorAll('.xld dl')) {
     final a = dl.querySelector('dt a');
     if (a == null) continue;
+    // 標題是空的（例如整篇只有一張圖）就跳過，列出來也點不出東西
+    if (txt(a).isEmpty) continue;
     final excerpt = dl.querySelector('dd.cl');
     out.add(SpaceItem(
       title: txt(a),
@@ -325,6 +327,7 @@ BlogData parseBlog(dom.Document doc) {
       name: name,
       count: int.tryParse(txt(a.querySelector('em'))) ?? 0,
       icon: absolute(attr(a.querySelector('img'), 'src')),
+      url: absolute(attr(a, 'href')),
     ));
   }
 
@@ -408,4 +411,51 @@ Future<SubmitResult> postBlogComment(
     desktop: true,
   );
   return submitResult(html, '留言');
+}
+
+
+/// 日誌廣場。跟記錄廣場一樣有三種視角，好友／我的都要登入
+Future<BlogListPage> fetchBlogList(
+  String view, {
+  int page = 1,
+  int catid = 0,
+}) async {
+  final q = StringBuffer('home.php?mod=space&do=blog&view=$view');
+  if (catid > 0) q.write('&catid=$catid');
+  if (page > 1) q.write('&page=$page');
+
+  final html = await Api.instance.get(q.toString(), desktop: true);
+  final doc = toDoc(html);
+
+  if (isLoginWall(doc) || isRedirectToLogin(doc, html)) {
+    return const BlogListPage(message: '要先登入才看得到', needsLogin: true);
+  }
+
+  final cats = <BlogCategory>[];
+  for (final a in doc.querySelectorAll('a[href*="catid="]')) {
+    final id = paramInt(attr(a, 'href'), 'catid');
+    final name = txt(a);
+    if (id == null || name.isEmpty) continue;
+    if (cats.any((c) => c.catid == id)) continue;
+    cats.add(BlogCategory(catid: id, name: name));
+  }
+
+  final items = _blog(doc);
+  return BlogListPage(
+    items: items,
+    categories: cats,
+    pager: parsePager(doc),
+    message: items.isEmpty ? (noticeMessage(doc) ?? '這裡沒有日誌') : null,
+  );
+}
+
+/// 對日誌表態（震驚／感謝／關心／加油／有愛）。
+/// 連結裡已經帶好 clickid 與 hash，直接 GET 就是送出
+Future<SubmitResult> clickBlogReaction(String url) async {
+  if (url.isEmpty) return const SubmitResult(ok: false, message: '這個表態沒有連結');
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  final html = await Api.instance
+      .get('${path.replaceFirst(RegExp(r'^/'), '')}&inajax=1', desktop: true);
+  return submitResult(html, '表態');
 }

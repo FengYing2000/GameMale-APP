@@ -1,5 +1,4 @@
 import '../../i18n/ui.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -12,6 +11,7 @@ import '../../store/settings.dart';
 import '../../theme.dart';
 import 'image_actions.dart';
 import 'image_reveal.dart';
+import 'smart_image.dart';
 import 'image_viewer.dart';
 import 'external_link.dart';
 
@@ -266,25 +266,18 @@ class _PostImageState extends State<_PostImage> {
       onLongPress: () => showImageActions(context, widget.src),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: CachedNetworkImage(
-          imageUrl: widget.src,
-          httpHeaders: Api.imageHeaders,
+        child: SmartImage(
+          src: widget.src,
           fit: BoxFit.contain,
-          placeholder: (c, _) => Container(
+          placeholder: Container(
             height: 150,
             alignment: Alignment.center,
-            color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
             child: const SizedBox(
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-          ),
-          errorWidget: (c, _, _) => Container(
-            height: 90,
-            alignment: Alignment.center,
-            color: Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.04),
-            child: Text(tr('圖片載入失敗'), style: TextStyle(fontSize: 12, color: faint(c))),
           ),
         ),
       ),

@@ -53,6 +53,7 @@ dependencies:
   # CI runner 的 Xcode 沒有就編不過。我們只用它判斷 Wi-Fi/行動網路。
   connectivity_plus: 6.1.0
   webview_flutter: ^4.14.1
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:

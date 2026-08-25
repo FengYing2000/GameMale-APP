@@ -73,6 +73,8 @@ class _ThreadPageState extends State<ThreadPage> {
       }
     }
     _loadExtras();
+    // 收藏清單是判斷星星要不要實心的依據，沒抓到就補一次
+    if (mounted) context.read<FavoriteStore>().refresh();
   }
 
   /// 回帖獎勵與附件只有桌面模板有，要多抓一次頁面（約 90 KB），
@@ -159,12 +161,15 @@ class _ThreadPageState extends State<ThreadPage> {
           style: const TextStyle(fontSize: 16),
         ),
         actions: [
-          IconButton(
-            tooltip: _translated ? tr('顯示原文') : tr('翻譯成繁體'),
-            icon: Icon(_translated ? Icons.translate : Icons.g_translate_outlined),
-            color: _translated ? Theme.of(context).colorScheme.primary : null,
-            onPressed: () => setState(() => _translated = !_translated),
-          ),
+          // 論壇本來就是簡體，介面設成簡體時這顆按鈕沒有意義
+          if (context.watch<SettingsStore>().toTraditional)
+            IconButton(
+              tooltip: _translated ? tr('顯示原文') : tr('翻譯成繁體'),
+              icon:
+                  Icon(_translated ? Icons.translate : Icons.g_translate_outlined),
+              color: _translated ? Theme.of(context).colorScheme.primary : null,
+              onPressed: () => setState(() => _translated = !_translated),
+            ),
           ValueListenableBuilder<bool>(
             valueListenable: _revealImages,
             builder: (c, all, _) => context.watch<SettingsStore>().autoLoadImages
@@ -286,7 +291,11 @@ class _ThreadPageState extends State<ThreadPage> {
                   if (d.poll case final poll?)
                     PollCard(poll: poll, onVoted: _load),
                   if (_extras.attachments.isNotEmpty)
-                    _AttachmentCard(items: _extras.attachments),
+                    _AttachmentCard(
+                      items: _extras.attachments,
+                      tid: widget.tid,
+                      onBought: _loadExtras,
+                    ),
                 ],
               ],
             ],
@@ -300,8 +309,93 @@ class _ThreadPageState extends State<ThreadPage> {
 
 /// 附件清單。免費的點了直接開下載，付費的先讓使用者知道要花多少
 class _AttachmentCard extends StatelessWidget {
-  const _AttachmentCard({required this.items});
+  const _AttachmentCard({
+    required this.items,
+    required this.tid,
+    required this.onBought,
+  });
   final List<Attachment> items;
+  final int tid;
+  final VoidCallback onBought;
+
+  /// 付費附件先把售價與購買後餘額攤開來，確認了才真的扣金幣
+  Future<void> _buy(BuildContext context, Attachment a) async {
+    if (!await requireLogin(context, action: tr('購買附件'))) return;
+    if (!context.mounted) return;
+    final aid = a.aid;
+    if (aid == null) {
+      return confirmExternal(context, a.url,
+          title: tr('購買附件'),
+          note: tr('這個附件的購買連結認不出編號，交給瀏覽器處理。'));
+    }
+
+    AttachPay pay;
+    try {
+      pay = await api.fetchAttachPay(aid, tid);
+    } on DiscuzException catch (e) {
+      if (context.mounted) toast(context, tr('拿不到購買資訊：${e.message}'));
+      return;
+    }
+    if (!context.mounted) return;
+    if (!pay.ready) {
+      toast(context, pay.message ?? tr('拿不到購買資訊'), kind: ToastKind.warn);
+      return;
+    }
+
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('購買附件')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(pay.name,
+                style: const TextStyle(
+                    fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.4)),
+            if (pay.author.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('${tr('作者')} ${pay.author}',
+                  style: TextStyle(fontSize: 12, color: faint(c))),
+            ],
+            const SizedBox(height: 12),
+            for (final r in pay.rows)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(r.label,
+                          style: TextStyle(fontSize: 13, color: faint(c))),
+                    ),
+                    Text(r.value,
+                        style: const TextStyle(
+                            fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(tr('確認購買'))),
+        ],
+      ),
+    );
+    if (go != true || !context.mounted) return;
+
+    try {
+      final r = await api.submitAttachPay(pay);
+      if (!context.mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) onBought();
+    } on DiscuzException catch (e) {
+      if (context.mounted) toast(context, tr('購買失敗：${e.message}'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -342,14 +436,14 @@ class _AttachmentCard extends StatelessWidget {
                   trailing: Icon(
                       items[i].needsPay ? Icons.shopping_cart_outlined : Icons.download,
                       size: 18),
-                  onTap: () => confirmExternal(
-                    context,
-                    items[i].url,
-                    title: items[i].needsPay ? tr('購買附件') : tr('下載附件'),
-                    note: items[i].needsPay
-                        ? tr('購買要在論壇頁面上完成，App 會交給瀏覽器。')
-                        : tr('App 不能直接存檔，下載會交給瀏覽器處理。'),
-                  ),
+                  onTap: () => items[i].needsPay
+                      ? _buy(context, items[i])
+                      : confirmExternal(
+                          context,
+                          items[i].url,
+                          title: tr('下載附件'),
+                          note: tr('App 不能直接存檔，下載會交給瀏覽器處理。'),
+                        ),
                 ),
                 if (i != items.length - 1)
                   const Divider(height: 1, indent: 56, endIndent: 14),

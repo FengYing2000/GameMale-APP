@@ -1,8 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/http.dart';
 import '../../api/models.dart';
 import '../../api/space.dart' as api;
 import '../../i18n/ui.dart';
@@ -10,6 +8,7 @@ import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_body.dart';
 import '../widgets/require_login.dart';
+import '../widgets/smart_image.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -149,33 +148,49 @@ class _BlogPageState extends State<BlogPage> {
     );
   }
 
+  Future<void> _react(BlogReaction r) async {
+    if (!await requireLogin(context, action: tr('表態'))) return;
+    if (!mounted) return;
+    try {
+      final res = await api.clickBlogReaction(r.url);
+      if (!mounted) return;
+      toast(context, res.message,
+          kind: res.ok ? ToastKind.ok : ToastKind.warn);
+      if (res.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, tr('表態失敗：${e.message}'));
+    }
+  }
+
   Widget _reactions(BlogData d) => Card(
+        clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
           child: Row(
             children: [
               for (final r in d.reactions)
                 Expanded(
-                  child: Column(
-                    children: [
-                      if (r.icon.isNotEmpty)
-                        CachedNetworkImage(
-                          imageUrl: r.icon,
-                          httpHeaders: Api.imageHeaders,
-                          height: 28,
-                          errorWidget: (c, _, _) =>
-                              const Icon(Icons.emoji_emotions_outlined, size: 24),
-                        ),
-                      const SizedBox(height: 6),
-                      Text('${r.count}',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w700)),
-                      Text(r.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(fontSize: 11, color: faint(context))),
-                    ],
+                  child: InkWell(
+                    onTap: () => _react(r),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        children: [
+                          if (r.icon.isNotEmpty)
+                            SmartImage(src: r.icon, height: 28),
+                          const SizedBox(height: 6),
+                          Text('${r.count}',
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700)),
+                          Text(r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 11, color: faint(context))),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],

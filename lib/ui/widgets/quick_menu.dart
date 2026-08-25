@@ -25,11 +25,8 @@ const forumTools = <({String id, String label, String icon, String path})>[
   (id: 'bgshop', label: '背景商店', icon: 'Ｂ', path: 'tshuz_bgshop-tshuz_bgshop.html'),
   (id: 'draw', label: '你畫我猜', icon: '✎', path: 'plugin.php?id=viewui_draw'),
   (id: 'task', label: '熱門任務', icon: '☑', path: 'home.php?mod=task'),
-  (id: 'signtask', label: '每日簽到任務', icon: '✓', path: 'k_misign-sign.html'),
   (id: 'posttask', label: '每週發帖獎勵', icon: '✎', path: 'home.php?mod=task&do=view&id=25'),
   (id: 'replytask', label: '每月回帖獎勵', icon: '↩', path: 'reply_reward-reply_reward.html'),
-  (id: 'survey', label: '科考小隊', icon: '⚑', path: 'nds_up_ques-nds_up_ques.html'),
-  (id: 'newblog', label: '最新日誌', icon: '✦', path: 'home.php?mod=space&uid=617370&do=blog&classid=1293&view=me'),
 ];
 
 /// 首頁的側邊欄
@@ -99,6 +96,10 @@ class QuickDrawer extends StatelessWidget {
                 icon: Icons.chat_bubble_outline,
                 label: tr('記錄廣場'),
                 onTap: () => context.push('/doing')),
+            _tile(context,
+                icon: Icons.article_outlined,
+                label: tr('日誌'),
+                onTap: () => context.push('/blogs')),
             _tile(context,
                 icon: Icons.groups_outlined,
                 label: tr('群組'),

@@ -985,6 +985,38 @@ class Attachment {
   final String price;
 
   bool get needsPay => price.isNotEmpty;
+
+  /// 購買頁網址裡的附件 id
+  int? get aid => int.tryParse(
+      RegExp(r'[?&]aid=(\d+)').firstMatch(url)?.group(1) ?? '');
+}
+
+/// 購買附件的確認資訊
+class AttachPay {
+  const AttachPay({
+    this.name = '',
+    this.author = '',
+    this.rows = const [],
+    this.formhash = '',
+    this.action = '',
+    this.aid = '',
+    this.message,
+  });
+
+  final String name;
+  final String author;
+
+  /// 售價／作者所得／購買後餘額，論壇給幾列就顯示幾列
+  final List<({String label, String value})> rows;
+
+  final String formhash;
+  final String action;
+  final String aid;
+
+  /// 拿不到表單時的原因
+  final String? message;
+
+  bool get ready => formhash.isNotEmpty && action.isNotEmpty;
 }
 
 /// 帖子頁桌面模板才有的東西：回帖獎勵與附件清單
@@ -1022,10 +1054,19 @@ class AlbumPhoto {
 
 /// 日誌的表態按鈕（震驚／感謝／關心／加油／有愛）
 class BlogReaction {
-  const BlogReaction({required this.name, required this.count, this.icon = ''});
+  const BlogReaction({
+    required this.name,
+    required this.count,
+    this.icon = '',
+    this.url = '',
+  });
+
   final String name;
   final int count;
   final String icon;
+
+  /// 表態的連結，裡面帶著 clickid 與 hash，按下去就是送出
+  final String url;
 }
 
 /// 日誌的一則評論
@@ -1239,6 +1280,36 @@ class GroupData {
 
   /// 還沒加入，論壇只給介紹跟一顆「加入群組」
   final bool canJoin;
+  final bool needsLogin;
+  final String? message;
+}
+
+/// 日誌廣場的三種視角，跟記錄廣場同一套
+const blogViews = <({String key, String name, bool needsLogin})>[
+  (key: 'all', name: '隨便看看', needsLogin: false),
+  (key: 'we', name: '好友的日誌', needsLogin: true),
+  (key: 'me', name: '我的日誌', needsLogin: true),
+];
+
+/// 日誌分類（論壇自己列出來的）
+class BlogCategory {
+  const BlogCategory({required this.catid, required this.name});
+  final int catid;
+  final String name;
+}
+
+class BlogListPage {
+  const BlogListPage({
+    this.items = const [],
+    this.categories = const [],
+    this.pager = const PageInfo(),
+    this.needsLogin = false,
+    this.message,
+  });
+
+  final List<SpaceItem> items;
+  final List<BlogCategory> categories;
+  final PageInfo pager;
   final bool needsLogin;
   final String? message;
 }

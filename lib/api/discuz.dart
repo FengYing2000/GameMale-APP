@@ -1108,6 +1108,65 @@ List<Attachment> parseAttachments(dom.Document doc) {
   return out;
 }
 
+/// 購買附件：先拿確認表單（作者、售價、購買後餘額），使用者確認後才送出。
+/// 只有桌面模板有這個浮層
+Future<AttachPay> fetchAttachPay(int aid, int tid) async {
+  final xml = await Api.instance.get(
+    'forum.php?mod=misc&action=attachpay&aid=$aid&tid=$tid'
+    '&infloat=yes&handlekey=attachpay&inajax=1',
+    desktop: true,
+  );
+  final doc = toDoc(_unwrapAjax(xml));
+  final form = doc.querySelector('#attachpayform');
+  if (form == null) {
+    return AttachPay(message: noticeMessage(doc) ?? '拿不到購買資訊');
+  }
+
+  final rows = <({String label, String value})>[];
+  var name = '';
+  var author = '';
+  for (final tr in form.querySelectorAll('tr')) {
+    final tds = tr.querySelectorAll('td');
+    if (tds.length < 2) continue;
+    final label = txt(tds[0]);
+    final value = txt(tds[1]);
+    if (label.contains('附件')) {
+      name = value;
+    } else if (label.contains('作者') && !label.contains('所得')) {
+      author = value;
+    } else {
+      rows.add((label: label, value: value));
+    }
+  }
+
+  return AttachPay(
+    name: name,
+    author: author,
+    rows: rows,
+    formhash: attr(form.querySelector('input[name="formhash"]'), 'value'),
+    action: attr(form, 'action'),
+    aid: attr(form.querySelector('input[name="aid"]'), 'value'),
+  );
+}
+
+Future<SubmitResult> submitAttachPay(AttachPay pay) async {
+  if (!pay.ready) {
+    return SubmitResult(ok: false, message: pay.message ?? '沒有購買表單');
+  }
+  final html = await Api.instance.post(
+    '${pay.action.replaceAll('&amp;', '&')}&inajax=1',
+    {
+      'formhash': pay.formhash,
+      'aid': pay.aid,
+      'handlekey': 'attachpay',
+      'paysubmit': 'true',
+      'referer': '$kOrigin/',
+    },
+    desktop: true,
+  );
+  return _submitResult(html, '購買');
+}
+
 /// 加好友（論壇會回一個確認表單頁，成功與否看回應訊息）
 Future<SubmitResult> addFriend(int uid) async {
   await _ensureFormhash();

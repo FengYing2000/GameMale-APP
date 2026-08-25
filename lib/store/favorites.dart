@@ -37,16 +37,22 @@ class FavoriteStore extends ChangeNotifier {
     final raw = prefs.getString(_key);
     if (raw == null) return;
     try {
-      final map = jsonDecode(raw);
-      if (map is Map) {
-        _favids = <int, int>{};
-        for (final e in map.entries) {
+      final data = jsonDecode(raw);
+      _favids = <int, int>{};
+      if (data is Map) {
+        for (final e in data.entries) {
           final t = int.tryParse('${e.key}');
           if (t == null) continue;
           _favids[t] = e.value is int ? e.value as int : 0;
         }
-        notifyListeners();
+      } else if (data is List) {
+        // 舊版只存 tid 陣列，沒有 favid。先讓星星亮起來，
+        // 下次重抓時再補上 favid（沒有它就取消不了收藏）
+        for (final t in data.whereType<int>()) {
+          _favids[t] = 0;
+        }
       }
+      notifyListeners();
     } catch (_) {
       // 壞掉就當作沒有，重抓一次就好
     }
@@ -77,9 +83,9 @@ class FavoriteStore extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final at = prefs.getInt(_stampKey) ?? 0;
     final age = DateTime.now().millisecondsSinceEpoch - at;
-    if (!force &&
-        _favids.isNotEmpty &&
-        age < const Duration(days: 1).inMilliseconds) {
+    // 沒有 favid 的舊資料也要重抓，不然取消收藏會找不到編號
+    final stale = _favids.isEmpty || _favids.values.every((v) => v == 0);
+    if (!force && !stale && age < const Duration(days: 1).inMilliseconds) {
       return;
     }
 

@@ -1,9 +1,8 @@
 import '../../i18n/ui.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../api/http.dart';
 import 'image_actions.dart';
+import 'smart_image.dart';
 
 /// 全螢幕看圖，支援雙指縮放與拖曳
 void showImageViewer(BuildContext context, String url) {
@@ -32,13 +31,12 @@ class _Viewer extends StatelessWidget {
                 minScale: 1,
                 maxScale: 5,
                 child: Center(
-                  child: CachedNetworkImage(
-                    imageUrl: url,
-                    httpHeaders: Api.imageHeaders,
+                  child: SmartImage(
+                    src: url,
                     fit: BoxFit.contain,
-                    placeholder: (c, _) => const CircularProgressIndicator(strokeWidth: 2),
-                    errorWidget: (c, _, _) =>
-                        Text(tr('圖片載入失敗'), style: TextStyle(color: Colors.white70)),
+                    placeholder: const CircularProgressIndicator(strokeWidth: 2),
+                    errorWidget: Text(tr('圖片載入失敗'),
+                        style: const TextStyle(color: Colors.white70)),
                   ),
                 ),
               ),
