@@ -10,7 +10,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Tests](https://img.shields.io/badge/測試-229%20項-4CAF50)](#測試策略)
+[![Tests](https://img.shields.io/badge/測試-232%20項-4CAF50)](#測試策略)
 [![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -65,7 +65,9 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 | **勳章 tip 照結構拆** | 等級和名字之間沒有空白，正則會黏成「Max黑暗之魂系列」；`<b>` 是等級、`<h4>` 其餘是名字 |
 | **深色底的灰字要明講顏色** | 回 `null` 等於不覆寫，元素上的 `color="#333"` 還是會生效 |
 | **論壇頁面用內建瀏覽器** | 丟給系統瀏覽器那邊沒有登入狀態，所以把 App 的 cookie 灌進 WebView |
-| **台灣用語替換預設關閉** | 換詞會改掉帖子原本的字（`汉化`→`中文化`），標題就跟網頁版對不起來 |
+| **論壇內容一律保留原文** | 轉過的標題跟網頁版對不起來，所以簡繁轉換改成帖子頁上逐篇按 |
+| **取消收藏是兩步驟** | 先 GET 拿確認表單（formhash 跟頁面上的不同），再 POST `deletesubmit=true` 才真的刪 |
+| **ajax 回應要抽訊息** | 整包只是一段 `<script>`，直接當文字會把 JavaScript 唸出來 |
 | **群組是另一套頁面** | `group-<fid>-1.html` 只有桌面模板，用 `/f/<fid>` 進去會顯示「沒有主題」 |
 | **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
@@ -130,14 +132,14 @@ tool/
 
 | 檔案 | 內容 | 數量 |
 |---|---|---|
-| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 169 |
+| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 172 |
 | `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 29 |
 | `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
 | `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
 | `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 33 |
 
 ```bash
-flutter test                        # 229 項離線測試
+flutter test                        # 232 項離線測試
 flutter analyze                     # 零問題
 ```
 

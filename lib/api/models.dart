@@ -200,6 +200,24 @@ class PostItem {
     this.quoteHref = '',
     this.comments = const [],
   });
+
+  /// 逐篇翻譯用：只換文字，其他照舊
+  PostItem mapText(String Function(String) f) => PostItem(
+        pid: pid,
+        floor: floor,
+        author: author,
+        uid: uid,
+        avatar: avatar,
+        time: time,
+        html: f(html),
+        signature: f(signature),
+        quoteHref: quoteHref,
+        comments: [
+          for (final c in comments)
+            FloorComment(
+                name: c.name, uid: c.uid, avatar: c.avatar, text: f(c.text)),
+        ],
+      );
 }
 
 class ThreadData {

@@ -133,7 +133,8 @@ class _MePageState extends State<MePage> {
                             Text(
                               [
                                 'UID ${session.uid ?? '—'}',
-                                if (me?.level.isNotEmpty == true) 'Lv.${me!.level}',
+                                // level 已經是完整的「Lvl. 7 ✓」，不要再加前綴
+                                if (me?.level.isNotEmpty == true) me!.level,
                                 if (session.sign?.title.isNotEmpty == true)
                                   session.sign!.title,
                               ].join(' · '),

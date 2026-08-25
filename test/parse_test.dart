@@ -872,6 +872,32 @@ void main() {
     });
   });
 
+  group('ajax 送出結果', () {
+    // 論壇的 ajax 回應常常整包只是一段 <script>，直接把 body 當訊息
+    // 會把 JavaScript 一起唸出來
+    test('抓 showDialog 裡的訊息', () {
+      const body = "<root><![CDATA[<script>hideWindow('x');"
+          "showDialog('操作成功 ', 'right', null);</script>]]></root>";
+      final r = api.submitResult(body, '取消收藏');
+      expect(r.message, '操作成功');
+      expect(r.ok, isTrue);
+    });
+    test('沒有 showDialog 時抓 succeedhandle 的第二個參數', () {
+      const body = "<root><![CDATA[<script>if(typeof succeedhandle_a_delete_1=="
+          "'function') {succeedhandle_a_delete_1('home.php?x=1', '操作成功 ', "
+          "{'favid':'1'});}</script>]]></root>";
+      final r = api.submitResult(body, '取消收藏');
+      expect(r.message, '操作成功');
+      expect(r.message, isNot(contains('succeedhandle')));
+      expect(r.ok, isTrue);
+    });
+    test('失敗訊息不會被當成成功', () {
+      const body = "<root><![CDATA[<script>showDialog('您需要先登录才能继续本操作', "
+          "'alert');</script>]]></root>";
+      expect(api.submitResult(body, '取消收藏').ok, isFalse);
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');

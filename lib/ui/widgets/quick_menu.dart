@@ -5,20 +5,31 @@ import 'package:provider/provider.dart';
 import '../../api/http.dart';
 import '../../i18n/ui.dart';
 import '../../store/session.dart';
+import '../../store/settings.dart';
 import '../../theme.dart';
 import 'avatar.dart';
 import 'external_link.dart';
 
 /// 論壇左側那排功能。這些是外掛頁面，沒有手機模板，
 /// 用內建瀏覽器開（帶得到登入狀態）。
-const _forumTools = <({String label, String icon, String path})>[
-  (label: '勳章商城', icon: '🎖', path: 'wodexunzhang-showxunzhang.html'),
-  (label: '我的勳章', icon: '▣', path: 'wodexunzhang-showxunzhang.html?action=my'),
-  (label: '道具超市', icon: '㍰', path: 'home.php?mod=magic'),
-  (label: '血液祭獻', icon: '⇄', path: 'plugin.php?id=k_xueyeji'),
-  (label: '頭銜稱號', icon: 'Ｔ', path: 'home.php?mod=spacecp&ac=profile&op=base'),
-  (label: '多彩名片', icon: '▤', path: 'k_usercard-style.html'),
-  (label: '熱門任務', icon: '☑', path: 'home.php?mod=task'),
+/// 論壇左側那排功能。全都是外掛頁面，只有桌面模板，
+/// 用內建瀏覽器開（帶得到登入狀態，網址也會補上 mobile=no）。
+const forumTools = <({String id, String label, String icon, String path})>[
+  (id: 'medalshop', label: '勳章商城', icon: '🎖', path: 'wodexunzhang-showxunzhang.html'),
+  (id: 'mymedal', label: '我的勳章', icon: '▣', path: 'wodexunzhang-showxunzhang.html?action=my'),
+  (id: 'magic', label: '道具超市', icon: '㍰', path: 'home.php?mod=magic'),
+  (id: 'blood', label: '血液祭獻', icon: '⇄', path: 'home.php?mod=spacecp&ac=credit&op=exchange'),
+  (id: 'card', label: '日常卡片', icon: '¼', path: 'it618_award-award.html'),
+  (id: 'buyname', label: '頭銜稱號', icon: 'Ｔ', path: 'tshuz_buyname-tshuz_buyname.html'),
+  (id: 'usercard', label: '多彩名片', icon: '▤', path: 'k_usercard-style.html'),
+  (id: 'bgshop', label: '背景商店', icon: 'Ｂ', path: 'tshuz_bgshop-tshuz_bgshop.html'),
+  (id: 'draw', label: '你畫我猜', icon: '✎', path: 'plugin.php?id=viewui_draw'),
+  (id: 'task', label: '熱門任務', icon: '☑', path: 'home.php?mod=task'),
+  (id: 'signtask', label: '每日簽到任務', icon: '✓', path: 'k_misign-sign.html'),
+  (id: 'posttask', label: '每週發帖獎勵', icon: '✎', path: 'home.php?mod=task&do=view&id=25'),
+  (id: 'replytask', label: '每月回帖獎勵', icon: '↩', path: 'reply_reward-reply_reward.html'),
+  (id: 'survey', label: '科考小隊', icon: '⚑', path: 'nds_up_ques-nds_up_ques.html'),
+  (id: 'newblog', label: '最新日誌', icon: '✦', path: 'home.php?mod=space&uid=617370&do=blog&classid=1293&view=me'),
 ];
 
 /// 首頁的側邊欄
@@ -28,6 +39,7 @@ class QuickDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionStore>();
+    final settings = context.watch<SettingsStore>();
     final scheme = Theme.of(context).colorScheme;
 
     return Drawer(
@@ -93,18 +105,32 @@ class QuickDrawer extends StatelessWidget {
                 onTap: () => context.push('/groups')),
             const Divider(height: 24, indent: 16, endIndent: 16),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(tr('論壇功能'),
-                  style: TextStyle(fontSize: 12, color: faint(context))),
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 4),
+              child: Row(
+                children: [
+                  Text(tr('論壇功能'),
+                      style: TextStyle(fontSize: 12, color: faint(context))),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.push('/settings/tools');
+                    },
+                    icon: const Icon(Icons.tune, size: 15),
+                    label: Text(tr('編排')),
+                  ),
+                ],
+              ),
             ),
-            for (final t in _forumTools)
+            for (final t in settings.visibleTools)
               _tile(context,
                   leading: Text(t.icon,
                       style: const TextStyle(fontSize: 16),
                       textAlign: TextAlign.center),
                   label: tr(t.label),
-                  onTap: () =>
-                      openInApp(context, '$kOrigin/${t.path}', title: tr(t.label))),
+                  onTap: () => openInApp(
+                      context, Api.desktopFullUrl(t.path),
+                      title: tr(t.label))),
             const SizedBox(height: 20),
           ],
         ),

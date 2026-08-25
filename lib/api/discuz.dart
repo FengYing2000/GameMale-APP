@@ -514,11 +514,23 @@ Future<ListPage> search(String keyword, {int page = 1}) async {
 /// 所以改成：落在帖子頁＝成功；否則看訊息文字比對已知的失敗樣態。
 final _failurePatterns = RegExp(
     '权限|權限|间隔|間隔|太快|过快|禁止|不能|无权|無權|失败|失敗|错误|錯誤|'
-    '请先登录|請先登錄|需要先登入|尚未登录|抱歉|不存在|已关闭|已關閉');
+    '请先登录|請先登錄|需要先登录|需要先登入|尚未登录|尚未登入|'
+    '抱歉|不存在|已关闭|已關閉');
 
 SubmitResult submitResult(String html, String what) => _submitResult(html, what);
 
 SubmitResult _submitResult(String html, String what) {
+  // ajax 回應常常整包只是一段 <script>，直接把 body 當訊息會連 JavaScript
+  // 一起唸出來。訊息可能在 showDialog('…') 或 succeedhandle_x(url, '…', {…})
+  final dialog = RegExp(r"showDialog\('([^']*)'").firstMatch(html)?.group(1) ??
+      RegExp(r"succeedhandle_\w+\('[^']*',\s*'([^']*)'")
+          .firstMatch(html)
+          ?.group(1);
+  if (dialog != null && dialog.trim().isNotEmpty) {
+    final text = zh(dialog.trim());
+    return SubmitResult(ok: !_failurePatterns.hasMatch(text), message: text);
+  }
+
   final doc = toDoc(html);
 
   // 論壇把我們轉到登入頁 = 這個操作根本沒送出。
@@ -844,7 +856,9 @@ Future<MeData> fetchMe(int uid) async {
   return MeData(
     uid: uid,
     name: title.replaceFirst(RegExp(r'Lvl\..*$'), '').trim(),
-    level: RegExp(r'Lvl\.\s*(\d+)').firstMatch(title)?.group(1) ?? '',
+    // 只抓數字會把「Lvl. 7 ✓」的勾與「Lvl. 10 · I」的羅馬數字吃掉，
+    // 那是用戶組的一部分，整段留著
+    level: RegExp(r'Lvl\..*$').firstMatch(title)?.group(0)?.trim() ?? '',
     avatar: avatarUrl(uid),
   );
 }
@@ -1197,10 +1211,28 @@ Future<SubmitResult> favoriteThread(int tid) async {
   return _submitResult(html, '收藏');
 }
 
+/// 取消收藏是兩步驟：先 GET 拿確認表單，再 POST 送出。
+/// 只做第一步的話論壇只會回一句「您确定要删除此收藏吗？」，什麼都沒刪。
+/// 表單裡的 formhash 跟頁面上那個不一樣，一定要用回傳的這個。
 Future<SubmitResult> unfavorite(int favid) async {
-  await _ensureFormhash();
-  final html = await Api.instance
-      .get('home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid&formhash=$_formhash');
+  final key = 'a_delete_$favid';
+  final form = await Api.instance.get(
+    'home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid'
+    '&infloat=yes&handlekey=$key&inajax=1',
+  );
+  final doc = toDoc(_unwrapAjax(form));
+  final hash = attr(doc.querySelector('input[name="formhash"]'), 'value');
+  if (hash.isEmpty) return _submitResult(form, '取消收藏');
+
+  final html = await Api.instance.post(
+    'home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid&type=all&inajax=1',
+    {
+      'deletesubmit': 'true',
+      'formhash': hash,
+      'handlekey': key,
+      'referer': '$kOrigin/home.php?mod=space&do=favorite&view=me',
+    },
+  );
   return _submitResult(html, '取消收藏');
 }
 

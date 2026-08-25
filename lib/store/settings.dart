@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../ui/widgets/quick_menu.dart' show forumTools;
+
 /// 帖子裡的圖片什麼時候自動載入
 enum ImagePolicy {
   always('一律載入', '不管用什麼網路都直接顯示'),
@@ -46,6 +48,7 @@ class SettingsStore extends ChangeNotifier {
   static const _kAccent = 'gm.accent';
   static const _kReplied = 'gm.replied';
   static const _kTwWords = 'gm.twWords';
+  static const _kTools = 'gm.tools';
 
   ImagePolicy imagePolicy = ImagePolicy.always;
   AppLang lang = AppLang.auto;
@@ -54,6 +57,10 @@ class SettingsStore extends ChangeNotifier {
 
   /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇
   bool markReplied = true;
+
+  /// 側邊欄「論壇功能」的顯示順序；沒設定過就用內建順序。
+  /// 值是工具的 id，不在清單裡的代表被關掉了
+  List<String>? _toolOrder;
 
   /// 把論壇內容的用詞也換成台灣說法（软件→軟體）。
   /// 會改掉帖子原本的字，跟網頁版對不起來，所以預設關閉
@@ -106,6 +113,7 @@ class SettingsStore extends ChangeNotifier {
     );
     markReplied = prefs.getBool(_kReplied) ?? true;
     taiwanWords = prefs.getBool(_kTwWords) ?? false;
+    _toolOrder = prefs.getStringList(_kTools);
 
     await _refreshNetwork();
     Connectivity().onConnectivityChanged.listen((_) => _refreshNetwork());
@@ -147,6 +155,38 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kAccent, v.name);
+  }
+
+  /// 依使用者排好的順序給出要顯示的工具
+  List<({String id, String label, String icon, String path})> get visibleTools {
+    final order = _toolOrder;
+    if (order == null) return forumTools;
+    return [
+      for (final id in order)
+        for (final t in forumTools)
+          if (t.id == id) t,
+    ];
+  }
+
+  /// 有哪些被關掉了
+  List<({String id, String label, String icon, String path})> get hiddenTools {
+    final order = _toolOrder;
+    if (order == null) return const [];
+    return [for (final t in forumTools) if (!order.contains(t.id)) t];
+  }
+
+  Future<void> setToolOrder(List<String> ids) async {
+    _toolOrder = ids;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kTools, ids);
+  }
+
+  Future<void> resetTools() async {
+    _toolOrder = null;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kTools);
   }
 
   Future<void> setTaiwanWords(bool v) async {

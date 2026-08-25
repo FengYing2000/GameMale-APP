@@ -33,6 +33,7 @@ import 'ui/pages/web_page.dart';
 import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
 import 'ui/pages/settings_page.dart';
+import 'ui/pages/tools_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
@@ -76,13 +77,14 @@ class _GameMaleAppState extends State<GameMaleApp> {
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
+  /// 語言只管**介面**。論壇內容一律保留原文 —— 轉過的標題跟網頁版對不起來，
+  /// 想看繁體的話在帖子頁上按「翻譯」，那是逐篇的，不會動到列表與標題。
   void _applyLang() {
     final want = _settings.toTraditional;
-    final changed = parse.convertToTraditional != want ||
-        UiLang.instance.simplified == want ||
-        S2T.instance.useTaiwanWords != (want && _settings.taiwanWords);
-    parse.convertToTraditional = want;       // 論壇內容
-    S2T.instance.useTaiwanWords = want && _settings.taiwanWords;
+    final changed = UiLang.instance.simplified == want ||
+        S2T.instance.useTaiwanWords != _settings.taiwanWords;
+    parse.convertToTraditional = false;
+    S2T.instance.useTaiwanWords = _settings.taiwanWords;
     UiLang.instance.simplified = !want;      // 介面文字
     if (changed && mounted) setState(() {});
   }
@@ -153,6 +155,7 @@ GoRouter _buildRouter(SessionStore session) {
         ),
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
+      GoRoute(path: '/settings/tools', builder: (c, s) => const ToolsPage()),
       GoRoute(path: '/groups', builder: (c, s) => const GroupsPage()),
       GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),

@@ -1,3 +1,4 @@
+import '../../i18n/s2t.dart';
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,10 @@ class ThreadPage extends StatefulWidget {
 class _ThreadPageState extends State<ThreadPage> {
   ThreadData? _data;
   ThreadExtras _extras = const ThreadExtras();
+
+  /// 逐篇翻譯。論壇內容平常保留原文（轉過的標題跟網頁版對不起來），
+  /// 想看繁體就按這顆，只影響當下這一篇
+  bool _translated = false;
   final _revealImages = ValueNotifier<bool>(false);
   bool _loading = true;
   String? _err;
@@ -133,6 +138,11 @@ class _ThreadPageState extends State<ThreadPage> {
     context.push(uri.toString());
   }
 
+  /// 開了翻譯才轉，沒開就原樣回去
+  String _zh(String s) => _translated ? S2T.instance.convert(s) : s;
+
+  PostItem _zhPost(PostItem p) => p.mapText(S2T.instance.convert);
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -141,12 +151,20 @@ class _ThreadPageState extends State<ThreadPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          d?.title.isNotEmpty == true ? d!.title : (d?.forumName ?? tr('主題')),
+          d?.title.isNotEmpty == true
+              ? _zh(d!.title)
+              : (d?.forumName ?? tr('主題')),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 16),
         ),
         actions: [
+          IconButton(
+            tooltip: _translated ? tr('顯示原文') : tr('翻譯成繁體'),
+            icon: Icon(_translated ? Icons.translate : Icons.g_translate_outlined),
+            color: _translated ? Theme.of(context).colorScheme.primary : null,
+            onPressed: () => setState(() => _translated = !_translated),
+          ),
           ValueListenableBuilder<bool>(
             valueListenable: _revealImages,
             builder: (c, all, _) => context.watch<SettingsStore>().autoLoadImages
@@ -223,7 +241,7 @@ class _ThreadPageState extends State<ThreadPage> {
                                     color: Theme.of(context).colorScheme.primary)),
                           ),
                         ),
-                      TextSpan(text: d.title),
+                      TextSpan(text: _zh(d.title)),
                     ]),
                     style: const TextStyle(
                         fontSize: 19, fontWeight: FontWeight.w700, height: 1.4),
@@ -232,7 +250,7 @@ class _ThreadPageState extends State<ThreadPage> {
               // 投票與附件都是樓主帖的一部分，排在第一樓底下才合理
               for (var i = 0; i < d.posts.length; i++) ...[
                 _PostCard(
-                  post: d.posts[i],
+                  post: _translated ? _zhPost(d.posts[i]) : d.posts[i],
                   onReply:
                       session.loggedIn ? () => _reply(d.posts[i]) : null,
                   onRate: (!session.loggedIn ||

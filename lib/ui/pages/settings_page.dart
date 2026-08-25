@@ -54,6 +54,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   trailingNote: settings.lang == AppLang.auto
                       ? (settings.toTraditional ? tr('目前：繁體') : tr('目前：简体'))
                       : null,
+                  note: tr('只影響 App 介面。帖子內容一律保留論壇原文，'
+                      '想看繁體請在帖子頁按右上角的翻譯'),
                 ),
                 const Divider(indent: 56, endIndent: 14),
                 _choice<ThemeMode>(
@@ -116,11 +118,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 SwitchListTile(
                   value: settings.taiwanWords,
                   secondary: const Icon(Icons.translate),
-                  title: Text(tr('台灣用語替換')),
+                  title: Text(tr('翻譯時也換成台灣用語')),
                   subtitle: Text(
-                    tr('把論壇內容的用詞換成台灣說法（软件→軟體）。'
-                        '這會改掉帖子原本的字，標題就跟網頁版對不起來；'
-                        '關掉只做簡繁字形轉換'),
+                    tr('按帖子頁的翻譯時，連用詞一起換（软件→軟體）。'
+                        '關掉就只做簡繁字形轉換，比較貼近原文'),
                     style: const TextStyle(fontSize: 12),
                   ),
                   onChanged: settings.setTaiwanWords,
@@ -199,13 +200,15 @@ class _SettingsPageState extends State<SettingsPage> {
     required String? Function(T) descOf,
     required Future<void> Function(T) onPick,
     String? trailingNote,
+    String? note,
   }) {
+    final sub = [?trailingNote, ?note].join('\n');
     return ListTile(
       leading: Icon(icon, size: 22),
       title: Text(title),
-      subtitle: trailingNote == null
+      subtitle: sub.isEmpty
           ? null
-          : Text(trailingNote, style: const TextStyle(fontSize: 12)),
+          : Text(sub, style: const TextStyle(fontSize: 12, height: 1.5)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
