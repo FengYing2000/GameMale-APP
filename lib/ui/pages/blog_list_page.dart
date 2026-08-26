@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -8,10 +9,12 @@ import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/external_link.dart';
 import '../widgets/login_required.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/smart_image.dart';
 import '../widgets/state_box.dart';
+import '../widgets/toast.dart';
 
 /// 日誌廣場。跟記錄廣場同一套：隨便看看誰都能看，好友／我的要登入
 class BlogListPageView extends StatefulWidget {
@@ -89,7 +92,7 @@ class _BlogListPageViewState extends State<BlogListPageView> {
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
                         avatar: v.needsLogin && !loggedIn
-                            ? const Icon(Icons.lock_outline, size: 14)
+                            ? const Icon(LucideIcons.lock, size: 14)
                             : null,
                         label: Text(tr(v.name)),
                         selected: _view == v.key,
@@ -171,6 +174,31 @@ class _BlogListPageViewState extends State<BlogListPageView> {
     );
   }
 
+  Future<void> _act(String url, String what) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(what),
+        content: Text('${tr('確定要')}$what${tr('嗎？')}'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true), child: Text(what)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await api.blogAction(url, what);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '$what${tr('失敗：')}${e.message}');
+    }
+  }
+
   Widget _tile(SpaceItem it) => ListTile(
         onTap: () {
           final m = RegExp(r'blog-(\d+)-(\d+)').firstMatch(it.url);
@@ -208,7 +236,29 @@ class _BlogListPageViewState extends State<BlogListPageView> {
             ],
           ),
         ),
-        trailing: it.image.isEmpty
+        trailing: it.actions.isNotEmpty
+            ? PopupMenuButton<String>(
+                tooltip: tr('管理'),
+                itemBuilder: (c) => [
+                  if (it.actions.containsKey('edit'))
+                    PopupMenuItem(value: 'edit', child: Text(tr('編輯'))),
+                  if (it.actions.containsKey('stick'))
+                    PopupMenuItem(value: 'stick', child: Text(tr('置頂'))),
+                  if (it.actions.containsKey('delete'))
+                    PopupMenuItem(value: 'delete', child: Text(tr('刪除'))),
+                ],
+                onSelected: (v) {
+                  final url = it.actions[v] ?? '';
+                  if (url.isEmpty) return;
+                  if (v == 'edit') {
+                    // 論壇的日誌編輯器有分類、隱私、標籤那一整套
+                    openInApp(context, url, title: tr('編輯日誌'));
+                  } else {
+                    _act(url, v == 'stick' ? tr('置頂') : tr('刪除'));
+                  }
+                },
+              )
+            : it.image.isEmpty
             ? null
             : ClipRRect(
                 borderRadius: BorderRadius.circular(6),

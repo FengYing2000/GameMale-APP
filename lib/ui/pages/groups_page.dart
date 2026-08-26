@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/group.dart' as api;
@@ -66,7 +67,7 @@ class _GroupsPageState extends State<GroupsPage> {
                     for (var i = 0; i < _items.length; i++) ...[
                       ListTile(
                         leading: _items[i].icon.isEmpty
-                            ? const Icon(Icons.groups_outlined)
+                            ? const Icon(LucideIcons.users)
                             : ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
                                 child: CachedNetworkImage(
@@ -76,7 +77,7 @@ class _GroupsPageState extends State<GroupsPage> {
                                   height: 38,
                                   fit: BoxFit.cover,
                                   errorWidget: (c, _, _) =>
-                                      const Icon(Icons.groups_outlined),
+                                      const Icon(LucideIcons.users),
                                 ),
                               ),
                         title: Text(_items[i].name,

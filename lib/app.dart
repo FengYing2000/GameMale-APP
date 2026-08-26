@@ -1,5 +1,6 @@
 import 'i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -195,7 +196,14 @@ GoRouter _buildRouter(SessionStore session) {
           fid: int.tryParse(s.uri.queryParameters['fid'] ?? '') ?? 0,
         ),
       ),
-      GoRoute(path: '/t/:tid', builder: (c, s) => ThreadPage(tid: _int(s, 'tid'))),
+      GoRoute(
+        path: '/t/:tid',
+        builder: (c, s) => ThreadPage(
+          tid: _int(s, 'tid'),
+          initialPage:
+              int.tryParse(s.uri.queryParameters['page'] ?? '') ?? 1,
+        ),
+      ),
       GoRoute(path: '/notice', builder: (c, s) => const NoticePage()),
       GoRoute(
         path: '/pm/:touid',
@@ -235,11 +243,11 @@ class _Scaffold extends StatelessWidget {
 
   // 標籤存原文，每次 build 才轉換 —— 存成 const/final 會讓語言切換後不更新
   static const _tabs = [
-    (Icons.forum_outlined, Icons.forum, '首頁'),
-    (Icons.explore_outlined, Icons.explore, '導讀'),
-    (Icons.search_outlined, Icons.search, '搜尋'),
-    (Icons.mail_outline, Icons.mail, '訊息'),
-    (Icons.person_outline, Icons.person, '我的'),
+    (LucideIcons.messagesSquare, LucideIcons.messagesSquare, '首頁'),
+    (LucideIcons.compass, LucideIcons.compass, '導讀'),
+    (LucideIcons.search, LucideIcons.search, '搜尋'),
+    (LucideIcons.mail, LucideIcons.mail, '訊息'),
+    (LucideIcons.user, LucideIcons.user, '我的'),
   ];
 
   @override

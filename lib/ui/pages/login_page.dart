@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -121,7 +122,7 @@ class _LoginPageState extends State<LoginPage> {
         leading: Navigator.of(context).canPop()
             ? const BackButton()
             : IconButton(
-                icon: const Icon(Icons.close),
+                icon: const Icon(LucideIcons.x),
                 tooltip: '關閉',
                 onPressed: () => context.go('/'),
               ),
@@ -201,7 +202,7 @@ class _LoginPageState extends State<LoginPage> {
                                           height: 34,
                                           color: Colors.black12,
                                           alignment: Alignment.center,
-                                          child: const Icon(Icons.refresh, size: 18),
+                                          child: const Icon(LucideIcons.refreshCw, size: 18),
                                         ),
                                 ),
                               ),

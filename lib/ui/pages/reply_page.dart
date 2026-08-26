@@ -4,6 +4,7 @@ import '../../store/session.dart';
 import '../widgets/composer_toolbar.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
@@ -114,7 +115,7 @@ class _ReplyPageState extends State<ReplyPage> {
               color: scheme.primary.withValues(alpha: .08),
               child: Row(
                 children: [
-                  Icon(Icons.reply, size: 16, color: scheme.primary),
+                  Icon(LucideIcons.reply, size: 16, color: scheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -192,7 +193,7 @@ class _ReplyPageState extends State<ReplyPage> {
                                   height: 15,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.send, size: 17),
+                              : const Icon(LucideIcons.send, size: 17),
                           label: Text(_busy ? tr('送出中') : tr('送出')),
                         ),
                       ],

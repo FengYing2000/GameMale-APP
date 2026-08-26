@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -89,19 +90,19 @@ class QuickDrawer extends StatelessWidget {
               ),
             ),
             _tile(context,
-                icon: Icons.event_available_outlined,
+                icon: LucideIcons.calendarCheck,
                 label: tr('每日簽到'),
                 onTap: () => context.push('/sign')),
             _tile(context,
-                icon: Icons.chat_bubble_outline,
+                icon: LucideIcons.messageCircle,
                 label: tr('記錄廣場'),
                 onTap: () => context.push('/doing')),
             _tile(context,
-                icon: Icons.article_outlined,
+                icon: LucideIcons.fileText,
                 label: tr('日誌'),
                 onTap: () => context.push('/blogs')),
             _tile(context,
-                icon: Icons.groups_outlined,
+                icon: LucideIcons.users,
                 label: tr('群組'),
                 onTap: () => context.push('/groups')),
             const Divider(height: 24, indent: 16, endIndent: 16),
@@ -117,7 +118,7 @@ class QuickDrawer extends StatelessWidget {
                       Navigator.pop(context);
                       context.push('/settings/tools');
                     },
-                    icon: const Icon(Icons.tune, size: 15),
+                    icon: const Icon(LucideIcons.slidersHorizontal, size: 15),
                     label: Text(tr('編排')),
                   ),
                 ],

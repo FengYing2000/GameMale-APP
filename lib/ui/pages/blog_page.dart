@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/models.dart';
@@ -6,6 +7,7 @@ import '../../api/space.dart' as api;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/external_link.dart';
 import '../widgets/post_body.dart';
 import '../widgets/require_login.dart';
 import '../widgets/smart_image.dart';
@@ -86,6 +88,36 @@ class _BlogPageState extends State<BlogPage> {
     }
   }
 
+  Future<void> _act(String url, String what, {bool pop = false}) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(what),
+        content: Text(tr('確定要') + what + tr('嗎？')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true), child: Text(what)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await api.blogAction(url, what);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (!r.ok) return;
+      if (pop) {
+        Navigator.of(context).pop(true);
+      } else {
+        _load();
+      }
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, what + tr('失敗：') + e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -95,7 +127,7 @@ class _BlogPageState extends State<BlogPage> {
           ? null
           : FloatingActionButton.extended(
               onPressed: _comment,
-              icon: const Icon(Icons.edit_outlined),
+              icon: const Icon(LucideIcons.squarePen),
               label: Text(tr('評論')),
             ),
       appBar: AppBar(
@@ -105,6 +137,41 @@ class _BlogPageState extends State<BlogPage> {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 16),
         ),
+        actions: [
+          if (d != null && d.favoriteUrl.isNotEmpty)
+            IconButton(
+              tooltip: tr('收藏'),
+              icon: const Icon(LucideIcons.star),
+              onPressed: () => _act(d.favoriteUrl, tr('收藏')),
+            ),
+          if (d != null &&
+              (d.editUrl.isNotEmpty ||
+                  d.deleteUrl.isNotEmpty ||
+                  d.stickUrl.isNotEmpty))
+            PopupMenuButton<String>(
+              tooltip: tr('管理'),
+              itemBuilder: (c) => [
+                if (d.editUrl.isNotEmpty)
+                  PopupMenuItem(value: 'edit', child: Text(tr('編輯'))),
+                if (d.stickUrl.isNotEmpty)
+                  PopupMenuItem(value: 'stick', child: Text(tr('置頂'))),
+                if (d.deleteUrl.isNotEmpty)
+                  PopupMenuItem(value: 'delete', child: Text(tr('刪除'))),
+              ],
+              onSelected: (v) {
+                switch (v) {
+                  case 'edit':
+                    // 論壇的日誌編輯器有分類、隱私、標籤那一整套，
+                    // 直接用內建瀏覽器開比重刻一份可靠
+                    openInApp(context, d.editUrl, title: tr('編輯日誌'));
+                  case 'stick':
+                    _act(d.stickUrl, tr('置頂'));
+                  case 'delete':
+                    _act(d.deleteUrl, tr('刪除'), pop: true);
+                }
+              },
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -125,7 +192,31 @@ class _BlogPageState extends State<BlogPage> {
                     style: const TextStyle(
                         fontSize: 19, fontWeight: FontWeight.w700, height: 1.4)),
               ),
-              if (d.meta.isNotEmpty)
+              if (d.stats.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final st in d.stats)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('${st.label} ${st.value}',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: subtle(context))),
+                        ),
+                    ],
+                  ),
+                )
+              else if (d.meta.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: Text(d.meta,
@@ -290,6 +381,30 @@ class _BlogPageState extends State<BlogPage> {
                   const SizedBox(height: 5),
                   Text(c.text,
                       style: const TextStyle(fontSize: 14, height: 1.55)),
+                  if (c.editUrl.isNotEmpty || c.deleteUrl.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        children: [
+                          if (c.editUrl.isNotEmpty)
+                            TextButton(
+                              style: _tight,
+                              onPressed: () => openInApp(context, c.editUrl,
+                                  title: tr('編輯評論')),
+                              child: Text(tr('編輯'),
+                                  style: const TextStyle(fontSize: 12)),
+                            ),
+                          if (c.deleteUrl.isNotEmpty)
+                            TextButton(
+                              style: _tight,
+                              onPressed: () =>
+                                  _act(c.deleteUrl, tr('刪除評論')),
+                              child: Text(tr('刪除'),
+                                  style: const TextStyle(fontSize: 12)),
+                            ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -304,7 +419,7 @@ class _BlogPageState extends State<BlogPage> {
             for (final o in d.otherPosts)
               ListTile(
                 dense: true,
-                leading: Icon(Icons.article_outlined, size: 18, color: faint(context)),
+                leading: Icon(LucideIcons.fileText, size: 18, color: faint(context)),
                 title: Text(o.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -335,3 +450,9 @@ class _BlogPageState extends State<BlogPage> {
         ],
       );
 }
+
+final _tight = TextButton.styleFrom(
+  minimumSize: Size.zero,
+  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);

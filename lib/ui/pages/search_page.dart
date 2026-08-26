@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -216,7 +217,7 @@ class _SearchPageState extends State<SearchPage> {
         actions: [
           if (_scope == SearchScope.forum)
             IconButton(
-              icon: Icon(_showAdvanced ? Icons.tune : Icons.tune_outlined),
+              icon: Icon(_showAdvanced ? LucideIcons.slidersHorizontal : LucideIcons.slidersHorizontal),
               color:
                   _adv.isDefault ? null : Theme.of(context).colorScheme.primary,
               tooltip: tr('高級搜索'),
@@ -274,7 +275,7 @@ class _SearchPageState extends State<SearchPage> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
-                        avatar: const Icon(Icons.folder_outlined, size: 15),
+                        avatar: const Icon(LucideIcons.folder, size: 15),
                         label: Text(tr('本版')),
                         selected: _scope == SearchScope.forum && _thisForumOnly,
                         onSelected: (_) => setState(() {
@@ -457,7 +458,7 @@ class _SearchPageState extends State<SearchPage> {
             _label(tr('搜尋範圍')),
             OutlinedButton.icon(
               onPressed: _forumTree.isEmpty ? null : _pickForums,
-              icon: const Icon(Icons.checklist, size: 17),
+              icon: const Icon(LucideIcons.listChecks, size: 17),
               label: Text(
                 _adv.forums.isEmpty
                     ? tr('全部版塊')
@@ -534,7 +535,7 @@ class _HitTile extends StatelessWidget {
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorWidget: (c, _, _) => const Icon(Icons.image_outlined),
+                    errorWidget: (c, _, _) => const Icon(LucideIcons.image),
                   ),
                 )
               : Avatar(hit.image, size: 40)),

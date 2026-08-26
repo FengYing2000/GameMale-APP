@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -79,7 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   httpHeaders: Api.imageHeaders,
                   height: 58,
                   errorWidget: (c, _, _) =>
-                      const Icon(Icons.military_tech_outlined, size: 40),
+                      const Icon(LucideIcons.medal, size: 40),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -209,7 +210,7 @@ class _ProfilePageState extends State<ProfilePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (d.online) ...[
-                  const Icon(Icons.circle, size: 9, color: Color(0xFF43A047)),
+                  const Icon(LucideIcons.circle, size: 9, color: Color(0xFF43A047)),
                   const SizedBox(width: 6),
                 ],
                 Flexible(
@@ -242,27 +243,27 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 OutlinedButton.icon(
                   onPressed: () => context.push('/space/${widget.uid}'),
-                  icon: const Icon(Icons.person_outline, size: 18),
+                  icon: const Icon(LucideIcons.user, size: 18),
                   label: Text(tr('個人空間')),
                 ),
                 if (!isMe) ...[
                   FilledButton.icon(
                     onPressed: () => context.push('/pm/${widget.uid}'),
-                    icon: const Icon(Icons.mail_outline, size: 18),
+                    icon: const Icon(LucideIcons.mail, size: 18),
                     label: Text(tr('傳送私訊')),
                   ),
                   OutlinedButton.icon(
                     onPressed: _busy
                         ? null
                         : () => _act(() => api.addFriend(widget.uid), tr('加好友')),
-                    icon: const Icon(Icons.person_add_alt, size: 18),
+                    icon: const Icon(LucideIcons.userPlus, size: 18),
                     label: Text(tr('加好友')),
                   ),
                   OutlinedButton.icon(
                     onPressed: _busy
                         ? null
                         : () => _act(() => api.poke(widget.uid), tr('打招呼')),
-                    icon: const Icon(Icons.waving_hand_outlined, size: 18),
+                    icon: const Icon(LucideIcons.handHelping, size: 18),
                     label: Text(tr('打招呼')),
                   ),
                 ],
@@ -333,7 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       httpHeaders: Api.imageHeaders,
                       height: 30,
                       errorWidget: (c, _, _) =>
-                          const Icon(Icons.military_tech_outlined, size: 26),
+                          const Icon(LucideIcons.medal, size: 26),
                     ),
                   ),
               ],

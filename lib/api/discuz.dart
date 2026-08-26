@@ -704,6 +704,44 @@ Future<SignResult> fetchSignPage() async {
   );
 }
 
+/// 簽到的說明頁（獎勵規則／簽到等級／道具擴展）。只有桌面模板
+Future<SignRules> fetchSignRules(String op) async {
+  final doc =
+      toDoc(await Api.instance.get('k_misign-misc.html?operation=$op', desktop: true));
+  final main = doc.querySelector('.mn') ?? doc.body!;
+
+  final tables = <SignRuleTable>[];
+  for (final table in main.querySelectorAll('table')) {
+    // 表格前面那個 bm_h 是它的標題
+    var title = '';
+    for (var n = table.parent; n != null; n = n.parent) {
+      final head = n.previousElementSibling;
+      if (head != null && head.classes.contains('bm_h')) {
+        title = txt(head);
+        break;
+      }
+    }
+
+    final rows = <List<String>>[];
+    for (final tr in table.querySelectorAll('tr')) {
+      final cells = <String>[];
+      for (final td in tr.querySelectorAll('td')) {
+        // 論壇每列開頭都塞一個空的圖示欄
+        if (td.classes.contains('icn')) continue;
+        cells.add(txt(td));
+      }
+      if (cells.any((c) => c.isNotEmpty)) rows.add(cells);
+    }
+    if (rows.isNotEmpty) tables.add(SignRuleTable(title: title, rows: rows));
+  }
+
+  return SignRules(
+    intro: txt(main.querySelector('.bm_c p')),
+    tables: tables,
+    text: tables.isEmpty ? txt(main) : '',
+  );
+}
+
 /* ─────────────── 通知 / 私訊 ─────────────── */
 
 /// 通知的兩層分類，取自論壇實際提供的連結
@@ -1333,6 +1371,83 @@ Future<ListPage> fetchFavorites(int uid, {int page = 1}) => _myList(uid, 'favori
 Future<ListPage> fetchMyPosts(int uid, {String type = 'thread', int page = 1}) =>
     _myList(uid, 'thread', page, type: type);
 
+/// 我的主題／回覆／點評。手機版只給標題，桌面版連版塊、作者、回覆內容
+/// 與那一樓的 pid 都有，所以走桌面模板。
+Future<ListPage> fetchGuideMine({
+  String type = 'thread',
+  int page = 1,
+  int fid = 0,
+}) async {
+  final q = StringBuffer('forum.php?mod=guide&view=my&type=$type');
+  if (fid > 0) q.write('&fid=$fid');
+  if (page > 1) q.write('&page=$page');
+
+  final html = await Api.instance.get(q.toString(), desktop: true);
+  final doc = toDoc(html);
+  if (isLoginWall(doc) || isRedirectToLogin(doc, html)) {
+    return const ListPage(list: [], message: '要先登入才看得到');
+  }
+
+  final list = <ThreadItem>[];
+  for (final body in doc.querySelectorAll('tbody')) {
+    final id = attr(body, 'id');
+    final tid = int.tryParse(
+        RegExp(r'normalthread_(\d+)').firstMatch(id)?.group(1) ?? '');
+    if (tid == null) continue;
+
+    final a = body.querySelector('th a.xst') ?? body.querySelector('th a');
+    if (a == null) continue;
+    final bys = body.querySelectorAll('td.by');
+    final num = body.querySelector('td.num');
+
+    // 我的回覆內容在下一個 tbody（class="bw0_all"）
+    var myReply = '';
+    int? myPid;
+    final next = body.nextElementSibling;
+    final replyLink = next?.querySelector('.tl_reply a');
+    if (replyLink != null) {
+      myReply = txt(replyLink);
+      myPid = paramInt(attr(replyLink, 'href'), 'pid');
+    }
+
+    final forumLink = body.querySelector('td.by a[href*="forum-"]') ??
+        body.querySelector('td.by a[href*="group-"]');
+
+    list.add(ThreadItem(
+      tid: tid,
+      title: txt(a),
+      forumName: txt(forumLink),
+      fid: int.tryParse(
+          RegExp(r'(?:forum|group)-(\d+)')
+                  .firstMatch(attr(forumLink, 'href'))
+                  ?.group(1) ??
+              ''),
+      author: bys.length > 1 ? txt(bys[1].querySelector('cite')) : '',
+      date: bys.length > 1 ? txt(bys[1].querySelector('em')) : '',
+      replies: int.tryParse(txt(num?.querySelector('a'))) ?? 0,
+      views: int.tryParse(txt(num?.querySelector('em'))) ?? 0,
+      myReply: myReply,
+      myPid: myPid,
+    ));
+  }
+
+  return ListPage(
+    list: list,
+    pager: parsePager(doc, current: page),
+    message: list.isEmpty ? (noticeMessage(doc) ?? '這裡沒有東西') : null,
+  );
+}
+
+/// 那一樓在第幾頁。論壇的 findpost 會轉到正確的頁，從轉址結果反推
+Future<int> resolvePostPage(int tid, int pid) async {
+  final html = await Api.instance
+      .get('forum.php?mod=redirect&goto=findpost&ptid=$tid&pid=$pid');
+  // 轉址後的頁面自己會標出目前頁數
+  final doc = toDoc(html);
+  final p = parsePager(doc).page;
+  return p > 0 ? p : 1;
+}
+
 Future<SubmitResult> favoriteThread(int tid) async {
   await _ensureFormhash();
   final html = await Api.instance.get(
@@ -1340,30 +1455,56 @@ Future<SubmitResult> favoriteThread(int tid) async {
   return _submitResult(html, '收藏');
 }
 
-/// 取消收藏是兩步驟：先 GET 拿確認表單，再 POST 送出。
-/// 只做第一步的話論壇只會回一句「您确定要删除此收藏吗？」，什麼都沒刪。
+/// 論壇的刪除類動作都是兩步驟：先 GET 拿一張確認表單，再 POST 送出。
+/// 只做第一步的話只會拿到「您确定要…吗？」，什麼都沒做。
 /// 表單裡的 formhash 跟頁面上那個不一樣，一定要用回傳的這個。
-Future<SubmitResult> unfavorite(int favid) async {
-  final key = 'a_delete_$favid';
-  final form = await Api.instance.get(
-    'home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid'
-    '&infloat=yes&handlekey=$key&inajax=1',
-  );
+///
+/// [url] 是論壇連結上寫的那個網址（`op=delete&...&handlekey=xxx`）。
+Future<SubmitResult> confirmAndSubmit(String url, String what) async {
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  path = path.replaceFirst(RegExp(r'^/'), '');
+
+  final key = param(path, 'handlekey') ?? '';
+  final sep = path.contains('?') ? '&' : '?';
+  final form =
+      await Api.instance.get('$path${sep}infloat=yes&inajax=1', desktop: true);
   final doc = toDoc(_unwrapAjax(form));
+  final formEl = doc.querySelector('form');
   final hash = attr(doc.querySelector('input[name="formhash"]'), 'value');
-  if (hash.isEmpty) return _submitResult(form, '取消收藏');
+  if (hash.isEmpty) return _submitResult(form, what);
+
+  // 送出的目標是表單自己的 action，不見得跟剛剛那個網址一樣
+  final action = attr(formEl, 'action').replaceAll('&amp;', '&');
+  final target = action.isEmpty ? path : action;
+
+  // 表單裡本來就有的隱藏欄位全帶上，少一個論壇就當作沒送
+  final fields = <String, String>{};
+  for (final input
+      in formEl?.querySelectorAll('input') ?? const <dom.Element>[]) {
+    final name = attr(input, 'name');
+    if (name.isEmpty) continue;
+    fields[name] = attr(input, 'value');
+  }
+  fields['formhash'] = hash;
+  if (key.isNotEmpty) fields['handlekey'] = key;
+  // 確認鈕本身也是欄位，論壇靠它判斷是不是真的按了
+  for (final b in formEl?.querySelectorAll('button') ?? const <dom.Element>[]) {
+    final name = attr(b, 'name');
+    if (name.isNotEmpty) fields[name] = attr(b, 'value').isEmpty ? 'true' : attr(b, 'value');
+  }
 
   final html = await Api.instance.post(
-    'home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid&type=all&inajax=1',
-    {
-      'deletesubmit': 'true',
-      'formhash': hash,
-      'handlekey': key,
-      'referer': '$kOrigin/home.php?mod=space&do=favorite&view=me',
-    },
-  );
-  return _submitResult(html, '取消收藏');
+      '$target${target.contains('?') ? '&' : '?'}inajax=1', fields,
+      desktop: true);
+  return _submitResult(html, what);
 }
+
+Future<SubmitResult> unfavorite(int favid) => confirmAndSubmit(
+      'home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid'
+      '&handlekey=a_delete_$favid',
+      '取消收藏',
+    );
 
 
 /* ─────────────── 積分變化（勳章觸發） ─────────────── */
@@ -1477,14 +1618,59 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
     final body = dl.querySelector('.ptm');
     final link = body?.querySelector('a');
     final href = attr(link, 'href');
+    final span = body?.querySelector('span');
+
+    // 回覆掛在 dd.cmt 底下，每則的刪除連結帶著 cid
+    final comments = <DoingComment>[];
+    for (final li in dl.querySelectorAll('dd.cmt li')) {
+      final who = li.querySelector('a.lit');
+      final del = li.querySelector('a[href*="op=delete"]');
+      final cid = paramInt(attr(del, 'href'), 'id') ??
+          int.tryParse(
+              RegExp(r'docomment_form\(\d+,\s*(\d+)')
+                      .firstMatch(li.innerHtml)
+                      ?.group(1) ??
+                  '');
+      // 論壇本來就把時間包在括號裡，別再套一層
+      final time = txt(li.querySelector('span.xg1'))
+          .replaceAll(RegExp(r'^\(|\)$'), '');
+      var text = txt(li);
+      for (final drop in [txt(who), time, '回复', '删除', '回覆', '刪除']) {
+        if (drop.isNotEmpty) text = text.replaceFirst(drop, '');
+      }
+      comments.add(DoingComment(
+        cid: cid ?? 0,
+        author: txt(who),
+        uid: paramInt(attr(who, 'href'), 'uid') ??
+            int.tryParse(
+                RegExp(r'space-uid-(\d+)')
+                        .firstMatch(attr(who, 'href'))
+                        ?.group(1) ??
+                    ''),
+        text: text.replaceFirst(RegExp(r'^[:：]\s*'), '').trim(),
+        time: time,
+        deleteUrl: absolute(attr(del, 'href')),
+      ));
+    }
+
+    // 自己那則記錄的刪除連結，id 是空的
+    var selfDelete = '';
+    for (final a in dl.querySelectorAll('a[href*="ac=doing"][href*="op=delete"]')) {
+      final h = attr(a, 'href');
+      if ((param(h, 'id') ?? '').isEmpty) selfDelete = absolute(h);
+    }
+
     items.add(DoingItem(
       doid: doid,
       uid: int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(href)?.group(1) ?? '') ??
           paramInt(href, 'uid'),
       name: txt(link),
       avatar: attr(dl.querySelector('.avt img'), 'src'),
-      message: txt(body?.querySelector('span')),
+      html: span == null ? '' : sanitizeContent(span),
+      message: txt(span),
       time: txt(dl.querySelector('.ptn .y')),
+      comments: comments,
+      deleteUrl: selfDelete,
     ));
   }
 
@@ -1493,6 +1679,28 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
     formhash: attr(doc.querySelector('#mood_addform input[name="formhash"]'), 'value'),
     pager: parsePager(doc, current: page),
   );
+}
+
+/// 回覆某則記錄。跟留言板、日誌評論同一支端點，只是 idtype 換成 doid
+Future<SubmitResult> replyDoing(int doid, String message,
+    {String formhash = ''}) async {
+  if (formhash.isEmpty) await _ensureFormhash();
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final html = await Api.instance.post(
+    'home.php?mod=spacecp&ac=comment&commentsubmit=yes'
+    '&handlekey=doingcomment_$doid&inajax=1',
+    {
+      'formhash': hash,
+      'message': message,
+      'id': '$doid',
+      'idtype': 'doid',
+      'commentsubmit': 'true',
+      'quickcomment': 'true',
+      'handlekey': 'doingcomment_$doid',
+    },
+    desktop: true,
+  );
+  return _submitResult(html, '回覆');
 }
 
 Future<SubmitResult> postDoing(String message, {String formhash = ''}) async {

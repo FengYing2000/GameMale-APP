@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -117,13 +118,13 @@ class ThreadTile extends StatelessWidget {
                     child: Text(tr('取消收藏'), style: TextStyle(fontSize: 12, color: subtle(context))),
                   ),
                 if (item.replies > 0) ...[
-                  Icon(Icons.mode_comment_outlined, size: 13, color: faint(context)),
+                  Icon(LucideIcons.messageSquare, size: 13, color: faint(context)),
                   const SizedBox(width: 3),
                   Text(compact(item.replies), style: meta),
                   const SizedBox(width: 10),
                 ],
                 if (item.views > 0) ...[
-                  Icon(Icons.visibility_outlined, size: 14, color: faint(context)),
+                  Icon(LucideIcons.eye, size: 14, color: faint(context)),
                   const SizedBox(width: 3),
                   Text(compact(item.views), style: meta),
                 ],

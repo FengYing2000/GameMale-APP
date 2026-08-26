@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/http.dart';
 import '../../api/models.dart';
@@ -80,7 +81,7 @@ class ComposerToolbar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8, top: 5, bottom: 5),
             child: ActionChip(
-              avatar: const Icon(Icons.emoji_emotions_outlined, size: 17),
+              avatar: const Icon(LucideIcons.smile, size: 17),
               label: Text(tr('表情')),
               onPressed: () => _pickSmiley(context),
             ),
@@ -197,7 +198,7 @@ class _SmileySheetState extends State<_SmileySheet> {
                             httpHeaders: Api.imageHeaders,
                             fit: BoxFit.contain,
                             errorWidget: (c, _, _) =>
-                                const Icon(Icons.broken_image_outlined, size: 16),
+                                const Icon(LucideIcons.imageOff, size: 16),
                           ),
                         ),
                       );

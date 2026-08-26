@@ -1,5 +1,6 @@
 import 'package:html/dom.dart' as dom;
 
+import 'discuz.dart' as discuz show confirmAndSubmit;
 import 'discuz.dart' show submitResult;
 import 'http.dart';
 import 'models.dart';
@@ -142,6 +143,12 @@ List<SpaceItem> _blog(dom.Document doc) {
       body: txt(excerpt),
       image: absolute(attr(excerpt?.querySelector('img'), 'src')),
       meta: txt(dl.querySelector('dd.xg1')),
+      // 我的日誌那一頁論壇會多給編輯／刪除／置頂
+      actions: {
+        for (final key in const ['edit', 'delete', 'stick'])
+          if (dl.querySelector('a[href*="op=$key"]') case final link?)
+            key: absolute(attr(link, 'href')),
+      },
     ));
   }
   return out;
@@ -360,6 +367,9 @@ BlogData parseBlog(dom.Document doc) {
       uid: _uidOf(attr(who, 'href')),
       avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
       date: txt(dl.querySelector('dt span.xg1')),
+      editUrl: absolute(attr(dl.querySelector('a[href*="op=edit"]'), 'href')),
+      deleteUrl:
+          absolute(attr(dl.querySelector('a[href*="op=delete"]'), 'href')),
       text: quoteText.isEmpty
           ? txt(body)
           : txt(body).replaceFirst(quoteText, '').trim(),
@@ -387,8 +397,50 @@ BlogData parseBlog(dom.Document doc) {
     comments: comments,
     otherPosts: others,
     formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
+    editUrl: absolute(
+        attr(doc.querySelector('a[href*="ac=blog"][href*="op=edit"]'), 'href')),
+    deleteUrl: absolute(attr(
+        doc.querySelector('a[href*="ac=blog"][href*="op=delete"]'), 'href')),
+    stickUrl: absolute(
+        attr(doc.querySelector('a[href*="ac=blog"][href*="op=stick"]'), 'href')),
+    favoriteUrl: absolute(attr(
+        doc.querySelector('a[href*="ac=favorite"][href*="type=blog"]'), 'href')),
+    stats: _blogStats(doc),
   );
 }
+
+/// 把「熱度 142 已有 328 次閱讀 2026-8-24 21:06 系統分類:論壇話題」
+/// 那一串拆成一格一格，直接倒出來很難讀
+List<({String label, String value})> _blogStats(dom.Document doc) {
+  final out = <({String label, String value})>[];
+  final head = doc.querySelector('.vw .h p.xg2');
+  if (head == null) return out;
+
+  final hot = txt(head.querySelector('.hot'));
+  if (hot.isNotEmpty) {
+    out.add((label: '熱度', value: hot.replaceAll(RegExp(r'[^0-9]'), '')));
+  }
+  for (final span in head.querySelectorAll('span.xg1')) {
+    final t = txt(span);
+    if (t.isEmpty) continue;
+    final views = RegExp(r'(\d+)\s*次[阅閱]').firstMatch(t);
+    if (views != null) {
+      out.add((label: '閱讀', value: views.group(1)!));
+    } else if (t.contains('分类') || t.contains('分類')) {
+      out.add((
+        label: '分類',
+        value: t.replaceFirst(RegExp(r'^.*?[:：]'), '').trim(),
+      ));
+    } else if (RegExp(r'\d{4}-\d{1,2}-\d{1,2}').hasMatch(t)) {
+      out.add((label: '發表', value: t));
+    }
+  }
+  return out;
+}
+
+/// 收藏／取消收藏日誌、置頂、刪除都是同一種確認流程
+Future<SubmitResult> blogAction(String url, String what) =>
+    discuz.confirmAndSubmit(url, what);
 
 /// 日誌留言。跟留言板同一支端點，只是 idtype 換成 blogid
 Future<SubmitResult> postBlogComment(

@@ -489,6 +489,82 @@ void main() {
         '｜版塊 ${f.pager.page}/${f.pager.total}');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
+  test('記錄的回覆與刪除連結解得出來', () async {
+    final all = await api.fetchDoing(view: 'all');
+    expect(all.items.any((i) => i.comments.isNotEmpty), isTrue);
+    // 記錄裡常夾表情圖，純文字會把它們吃掉
+    expect(all.items.any((i) => i.html.contains('<img')), isTrue);
+    // 別人的記錄不該給刪除連結
+    expect(all.items.every((i) => i.deleteUrl.isEmpty), isTrue);
+
+    final mine = await api.fetchDoing(view: 'me');
+    expect(mine.items, isNotEmpty);
+    expect(mine.items.every((i) => i.deleteUrl.isNotEmpty), isTrue);
+    final withComment =
+        mine.items.where((i) => i.comments.isNotEmpty).firstOrNull;
+    expect(withComment, isNotNull);
+    expect(withComment!.comments.first.deleteUrl, isNotEmpty);
+    // 時間本來就帶括號，不該再被套一層
+    expect(withComment.comments.first.time, isNot(startsWith('(')));
+    // ignore: avoid_print
+    print('  我的記錄 ${mine.items.length} 筆，可刪回覆 '
+        '${mine.items.expand((i) => i.comments).where((c) => c.deleteUrl.isNotEmpty).length} 則');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('日誌的編輯／刪除／收藏連結與統計', () async {
+    final mine = await space.fetchBlog(677863, 36332);
+    expect(mine.editUrl, isNotEmpty);
+    expect(mine.deleteUrl, isNotEmpty);
+    expect(mine.favoriteUrl, isNotEmpty);
+
+    final other = await space.fetchBlog(610657, 148970);
+    expect(other.editUrl, isEmpty, reason: '別人的日誌不該有編輯連結');
+    expect(other.stats, isNotEmpty);
+    expect(other.stats.any((s) => s.label == '熱度'), isTrue);
+    expect(other.stats.any((s) => s.label == '閱讀'), isTrue);
+    // ignore: avoid_print
+    print('  ${other.stats.map((s) => '${s.label} ${s.value}').join('　')}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('我的回覆帶得到版塊、回覆內容與樓層', () async {
+    final r = await api.fetchGuideMine(type: 'reply');
+    expect(r.list, isNotEmpty);
+    expect(r.list.any((t) => t.forumName.isNotEmpty), isTrue);
+    expect(r.list.any((t) => t.myReply.isNotEmpty), isTrue);
+    final withPid = r.list.where((t) => t.myPid != null).firstOrNull;
+    expect(withPid, isNotNull);
+
+    // findpost 會轉到正確的頁，靠它跳到自己那一樓
+    final page = await api.resolvePostPage(withPid!.tid, withPid.myPid!);
+    expect(page, greaterThan(0));
+
+    // 版塊篩選要真的縮小範圍
+    final fid = r.list.firstWhere((t) => t.fid != null).fid!;
+    final filtered = await api.fetchGuideMine(type: 'reply', fid: fid);
+    expect(filtered.list, isNotEmpty);
+    expect(filtered.list.every((t) => t.fid == null || t.fid == fid), isTrue);
+    // ignore: avoid_print
+    print('  ${r.list.length} 筆｜第一筆在 [${r.list.first.forumName}]'
+        '｜跳到第 $page 頁｜篩 fid=$fid 剩 ${filtered.list.length} 筆');
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
+  test('簽到說明三頁都解得出表格', () async {
+    for (final p in signRulePages) {
+      final r = await api.fetchSignRules(p.op);
+      expect(r.tables.isNotEmpty || r.text.isNotEmpty, isTrue,
+          reason: '${p.name} 什麼都沒解到');
+      // 論壇每列開頭都塞一個空的圖示欄，不該留在資料裡
+      for (final t in r.tables) {
+        expect(t.rows.every((row) => row.isNotEmpty), isTrue);
+      }
+    }
+    final rule = await api.fetchSignRules('rewardrule');
+    expect(rule.intro, contains('奖励'));
+    expect(rule.tables.length, greaterThanOrEqualTo(3));
+    // ignore: avoid_print
+    print('  ${rule.intro}｜${rule.tables.map((t) => '${t.title}(${t.rows.length})').join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

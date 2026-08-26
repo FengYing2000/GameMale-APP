@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/http.dart';
 import '../../api/models.dart';
@@ -98,7 +99,7 @@ class _AlbumPageState extends State<AlbumPage> {
                       httpHeaders: Api.imageHeaders,
                       fit: BoxFit.cover,
                       errorWidget: (c, _, _) =>
-                          const Icon(Icons.broken_image_outlined),
+                          const Icon(LucideIcons.imageOff),
                     ),
                   ),
                 ),

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -158,7 +159,7 @@ class _SpacePageState extends State<SpacePage>
       floatingActionButton: _tab == SpaceTab.wall
           ? FloatingActionButton.extended(
               onPressed: _leaveMessage,
-              icon: const Icon(Icons.edit_outlined),
+              icon: const Icon(LucideIcons.squarePen),
               label: Text(tr('留言')),
             )
           : null,
@@ -344,7 +345,7 @@ class _SpacePageState extends State<SpacePage>
                                     color: Theme.of(context)
                                         .colorScheme
                                         .surfaceContainerHighest,
-                                    child: const Icon(Icons.photo_outlined),
+                                    child: const Icon(LucideIcons.image),
                                   )
                                 : CachedNetworkImage(
                                     imageUrl: it.image,
@@ -352,7 +353,7 @@ class _SpacePageState extends State<SpacePage>
                                     width: double.infinity,
                                     fit: BoxFit.cover,
                                     errorWidget: (c, _, _) =>
-                                        const Icon(Icons.broken_image_outlined),
+                                        const Icon(LucideIcons.imageOff),
                                   ),
                           ),
                   ),
@@ -418,10 +419,10 @@ class _EmptyReason extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, title) = data.needsLogin
-        ? (Icons.lock_outline, tr('要登入才看得到'))
+        ? (LucideIcons.lock, tr('要登入才看得到'))
         : data.restricted
-            ? (Icons.visibility_off_outlined, tr('對方設了隱私限制'))
-            : (Icons.inbox_outlined, '${tr('沒有')}${tr(data.tab.label)}');
+            ? (LucideIcons.eyeOff, tr('對方設了隱私限制'))
+            : (LucideIcons.inbox, '${tr('沒有')}${tr(data.tab.label)}');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(36, 60, 36, 20),

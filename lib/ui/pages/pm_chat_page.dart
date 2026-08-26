@@ -1,6 +1,7 @@
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/discuz.dart' as api;
@@ -104,7 +105,7 @@ class _PmChatPageState extends State<PmChatPage> {
         title: Text(widget.name.isNotEmpty ? widget.name : tr('私人訊息')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
+            icon: const Icon(LucideIcons.circleUserRound),
             tooltip: tr('個人資料'),
             onPressed: () => context.push('/u/${widget.touid}'),
           ),
@@ -258,7 +259,7 @@ class _Composer extends StatelessWidget {
                   ? const SizedBox(
                       width: 16, height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.send, size: 18),
+                  : const Icon(LucideIcons.send, size: 18),
             ),
           ],
         ),

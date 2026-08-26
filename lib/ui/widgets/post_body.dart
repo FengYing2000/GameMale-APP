@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:provider/provider.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -282,7 +283,7 @@ class _PostImageState extends State<_PostImage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.image_outlined, size: 24, color: faint(context)),
+            Icon(LucideIcons.image, size: 24, color: faint(context)),
             const SizedBox(height: 6),
             Text(tr('點一下載入圖片'),
                 style: TextStyle(fontSize: 13, color: subtle(context))),

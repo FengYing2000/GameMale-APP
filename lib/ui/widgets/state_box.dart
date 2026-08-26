@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme.dart';
 
@@ -51,7 +52,7 @@ class StateBox extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 28),
         child: Column(
           children: [
-            Icon(Icons.error_outline, size: 38, color: faint(context)),
+            Icon(LucideIcons.circleAlert, size: 38, color: faint(context)),
             const SizedBox(height: 10),
             Text(error!, textAlign: TextAlign.center, style: TextStyle(color: subtle(context))),
             if (onRetry != null) ...[

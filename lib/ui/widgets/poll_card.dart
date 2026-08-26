@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
@@ -46,7 +47,7 @@ class _PollCardState extends State<PollCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.poll_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                Icon(LucideIcons.chartNoAxesColumn, size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 6),
                 Text(p.title.isEmpty ? tr('投票') : p.title,
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
@@ -112,7 +113,7 @@ class _PollCardState extends State<PollCard> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.how_to_vote_outlined,
+                  Icon(LucideIcons.vote,
                       size: 16, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 7),
                   Expanded(

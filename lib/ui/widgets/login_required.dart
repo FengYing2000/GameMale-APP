@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../i18n/ui.dart';
@@ -18,7 +19,7 @@ class LoginRequired extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(32, 70, 32, 40),
       child: Column(
         children: [
-          Icon(Icons.lock_outline, size: 40, color: faint(context)),
+          Icon(LucideIcons.lock, size: 40, color: faint(context)),
           const SizedBox(height: 14),
           Text(
             tr('需要登入才能查看'),
@@ -33,7 +34,7 @@ class LoginRequired extends StatelessWidget {
           const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: () => context.push('/login'),
-            icon: const Icon(Icons.login, size: 18),
+            icon: const Icon(LucideIcons.logIn, size: 18),
             label: Text(tr('前往登入')),
           ),
         ],

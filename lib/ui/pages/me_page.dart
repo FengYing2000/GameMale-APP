@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -22,9 +23,9 @@ class _MePageState extends State<MePage> {
 
   // needsLogin=false 的訪客也能看，論壇本來就開放
   static const _entries = [
-    (Icons.star_outline, '我的收藏', '/my/favorite', true),
-    (Icons.edit_note, '我的主題', '/my/thread', true),
-    (Icons.reply_outlined, '我的回覆', '/my/reply', true),
+    (LucideIcons.star, '我的收藏', '/my/favorite', true),
+    (LucideIcons.squarePen, '我的主題', '/my/thread', true),
+    (LucideIcons.reply, '我的回覆', '/my/reply', true),
   ];
 
 
@@ -97,7 +98,7 @@ class _MePageState extends State<MePage> {
         title: Text(tr('我的')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(LucideIcons.settings),
             tooltip: tr('設定'),
             onPressed: () => context.push('/settings'),
           ),
@@ -143,7 +144,7 @@ class _MePageState extends State<MePage> {
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, color: faint(context)),
+                      Icon(LucideIcons.chevronRight, color: faint(context)),
                     ],
                   ),
                 ),
@@ -163,7 +164,7 @@ class _MePageState extends State<MePage> {
                         leading: Icon(items[i].$1, size: 22),
                         title: Text(tr(items[i].$2)),
                         trailing:
-                            Icon(Icons.chevron_right, size: 18, color: faint(context)),
+                            Icon(LucideIcons.chevronRight, size: 18, color: faint(context)),
                         onTap: () => context.push(items[i].$3),
                       ),
                       if (i != items.length - 1)

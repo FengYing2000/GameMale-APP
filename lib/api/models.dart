@@ -92,6 +92,14 @@ class ThreadItem {
   /// 只有收藏列表才有，用來取消收藏
   final int? favid;
 
+  /// 版塊名稱（我的主題／回覆那幾頁論壇會給）
+  final String forumName;
+  final int? fid;
+
+  /// 「我的回覆」才有：我在這帖回了什麼，以及那一樓的 pid
+  final String myReply;
+  final int? myPid;
+
   const ThreadItem({
     required this.tid,
     required this.title,
@@ -102,6 +110,10 @@ class ThreadItem {
     this.date = '',
     this.views = 0,
     this.replies = 0,
+    this.forumName = '',
+    this.fid,
+    this.myReply = '',
+    this.myPid,
     this.digest = '',
     this.favid,
   });
@@ -527,21 +539,52 @@ class CreditChange {
   String toString() => '$name ${delta > 0 ? '+' : ''}$delta$unit';
 }
 
+/// 記錄底下的一則回覆
+class DoingComment {
+  const DoingComment({
+    required this.cid,
+    this.author = '',
+    this.uid,
+    this.text = '',
+    this.time = '',
+    this.deleteUrl = '',
+  });
+
+  final int cid;
+  final String author;
+  final int? uid;
+  final String text;
+  final String time;
+
+  /// 只有自己的記錄／自己的回覆才有
+  final String deleteUrl;
+}
+
 class DoingItem {
   final int doid;
   final int? uid;
   final String name;
   final String avatar;
+
+  /// 已淨化的 HTML —— 記錄裡會夾表情圖，純文字會把它們吃掉
+  final String html;
   final String message;
   final String time;
+  final List<DoingComment> comments;
+
+  /// 自己的記錄才有
+  final String deleteUrl;
 
   const DoingItem({
     required this.doid,
     this.uid,
     this.name = '',
     this.avatar = '',
+    this.html = '',
     this.message = '',
     this.time = '',
+    this.comments = const [],
+    this.deleteUrl = '',
   });
 }
 
@@ -774,6 +817,7 @@ class SpaceItem {
     this.albumId,
     this.children = const [],
     this.locked = false,
+    this.actions = const {},
   });
 
   final String title;
@@ -796,6 +840,9 @@ class SpaceItem {
 
   /// 相冊沒公開時封面是 nopublish.gif
   final bool locked;
+
+  /// 這一項可以做什麼：編輯／刪除／置頂 → 論壇給的連結
+  final Map<String, String> actions;
 }
 
 class SpaceData {
@@ -1113,6 +1160,8 @@ class BlogComment {
     this.date = '',
     this.text = '',
     this.quote = '',
+    this.editUrl = '',
+    this.deleteUrl = '',
   });
 
   final String author;
@@ -1123,6 +1172,10 @@ class BlogComment {
 
   /// 回覆別人時引用的那段
   final String quote;
+
+  /// 自己的評論（或自己日誌底下的評論）才有
+  final String editUrl;
+  final String deleteUrl;
 }
 
 /// 日誌內頁
@@ -1138,6 +1191,11 @@ class BlogData {
     this.comments = const [],
     this.otherPosts = const [],
     this.formhash = '',
+    this.editUrl = '',
+    this.deleteUrl = '',
+    this.stickUrl = '',
+    this.favoriteUrl = '',
+    this.stats = const [],
     this.message,
   });
 
@@ -1160,6 +1218,18 @@ class BlogData {
   final List<SpaceItem> otherPosts;
 
   final String formhash;
+
+  /// 自己的日誌才有：編輯／刪除／置頂
+  final String editUrl;
+  final String deleteUrl;
+  final String stickUrl;
+
+  /// 收藏這篇日誌
+  final String favoriteUrl;
+
+  /// 「熱度 142」「已有 328 次閱讀」「2026-8-24 21:06」「系統分類:論壇話題」
+  final List<({String label, String value})> stats;
+
   final String? message;
 }
 
@@ -1348,3 +1418,29 @@ class BlogListPage {
   final bool needsLogin;
   final String? message;
 }
+
+/// 簽到說明頁的一張表
+class SignRuleTable {
+  const SignRuleTable({this.title = '', this.rows = const []});
+  final String title;
+
+  /// 每一列已經去掉論壇那個空的圖示欄
+  final List<List<String>> rows;
+}
+
+class SignRules {
+  const SignRules({this.intro = '', this.tables = const [], this.text = ''});
+
+  /// 「基础奖励: 3~3 枚金币」
+  final String intro;
+  final List<SignRuleTable> tables;
+
+  /// 沒有表格的頁面（道具擴展）就只有一段文字
+  final String text;
+}
+
+const signRulePages = <({String op, String name})>[
+  (op: 'rewardrule', name: '獎勵規則'),
+  (op: 'leval', name: '簽到等級'),
+  (op: 'magics', name: '道具擴展'),
+];

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/group.dart' as api;
 import '../../api/http.dart';
@@ -100,7 +101,7 @@ class _GroupPageState extends State<GroupPage> {
                         height: 48,
                         fit: BoxFit.cover,
                         errorWidget: (c, _, _) =>
-                            const Icon(Icons.groups_outlined),
+                            const Icon(LucideIcons.users),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -138,7 +139,7 @@ class _GroupPageState extends State<GroupPage> {
         padding: const EdgeInsets.fromLTRB(36, 40, 36, 20),
         child: Column(
           children: [
-            Icon(d.needsLogin ? Icons.lock_outline : Icons.groups_outlined,
+            Icon(d.needsLogin ? LucideIcons.lock : LucideIcons.users,
                 size: 34, color: faint(context)),
             const SizedBox(height: 14),
             Text(
@@ -154,7 +155,7 @@ class _GroupPageState extends State<GroupPage> {
                 '$kOrigin/group-${widget.fid}-1.html',
                 title: d.name,
               ),
-              icon: const Icon(Icons.open_in_browser, size: 18),
+              icon: const Icon(LucideIcons.externalLink, size: 18),
               label: Text(tr('在論壇頁面開啟')),
             ),
           ],

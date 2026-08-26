@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/discuz.dart' as api;
@@ -62,13 +63,61 @@ class _SignPageState extends State<SignPage> {
     }
   }
 
+  /// 獎勵規則／簽到等級／道具擴展，論壇拆成三頁，這裡放同一張表裡切
+  Future<void> _showRules() async {
+    var op = signRulePages.first.op;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setSheet) => SizedBox(
+          height: MediaQuery.of(c).size.height * .8,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: [
+                    for (final p in signRulePages)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(tr(p.name)),
+                          selected: op == p.op,
+                          onSelected: (_) => setSheet(() => op = p.op),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(child: _RulesView(key: ValueKey(op), op: op)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
     final session = context.watch<SessionStore>();
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('每日簽到'))),
+      appBar: AppBar(
+        title: Text(tr('每日簽到')),
+        actions: [
+          IconButton(
+            tooltip: tr('獎勵規則'),
+            icon: const Icon(LucideIcons.circleHelp),
+            onPressed: _showRules,
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -173,7 +222,7 @@ class _SignPageState extends State<SignPage> {
               child: d.signed
                   ? OutlinedButton.icon(
                       onPressed: null,
-                      icon: const Icon(Icons.check_circle, size: 18),
+                      icon: const Icon(LucideIcons.circleCheckBig, size: 18),
                       label: Text(tr('今天已經簽到了')),
                     )
                   : FilledButton.icon(
@@ -184,13 +233,111 @@ class _SignPageState extends State<SignPage> {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.event_available, size: 19),
+                          : const Icon(LucideIcons.calendarCheck, size: 19),
                       label: Text(_busy ? tr('簽到中…') : tr('立即簽到')),
                     ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RulesView extends StatefulWidget {
+  const _RulesView({super.key, required this.op});
+  final String op;
+
+  @override
+  State<_RulesView> createState() => _RulesViewState();
+}
+
+class _RulesViewState extends State<_RulesView> {
+  SignRules? _rules;
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _err = null);
+    try {
+      final r = await api.fetchSignRules(widget.op);
+      if (mounted) setState(() => _rules = r);
+    } on DiscuzException catch (e) {
+      if (mounted) setState(() => _err = e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _rules;
+    if (_err != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_err!, style: TextStyle(fontSize: 13, color: faint(context))),
+            TextButton(onPressed: _load, child: Text(tr('重試'))),
+          ],
+        ),
+      );
+    }
+    if (r == null) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        if (r.intro.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(r.intro,
+                style: const TextStyle(fontSize: 14, height: 1.6)),
+          ),
+        if (r.text.isNotEmpty)
+          Text(r.text, style: TextStyle(fontSize: 13.5, height: 1.8, color: subtle(context))),
+        for (final t in r.tables) ...[
+          if (t.title.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 14, 0, 6),
+              child: Text(t.title,
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: faint(context))),
+            ),
+          for (var i = 0; i < t.rows.length; i++)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+              decoration: BoxDecoration(
+                border: Border(
+                    bottom: BorderSide(color: Theme.of(context).dividerColor)),
+              ),
+              child: Row(
+                children: [
+                  for (var j = 0; j < t.rows[i].length; j++)
+                    Expanded(
+                      flex: j == 0 ? 3 : 4,
+                      child: Text(
+                        t.rows[i][j],
+                        style: TextStyle(
+                          fontSize: 13,
+                          // 第一列是表頭
+                          fontWeight: i == 0 ? FontWeight.w600 : null,
+                          color: i == 0 ? null : subtle(context),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ],
     );
   }
 }

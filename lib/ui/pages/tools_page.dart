@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../i18n/ui.dart';
@@ -87,7 +88,7 @@ class _ToolsPageState extends State<ToolsPage> {
                     index: i,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(Icons.drag_handle, color: faint(context)),
+                      child: Icon(LucideIcons.gripHorizontal, color: faint(context)),
                     ),
                   ),
                   title: Row(

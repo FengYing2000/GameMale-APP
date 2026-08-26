@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 
 import '../../api/discuz.dart' as api;
@@ -116,7 +117,7 @@ class _SheetState extends State<_Sheet> {
                   children: [
                     for (final l in _links)
                       ActionChip(
-                        avatar: const Icon(Icons.open_in_new, size: 15),
+                        avatar: const Icon(LucideIcons.externalLink, size: 15),
                         label: Text(Uri.tryParse(l)?.host ?? l,
                             style: const TextStyle(fontSize: 12.5)),
                         onPressed: () => confirmExternal(context, l),
@@ -132,7 +133,7 @@ class _SheetState extends State<_Sheet> {
                         Clipboard.setData(ClipboardData(text: t));
                         toast(context, tr('已複製內容'), kind: ToastKind.ok);
                       },
-                      icon: const Icon(Icons.copy, size: 17),
+                      icon: const Icon(LucideIcons.copy, size: 17),
                       label: Text(tr('複製全部')),
                     ),
                   ),

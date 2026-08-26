@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -193,7 +194,7 @@ class _ForumPageState extends State<ForumPage> {
                 ListTile(
                   title: Text(o.label, style: const TextStyle(fontSize: 15)),
                   trailing: o.value == current
-                      ? Icon(Icons.check,
+                      ? Icon(LucideIcons.check,
                           size: 20, color: Theme.of(c).colorScheme.primary)
                       : null,
                   onTap: () => Navigator.pop(c, o.value),
@@ -213,7 +214,7 @@ class _ForumPageState extends State<ForumPage> {
         title: Text(d?.name ?? tr('板塊')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(LucideIcons.search),
             tooltip: tr('在本版搜尋'),
             onPressed: () => context.push(Uri(
               path: '/f/${widget.fid}/search',
@@ -226,7 +227,7 @@ class _ForumPageState extends State<ForumPage> {
           ? FloatingActionButton(
               onPressed: () => context.push('/f/${widget.fid}/post'),
               tooltip: tr('發表新主題'),
-              child: const Icon(Icons.edit_outlined),
+              child: const Icon(LucideIcons.squarePen),
             )
           : null,
       bottomNavigationBar: d == null
@@ -267,7 +268,7 @@ class _ForumPageState extends State<ForumPage> {
                   children: [
                     for (final sub in d.subforums)
                       ActionChip(
-                        avatar: const Icon(Icons.folder_outlined, size: 15),
+                        avatar: const Icon(LucideIcons.folder, size: 15),
                         label: Text(sub.name, style: const TextStyle(fontSize: 13)),
                         visualDensity: VisualDensity.compact,
                         onPressed: () => context.push('/f/${sub.fid}'),
@@ -336,7 +337,7 @@ class _ForumPageState extends State<ForumPage> {
             label: tr('更多'),
             active: _q.hasExtra,
             onTap: _openMore,
-            icon: Icons.tune,
+            icon: LucideIcons.slidersHorizontal,
             accent: accent,
           ),
         ],
@@ -348,7 +349,7 @@ class _ForumPageState extends State<ForumPage> {
     required String label,
     required bool active,
     required VoidCallback onTap,
-    IconData icon = Icons.expand_more,
+    IconData icon = LucideIcons.chevronDown,
     Color? accent,
   }) =>
       Padding(

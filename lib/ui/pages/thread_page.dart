@@ -2,6 +2,7 @@ import '../../i18n/s2t.dart';
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -24,8 +25,11 @@ import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
 class ThreadPage extends StatefulWidget {
-  const ThreadPage({super.key, required this.tid});
+  const ThreadPage({super.key, required this.tid, this.initialPage = 1});
   final int tid;
+
+  /// 從「我的回覆」點進來時，直接跳到自己那一樓所在的頁
+  final int initialPage;
 
   @override
   State<ThreadPage> createState() => _ThreadPageState();
@@ -41,7 +45,7 @@ class _ThreadPageState extends State<ThreadPage> {
   final _revealImages = ValueNotifier<bool>(false);
   bool _loading = true;
   String? _err;
-  int _page = 1;
+  late int _page = widget.initialPage;
   final _scroll = ScrollController();
 
   @override
@@ -167,7 +171,7 @@ class _ThreadPageState extends State<ThreadPage> {
             IconButton(
               tooltip: _translated ? tr('顯示原文') : tr('翻譯成繁體'),
               icon:
-                  Icon(_translated ? Icons.translate : Icons.g_translate_outlined),
+                  Icon(_translated ? LucideIcons.languages : LucideIcons.languages),
               color: _translated ? Theme.of(context).colorScheme.primary : null,
               onPressed: () => setState(() => _translated = !_translated),
             ),
@@ -178,8 +182,8 @@ class _ThreadPageState extends State<ThreadPage> {
                 : IconButton(
                     tooltip: all ? tr('圖片已全部載入') : tr('全部載入圖片'),
                     icon: Icon(all
-                        ? Icons.photo_library
-                        : Icons.photo_library_outlined),
+                        ? LucideIcons.images
+                        : LucideIcons.images),
                     onPressed: all ? null : () => _revealImages.value = true,
                   ),
           ),
@@ -187,7 +191,7 @@ class _ThreadPageState extends State<ThreadPage> {
             Builder(builder: (c) {
               final faved = c.watch<FavoriteStore>().contains(widget.tid);
               return IconButton(
-                icon: Icon(faved ? Icons.star : Icons.star_border),
+                icon: Icon(faved ? LucideIcons.star : LucideIcons.star),
                 color: faved ? const Color(0xFFF6B93B) : null,
                 tooltip: faved ? tr('取消收藏') : tr('收藏'),
                 onPressed: _fav,
@@ -199,7 +203,7 @@ class _ThreadPageState extends State<ThreadPage> {
           ? FloatingActionButton(
               onPressed: () => _reply(),
               tooltip: tr('回覆'),
-              child: const Icon(Icons.reply),
+              child: const Icon(LucideIcons.reply),
             )
           : null,
       bottomNavigationBar: d == null
@@ -419,10 +423,10 @@ class _AttachmentCard extends StatelessWidget {
                 ListTile(
                   leading: Icon(
                     items[i].needsPay
-                        ? Icons.lock_outline
+                        ? LucideIcons.lock
                         : (items[i].bought && items[i].price.isNotEmpty
-                            ? Icons.check_circle_outline
-                            : Icons.attach_file),
+                            ? LucideIcons.circleCheck
+                            : LucideIcons.paperclip),
                     size: 22,
                     color: items[i].bought && items[i].price.isNotEmpty
                         ? const Color(0xFF4CAF50)
@@ -450,14 +454,14 @@ class _AttachmentCard extends StatelessWidget {
                         IconButton(
                           tooltip: tr('購買紀錄'),
                           visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                          icon: const Icon(LucideIcons.receipt, size: 17),
                           onPressed: () => openInApp(context, items[i].recordUrl,
                               title: tr('購買紀錄')),
                         ),
                       Icon(
                           items[i].needsPay
-                              ? Icons.shopping_cart_outlined
-                              : Icons.download,
+                              ? LucideIcons.shoppingCart
+                              : LucideIcons.download,
                           size: 18),
                     ],
                   ),
@@ -567,7 +571,7 @@ class _PostCard extends StatelessWidget {
               if (onEdit != null)
                 TextButton.icon(
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  icon: const Icon(LucideIcons.squarePen, size: 16),
                   label: Text(tr('編輯')),
                   style: TextButton.styleFrom(
                     foregroundColor: subtle(context),
@@ -577,7 +581,7 @@ class _PostCard extends StatelessWidget {
               if (onShowRatings != null)
                 TextButton.icon(
                   onPressed: onShowRatings,
-                  icon: const Icon(Icons.workspace_premium_outlined, size: 16),
+                  icon: const Icon(LucideIcons.award, size: 16),
                   label: Text(tr('評分紀錄')),
                   style: TextButton.styleFrom(
                     foregroundColor: faint(context),
@@ -587,7 +591,7 @@ class _PostCard extends StatelessWidget {
               if (onRate != null)
                 TextButton.icon(
                   onPressed: onRate,
-                  icon: const Icon(Icons.thumb_up_outlined, size: 16),
+                  icon: const Icon(LucideIcons.thumbsUp, size: 16),
                   label: Text(tr('評分')),
                   style: TextButton.styleFrom(
                     foregroundColor: subtle(context),
@@ -597,7 +601,7 @@ class _PostCard extends StatelessWidget {
               if (onReply != null)
               TextButton.icon(
                 onPressed: onReply,
-                icon: const Icon(Icons.reply, size: 16),
+                icon: const Icon(LucideIcons.reply, size: 16),
                 label: Text(tr('回覆')),
                 style: TextButton.styleFrom(
                   foregroundColor: subtle(context),
@@ -681,7 +685,7 @@ class _PrizeBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.redeem_outlined, size: 22, color: c.primary),
+          Icon(LucideIcons.gift, size: 22, color: c.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

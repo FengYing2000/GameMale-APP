@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
@@ -30,7 +31,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.download_outlined),
+            leading: const Icon(LucideIcons.download),
             title: Text(tr('儲存到相簿')),
             onTap: () {
               Navigator.pop(sheet);
@@ -38,7 +39,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.ios_share),
+            leading: const Icon(LucideIcons.share),
             title: Text(tr('分享')),
             onTap: () {
               Navigator.pop(sheet);
@@ -46,7 +47,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.link),
+            leading: const Icon(LucideIcons.link),
             title: Text(tr('複製原始連結')),
             onTap: () async {
               Navigator.pop(sheet);
@@ -55,7 +56,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.open_in_browser),
+            leading: const Icon(LucideIcons.externalLink),
             title: Text(tr('用瀏覽器開啟')),
             onTap: () {
               Navigator.pop(sheet);

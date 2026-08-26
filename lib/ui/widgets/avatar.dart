@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/http.dart';
 
@@ -16,7 +17,7 @@ class Avatar extends StatelessWidget {
       width: size,
       height: size,
       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
-      child: Icon(Icons.person, size: size * 0.6, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25)),
+      child: Icon(LucideIcons.user, size: size * 0.6, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25)),
     );
 
     // AppBar 的 leading 會給「寬 56、高滿版」的緊約束，SizedBox 擋不住，

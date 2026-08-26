@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../api/http.dart';
@@ -60,7 +61,7 @@ class SmartImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fallback = errorWidget ??
-        Icon(Icons.broken_image_outlined,
+        Icon(LucideIcons.imageOff,
             size: 22,
             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .4));
 

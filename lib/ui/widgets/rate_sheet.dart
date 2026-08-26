@@ -1,6 +1,7 @@
 import '../../i18n/ui.dart';
 import 'require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
@@ -130,7 +131,7 @@ class _RateSheetState extends State<_RateSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info_outline, size: 32, color: faint(context)),
+            Icon(LucideIcons.info, size: 32, color: faint(context)),
             const SizedBox(height: 10),
             Text(
               _err ?? f?.message ?? tr('目前不能評分'),
@@ -156,7 +157,7 @@ class _RateSheetState extends State<_RateSheet> {
             children: [
               for (final p in _presets)
                 ActionChip(
-                  avatar: const Icon(Icons.bolt, size: 15),
+                  avatar: const Icon(LucideIcons.zap, size: 15),
                   label: Text(tr(p.label)),
                   onPressed: () => _applyPreset(p),
                 ),

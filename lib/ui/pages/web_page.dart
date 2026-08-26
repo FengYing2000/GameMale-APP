@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -84,12 +85,12 @@ class _WebPageState extends State<WebPage> {
         actions: [
           IconButton(
             tooltip: tr('重新整理'),
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(LucideIcons.refreshCw),
             onPressed: () => c?.reload(),
           ),
           IconButton(
             tooltip: tr('用系統瀏覽器開啟'),
-            icon: const Icon(Icons.open_in_new),
+            icon: const Icon(LucideIcons.externalLink),
             onPressed: () => launchUrl(Uri.parse(widget.url),
                 mode: LaunchMode.externalApplication),
           ),
@@ -107,13 +108,13 @@ class _WebPageState extends State<WebPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                      icon: const Icon(LucideIcons.chevronLeft, size: 18),
                       onPressed: () async {
                         if (await c.canGoBack()) await c.goBack();
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios, size: 18),
+                      icon: const Icon(LucideIcons.chevronRight, size: 18),
                       onPressed: () async {
                         if (await c.canGoForward()) await c.goForward();
                       },

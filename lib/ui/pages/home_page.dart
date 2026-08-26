@@ -2,6 +2,7 @@ import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -163,7 +164,7 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none),
+            icon: const Icon(LucideIcons.bell),
             tooltip: tr('通知'),
             onPressed: () => context.push('/notice'),
           ),
@@ -291,7 +292,7 @@ class _GroupHeader extends StatelessWidget {
             Text(name,
                 style: TextStyle(
                     fontSize: 12.5, fontWeight: FontWeight.w600, color: faint(context))),
-            Icon(open ? Icons.expand_more : Icons.chevron_right,
+            Icon(open ? LucideIcons.chevronDown : LucideIcons.chevronRight,
                 size: 18, color: faint(context)),
           ],
         ),
@@ -328,7 +329,7 @@ class _FavoriteForums extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ActionChip(
-                    avatar: const Icon(Icons.star, size: 15),
+                    avatar: const Icon(LucideIcons.star, size: 15),
                     label: Text(f.name, style: const TextStyle(fontSize: 13)),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => context.push('/f/${f.fid}'),
@@ -355,13 +356,13 @@ class _SubForumRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(66, 9, 14, 9),
         child: Row(
           children: [
-            Icon(Icons.subdirectory_arrow_right, size: 15, color: faint(context)),
+            Icon(LucideIcons.cornerDownRight, size: 15, color: faint(context)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(item.name,
                   style: TextStyle(fontSize: 14, color: subtle(context))),
             ),
-            Icon(Icons.chevron_right, size: 16, color: faint(context)),
+            Icon(LucideIcons.chevronRight, size: 16, color: faint(context)),
           ],
         ),
       ),
@@ -432,13 +433,13 @@ class _ForumRow extends StatelessWidget {
             ),
             // 有子版塊就變成展開/收合，沒有就維持一個指向內頁的箭頭
             if (subforums.isEmpty)
-              Icon(Icons.chevron_right, size: 18, color: faint(context))
+              Icon(LucideIcons.chevronRight, size: 18, color: faint(context))
             else
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: expanded ? tr('收合子版塊') : tr('展開子版塊'),
                 icon: Icon(
-                    expanded ? Icons.expand_less : Icons.expand_more,
+                    expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                     size: 20),
                 onPressed: onToggle,
               ),

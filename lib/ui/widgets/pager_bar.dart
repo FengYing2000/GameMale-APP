@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/models.dart';
 import '../../theme.dart';
@@ -71,7 +72,7 @@ class StickyPager extends StatelessWidget {
               onPressed: (pager.page > 1 || pager.hasPrev)
                   ? () => onGo(pager.page - 1)
                   : null,
-              icon: const Icon(Icons.chevron_left),
+              icon: const Icon(LucideIcons.chevronLeft),
               tooltip: tr('上一頁'),
             ),
             TextButton(
@@ -88,7 +89,7 @@ class StickyPager extends StatelessWidget {
               onPressed: (pager.hasNext || pager.page < pager.total)
                   ? () => onGo(pager.page + 1)
                   : null,
-              icon: const Icon(Icons.chevron_right),
+              icon: const Icon(LucideIcons.chevronRight),
               tooltip: tr('下一頁'),
             ),
           ],

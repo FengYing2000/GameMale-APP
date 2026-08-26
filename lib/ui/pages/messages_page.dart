@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -81,13 +82,13 @@ class _MessagesPageState extends State<MessagesPage> {
                 leading: CircleAvatar(
                   backgroundColor:
                       Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
-                  child: Icon(Icons.notifications_none,
+                  child: Icon(LucideIcons.bell,
                       color: Theme.of(context).colorScheme.primary),
                 ),
                 title: Text(tr('系統通知'), style: TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text(tr('回覆、@我、積分等提醒'),
                     style: TextStyle(fontSize: 12.5, color: faint(context))),
-                trailing: Icon(Icons.chevron_right, color: faint(context)),
+                trailing: Icon(LucideIcons.chevronRight, color: faint(context)),
                 onTap: () => context.push('/notice'),
               ),
             ),

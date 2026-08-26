@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -44,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 _choice<AppLang>(
                   context,
-                  icon: Icons.translate,
+                  icon: LucideIcons.languages,
                   title: tr('語言'),
                   current: settings.lang,
                   values: AppLang.values,
@@ -60,7 +61,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const Divider(indent: 56, endIndent: 14),
                 _choice<ThemeMode>(
                   context,
-                  icon: Icons.dark_mode_outlined,
+                  icon: LucideIcons.moon,
                   title: tr('主題'),
                   current: settings.themeMode,
                   values: ThemeMode.values,
@@ -84,7 +85,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 _choice<ImagePolicy>(
                   context,
-                  icon: Icons.image_outlined,
+                  icon: LucideIcons.image,
                   title: tr('帖子圖片載入'),
                   current: settings.imagePolicy,
                   values: ImagePolicy.values,
@@ -105,7 +106,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 SwitchListTile(
                   value: settings.markReplied,
-                  secondary: const Icon(Icons.reply_all_outlined),
+                  secondary: const Icon(LucideIcons.replyAll),
                   title: Text(tr('標記已回過的帖')),
                   subtitle: Text(
                     tr('主題列表會在標題前標「已回」。每個主題都要單獨問論壇一次，'
@@ -154,7 +155,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const Divider(indent: 14, endIndent: 14),
                 ListTile(
                   title: Text(tr('用瀏覽器開啟論壇')),
-                  trailing: Icon(Icons.open_in_new, size: 18, color: faint(context)),
+                  trailing: Icon(LucideIcons.externalLink, size: 18, color: faint(context)),
                   onTap: () => launchUrl(
                     Uri.parse('$kOrigin/forum.php'),
                     mode: LaunchMode.externalApplication,
@@ -202,7 +203,7 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           Text(labelOf(current),
               style: TextStyle(fontSize: 14, color: subtle(context))),
-          Icon(Icons.chevron_right, size: 18, color: faint(context)),
+          Icon(LucideIcons.chevronRight, size: 18, color: faint(context)),
         ],
       ),
       onTap: () async {
@@ -254,7 +255,7 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
         child: Row(
           children: [
-            const SizedBox(width: 40, child: Icon(Icons.palette_outlined)),
+            const SizedBox(width: 40, child: Icon(LucideIcons.palette)),
             Expanded(child: Text(tr('強調色'))),
             for (final a in Accent.values)
               Padding(
@@ -275,7 +276,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                     child: settings.accent == a
-                        ? const Icon(Icons.check, size: 15, color: Colors.white)
+                        ? const Icon(LucideIcons.check, size: 15, color: Colors.white)
                         : null,
                   ),
                 ),

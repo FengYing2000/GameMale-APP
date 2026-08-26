@@ -1,6 +1,7 @@
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +11,7 @@ import '../../api/models.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/pager_bar.dart';
+import '../widgets/post_body.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -89,6 +91,66 @@ class _DoingPageViewState extends State<DoingPageView> {
     }
   }
 
+  Future<void> _reply(DoingItem item) async {
+    if (!await requireLogin(context, action: tr('回覆記錄'))) return;
+    if (!mounted) return;
+    final ctrl = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('${tr('回覆')} ${item.name}'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 3,
+          decoration: InputDecoration(hintText: tr('說點什麼…')),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: Text(tr('送出'))),
+        ],
+      ),
+    );
+    if (text == null || text.isEmpty || !mounted) return;
+    try {
+      final r = await api.replyDoing(item.doid, text,
+          formhash: _data?.formhash ?? '');
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, tr('回覆失敗：') + e.message);
+    }
+  }
+
+  Future<void> _delete(String url, String what) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(what),
+        content: Text(tr('確定要刪除嗎？刪了就找不回來了。')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true), child: Text(tr('刪除'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await api.confirmAndSubmit(url, what);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, what + tr('失敗：') + e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -103,7 +165,7 @@ class _DoingPageViewState extends State<DoingPageView> {
           ? FloatingActionButton(
               onPressed: _busy ? null : _compose,
               tooltip: tr('發布記錄'),
-              child: const Icon(Icons.edit_outlined),
+              child: const Icon(LucideIcons.squarePen),
             )
           : null,
       body: RefreshIndicator(
@@ -147,7 +209,15 @@ class _DoingPageViewState extends State<DoingPageView> {
                 child: Column(
                   children: [
                     for (var i = 0; i < d.items.length; i++) ...[
-                      _DoingRow(item: d.items[i]),
+                      _DoingRow(
+                        item: d.items[i],
+                        onReply: () => _reply(d.items[i]),
+                        onDelete: d.items[i].deleteUrl.isEmpty
+                            ? null
+                            : () => _delete(d.items[i].deleteUrl, tr('刪除記錄')),
+                        onDeleteComment: (c) =>
+                            _delete(c.deleteUrl, tr('刪除回覆')),
+                      ),
                       if (i != d.items.length - 1)
                         const Divider(indent: 60, endIndent: 14),
                     ],
@@ -162,8 +232,16 @@ class _DoingPageViewState extends State<DoingPageView> {
 }
 
 class _DoingRow extends StatelessWidget {
-  const _DoingRow({required this.item});
+  const _DoingRow({
+    required this.item,
+    required this.onReply,
+    this.onDelete,
+    required this.onDeleteComment,
+  });
   final DoingItem item;
+  final VoidCallback onReply;
+  final VoidCallback? onDelete;
+  final void Function(DoingComment) onDeleteComment;
 
   @override
   Widget build(BuildContext context) {
@@ -183,9 +261,86 @@ class _DoingRow extends StatelessWidget {
                 Text(item.name,
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
-                Text(item.message, style: const TextStyle(fontSize: 14, height: 1.5)),
-                const SizedBox(height: 4),
-                Text(item.time, style: TextStyle(fontSize: 11.5, color: faint(context))),
+                // 記錄裡常夾表情圖，純文字會把它們吃掉
+                if (item.html.isNotEmpty)
+                  PostBody(item.html,
+                      textStyle: const TextStyle(fontSize: 14, height: 1.5))
+                else
+                  Text(item.message,
+                      style: const TextStyle(fontSize: 14, height: 1.5)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(item.time,
+                        style: TextStyle(fontSize: 11.5, color: faint(context))),
+                    const Spacer(),
+                    _action(context, tr('回覆'), onReply),
+                    if (onDelete != null) ...[
+                      const SizedBox(width: 14),
+                      _action(context, tr('刪除'), onDelete!),
+                    ],
+                  ],
+                ),
+                if (item.comments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: .55),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final c in item.comments)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text.rich(
+                                    TextSpan(children: [
+                                      TextSpan(
+                                        text: '${c.author}：',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary),
+                                      ),
+                                      TextSpan(text: c.text),
+                                      if (c.time.isNotEmpty)
+                                        TextSpan(
+                                          text: '  ${c.time}',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: faint(context)),
+                                        ),
+                                    ]),
+                                    style: const TextStyle(
+                                        fontSize: 13, height: 1.5),
+                                  ),
+                                ),
+                                if (c.deleteUrl.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () => onDeleteComment(c),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                          left: 8, top: 2),
+                                      child: Icon(LucideIcons.x,
+                                          size: 14, color: faint(context)),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -193,4 +348,14 @@ class _DoingRow extends StatelessWidget {
       ),
     );
   }
+
+  Widget _action(BuildContext c, String label, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(c).colorScheme.primary)),
+      );
 }

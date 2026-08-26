@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/discuz.dart' as api;
@@ -173,7 +174,7 @@ class _NoticeRow extends StatelessWidget {
               ),
             ),
             if (item.tid != null)
-              Icon(Icons.chevron_right, size: 18, color: faint(context)),
+              Icon(LucideIcons.chevronRight, size: 18, color: faint(context)),
           ],
         ),
       ),

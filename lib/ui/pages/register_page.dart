@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/http.dart';
@@ -110,7 +111,7 @@ class _RegisterPageState extends State<RegisterPage> {
         actions: [
           IconButton(
             tooltip: tr('用瀏覽器開啟'),
-            icon: const Icon(Icons.open_in_browser),
+            icon: const Icon(LucideIcons.externalLink),
             onPressed: _openInBrowser,
           ),
         ],
@@ -171,7 +172,7 @@ class _RegisterPageState extends State<RegisterPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(bad ? Icons.block : Icons.info_outline,
+          Icon(bad ? LucideIcons.ban : LucideIcons.info,
               size: 20, color: bad ? c.error : c.primary),
           const SizedBox(width: 10),
           Expanded(
@@ -218,11 +219,11 @@ class _RegisterPageState extends State<RegisterPage> {
                       Icon(
                         q.multi
                             ? (picked.contains(o.value)
-                                ? Icons.check_box
-                                : Icons.check_box_outline_blank)
+                                ? LucideIcons.squareCheckBig
+                                : LucideIcons.square)
                             : (picked.contains(o.value)
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked),
+                                ? LucideIcons.circleDot
+                                : LucideIcons.circle),
                         size: 20,
                         color: picked.contains(o.value)
                             ? Theme.of(context).colorScheme.primary

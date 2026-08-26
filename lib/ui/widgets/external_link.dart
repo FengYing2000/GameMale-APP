@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -25,7 +26,7 @@ Future<void> confirmExternal(
   final go = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      icon: const Icon(Icons.open_in_new, size: 26),
+      icon: const Icon(LucideIcons.externalLink, size: 26),
       title: Text(title ?? tr('即將離開 GameMale')),
       content: Column(
         mainAxisSize: MainAxisSize.min,

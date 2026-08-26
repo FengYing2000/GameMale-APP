@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/models.dart';
 import '../../theme.dart';
@@ -137,9 +138,9 @@ class _ToastCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (icon, accent) = switch (kind) {
-      ToastKind.ok => (Icons.check_circle_outline, const Color(0xFF4CAF50)),
-      ToastKind.warn => (Icons.error_outline, scheme.error),
-      ToastKind.info => (Icons.info_outline, scheme.primary),
+      ToastKind.ok => (LucideIcons.circleCheck, const Color(0xFF4CAF50)),
+      ToastKind.warn => (LucideIcons.circleAlert, scheme.error),
+      ToastKind.info => (LucideIcons.info, scheme.primary),
     };
 
     return _Frame(
@@ -181,7 +182,7 @@ class _CreditCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome,
+              const Icon(LucideIcons.sparkles,
                   size: 18, color: Color(0xFFF6B93B)),
               const SizedBox(width: 9),
               Expanded(
