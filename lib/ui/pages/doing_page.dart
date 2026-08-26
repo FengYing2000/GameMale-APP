@@ -9,6 +9,7 @@ import '../../store/session.dart';
 import '../../api/models.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -24,6 +25,7 @@ class _DoingPageViewState extends State<DoingPageView> {
   String _view = 'all';
   DoingPage? _data;
   bool _loading = true;
+  int _page = 1;
   bool _busy = false;
   String? _err;
 
@@ -33,13 +35,14 @@ class _DoingPageViewState extends State<DoingPageView> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({int? page}) async {
+    if (page != null) _page = page;
     setState(() {
       _loading = true;
       _err = null;
     });
     try {
-      final d = await api.fetchDoing(view: _view);
+      final d = await api.fetchDoing(view: _view, page: _page);
       if (mounted) setState(() => _data = d);
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
@@ -93,6 +96,9 @@ class _DoingPageViewState extends State<DoingPageView> {
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('記錄廣場'))),
+      bottomNavigationBar: d == null || d.items.isEmpty
+          ? null
+          : StickyPager(pager: d.pager, onGo: (p) => _load(page: p)),
       floatingActionButton: session.loggedIn
           ? FloatingActionButton(
               onPressed: _busy ? null : _compose,

@@ -87,6 +87,15 @@ class _GuidePageState extends State<GuidePage> {
     final d = _data;
 
     return Scaffold(
+      bottomNavigationBar: d == null || d.list.isEmpty
+          ? null
+          : StickyPager(
+              pager: d.pager,
+              onGo: (p) {
+                setState(() => _page = p);
+                _load();
+              },
+            ),
       appBar: AppBar(title: Text(tr('導讀'))),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -125,14 +134,6 @@ class _GuidePageState extends State<GuidePage> {
               onRetry: _load,
             ),
             if (d != null && d.list.isNotEmpty) ThreadListCard(list: d.list),
-            if (d != null)
-              PagerBar(
-                pager: d.pager,
-                onGo: (p) {
-                  setState(() => _page = p);
-                  _load();
-                },
-              ),
           ],
         ),
       ),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:html/dom.dart' as dom;
@@ -194,10 +195,10 @@ Future<ForumData> fetchForum(
   q.addAll(query.toParams());
 
   final doc = await _page('forum.php?${_qs(q)}');
-  return parseForumFromDoc(doc, fid);
+  return parseForumFromDoc(doc, fid, page: page);
 }
 
-ForumData parseForumFromDoc(dom.Document doc, int fid) {
+ForumData parseForumFromDoc(dom.Document doc, int fid, {int page = 1}) {
   return ForumData(
     fid: fid,
     name: txt(doc.querySelector('header h1')).isNotEmpty
@@ -224,7 +225,7 @@ ForumData parseForumFromDoc(dom.Document doc, int fid) {
       );
     }).toList(),
     list: parseThreadList(doc),
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     message: noticeMessage(doc),
     requiresLogin: isLoginWall(doc),
   );
@@ -470,7 +471,8 @@ Future<ListPage> fetchGuide({String view = 'newthread', int page = 1}) async {
   final q = <String, String>{'mod': 'guide', 'view': view};
   if (page > 1) q['page'] = '$page';
   final doc = await _page('forum.php?${_qs(q)}');
-  return ListPage(list: parseThreadList(doc), pager: parsePager(doc));
+  return ListPage(
+      list: parseThreadList(doc), pager: parsePager(doc, current: page));
 }
 
 Future<ListPage> search(String keyword, {int page = 1}) async {
@@ -485,7 +487,9 @@ Future<ListPage> search(String keyword, {int page = 1}) async {
   final doc = await _page('search.php?${_qs(q)}');
 
   final list = parseThreadList(doc);
-  if (list.isNotEmpty) return ListPage(list: list, pager: parsePager(doc));
+  if (list.isNotEmpty) {
+    return ListPage(list: list, pager: parsePager(doc, current: page));
+  }
 
   // 搜尋結果頁版型和主題列表不同時，退而抓所有 viewthread 連結
   final seen = <int, ThreadItem>{};
@@ -498,7 +502,7 @@ Future<ListPage> search(String keyword, {int page = 1}) async {
   }
   return ListPage(
     list: seen.values.toList(),
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     message: noticeMessage(doc),
   );
 }
@@ -1065,25 +1069,62 @@ ThreadPrize? parseThreadPrize(dom.Document doc) {
   return ThreadPrize(pool: pool, rule: rule);
 }
 
-/// `.pattl dl.tattl` —— `dt` 是檔案類型圖示，`dd` 裡第一段是檔名連結，
-/// 後面接大小／下載次數，付費附件多一段「售价」
+/// 附件有三種長相，只認一種會漏掉一大半：
+///
+/// * `dl.tattl`（不含 `.attm`）—— 帖尾那塊列出來的檔案
+/// * `dl.tattl.attm` —— 「更多圖片」裡的圖片附件，內文已經顯示過，要排除
+/// * `<span id="attach_NNN">` —— 夾在內文中間的附件，很常見
+///
+/// 買過沒買過看連結：`mod=attachment` 是可以直接下載，
+/// `action=attachpay` 是還要先付錢。
 List<Attachment> parseAttachments(dom.Document doc) {
   final out = <Attachment>[];
+  final seen = <String>{};
+
+  void add(Attachment a) {
+    if (a.name.isEmpty) return;
+    final key = '${a.name}|${a.url}';
+    if (!seen.add(key)) return;
+    out.add(a);
+  }
+
+  // 內文中間的附件
+  for (final span in doc.querySelectorAll('span[id^="attach_"]')) {
+    final a = span.querySelector('a');
+    if (a == null) continue;
+    final href = attr(a, 'href');
+    final tip = doc.getElementById('${attr(span, 'id')}_menu');
+    final tipText = txt(tip);
+    add(Attachment(
+      name: txt(a),
+      url: absolute(href),
+      icon: absolute(attr(span.previousElementSibling, 'src')),
+      info: txt(span.querySelector('em')).replaceAll(RegExp(r'^\(|\)$'), ''),
+      price: RegExp(r'售价[:：]\s*([^\s\[]+)').firstMatch(tipText)?.group(1) ?? '',
+      permission:
+          RegExp(r'阅读权限[:：]\s*(\S+)').firstMatch(tipText)?.group(1) ?? '',
+      recordUrl: absolute(
+          attr(tip?.querySelector('a[href*="viewattachpayments"]'), 'href')),
+      bought: href.contains('mod=attachment'),
+    ));
+  }
+
+  // 帖尾那塊
   for (final dl in doc.querySelectorAll('dl.tattl')) {
+    // 「更多圖片」的圖片附件，內文已經顯示過了
+    if (dl.classes.contains('attm')) continue;
+
     final a = dl.querySelector('p.attnm a') ?? dl.querySelector('a');
     if (a == null) continue;
     final name = txt(a);
     if (name.isEmpty) continue;
 
-    // 圖片附件已經在內文裡顯示了，不用再列一次。
-    // 論壇用 dt 那顆檔案類型圖示分辨，image_s.gif 就是圖片
     final icon = attr(dl.querySelector('dt img'), 'src');
     if (RegExp(r'filetype/image').hasMatch(icon)) continue;
 
     var info = '';
     var price = '';
-    // 只看 dd 的直接子 p —— 檔名那段裡還巢了一個提示框，
-    // 用 querySelectorAll 會先抓到提示框裡的上傳時間
+    var permission = '';
     for (final dd in dl.children.where((e) => e.localName == 'dd')) {
       for (final p in dd.children.where((e) => e.localName == 'p')) {
         if (p.classes.contains('attnm')) continue;
@@ -1093,19 +1134,45 @@ List<Attachment> parseAttachments(dom.Document doc) {
           price = txt(p.querySelector('strong'));
         } else if (info.isEmpty) {
           info = t;
+          permission =
+              RegExp(r'阅读权限[:：]\s*(\S+?)[,，]').firstMatch(t)?.group(1) ?? '';
         }
       }
     }
 
-    out.add(Attachment(
+    final href = attr(a, 'href');
+    add(Attachment(
       name: name,
-      url: absolute(attr(a, 'href')),
+      url: absolute(href),
       icon: absolute(icon),
       info: info,
       price: price,
+      permission: permission,
+      recordUrl: absolute(
+          attr(dl.querySelector('a[href*="viewattachpayments"]'), 'href')),
+      bought: href.contains('mod=attachment'),
     ));
   }
+
   return out;
+}
+
+/// 附件的純文字內容。
+///
+/// 論壇送 `application/octet-stream` 而且不帶 charset，瀏覽器只好用系統
+/// 預設編碼去猜 —— 繁體中文系統會猜成 Big5，UTF-8 的檔案就變一片亂碼。
+/// 自己抓下來解碼就不會有這個問題。
+Future<String> fetchAttachmentText(String url) async {
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  final bytes =
+      await Api.instance.getBytes(path.replaceFirst(RegExp(r'^/'), ''));
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    // 舊檔案可能是 GBK，退而求其次別讓整段變問號
+    return latin1.decode(bytes);
+  }
 }
 
 /// 購買附件：先拿確認表單（作者、售價、購買後餘額），使用者確認後才送出。
@@ -1221,7 +1288,9 @@ Future<ListPage> _myList(int uid, String doType, int page, {String type = ''}) a
   final doc = await _page('home.php?${_qs(q)}');
 
   final list = doType == 'favorite' ? parseFavList(doc) : parseThreadList(doc);
-  if (list.isNotEmpty) return ListPage(list: list, pager: parsePager(doc));
+  if (list.isNotEmpty) {
+    return ListPage(list: list, pager: parsePager(doc, current: page));
+  }
 
   final seen = <int, ThreadItem>{};
   for (final a in doc.querySelectorAll('a[href*="mod=viewthread"], a[href*="/thread-"], a[href*="ptid="]')) {
@@ -1234,7 +1303,8 @@ Future<ListPage> _myList(int uid, String doType, int page, {String type = ''}) a
       seen.putIfAbsent(tid, () => ThreadItem(tid: tid, title: title));
     }
   }
-  return ListPage(list: seen.values.toList(), pager: parsePager(doc));
+  return ListPage(
+      list: seen.values.toList(), pager: parsePager(doc, current: page));
 }
 
 /// 收藏的版塊：和收藏帖子同一種 .fav_list 版型，只是連結指向 forumdisplay
@@ -1333,6 +1403,8 @@ List<String> get creditNamesDebug =>
 /// 最後一格必須等於自己的 uid，否則這份 cookie 不是給這個帳號的，直接丟掉。
 Future<List<CreditChange>> consumeCreditNotice({int? uid}) async {
   final raw = await Api.instance.cookieEndingWith('_creditnotice');
+  // 讀完就清掉，跟網頁版一樣。不清的話內建瀏覽器每開一頁都會再跳一次
+  await Api.instance.clearCookieEndingWith('_creditnotice');
   if (raw == null || raw.isEmpty) return const [];
   return parseCreditNotice(raw, uid: uid);
 }
@@ -1359,10 +1431,18 @@ List<CreditChange> parseCreditNotice(String raw, {int? uid}) {
 void captureCreditNamesForTest(String spec) =>
     _captureCreditNames("creditnotice = '$spec'");
 
+/// 開內建瀏覽器前先把積分提示清掉，不然論壇會把上一次操作的變化
+/// 再跳一次（而且每開一頁跳一次）
+Future<void> dismissCreditNotice() async {
+  await Api.instance.clearCookieEndingWith('_creditnotice');
+  await Api.instance.clearCookieEndingWith('_creditrule');
+}
+
 /// 這次積分是哪個動作給的（「发表回复」「每天登录」…）。
 /// 論壇顯示在積分變化前面，跟 creditnotice 是同一批 cookie。
 Future<String> consumeCreditRule() async {
   final raw = await Api.instance.cookieEndingWith('_creditrule');
+  await Api.instance.clearCookieEndingWith('_creditrule');
   if (raw == null || raw.isEmpty) return '';
   // cookie 是 URL 編碼過的，規則之間用 tab 分隔
   try {
@@ -1384,8 +1464,9 @@ const doingViews = <({String key, String name, bool needsLogin})>[
 ];
 
 /// 記錄沒有手機版，帶 forcemobile=1 拿桌面模板來解析
-Future<DoingPage> fetchDoing({String view = 'all'}) async {
-  final doc = await _page('home.php?mod=space&do=doing&view=$view&forcemobile=1');
+Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
+  final doc = await _page('home.php?mod=space&do=doing&view=$view'
+      '&forcemobile=1${page > 1 ? '&page=$page' : ''}');
   final items = <DoingItem>[];
 
   for (final dl in doc.querySelectorAll('.xld dl')) {
@@ -1410,6 +1491,7 @@ Future<DoingPage> fetchDoing({String view = 'all'}) async {
   return DoingPage(
     items: items,
     formhash: attr(doc.querySelector('#mood_addform input[name="formhash"]'), 'value'),
+    pager: parsePager(doc, current: page),
   );
 }
 

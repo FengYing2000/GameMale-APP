@@ -8,10 +8,10 @@ import 'parse.dart';
 /// 所以 App 走 `/f/<fid>` 進來會看到「這個板塊沒有主題」。
 Future<GroupData> fetchGroup(int fid, {int page = 1}) async {
   final html = await Api.instance.get('group-$fid-$page.html', desktop: true);
-  return parseGroup(toDoc(html), html, fid);
+  return parseGroup(toDoc(html), html, fid, page: page);
 }
 
-GroupData parseGroup(dom.Document doc, String html, int fid) {
+GroupData parseGroup(dom.Document doc, String html, int fid, {int page = 1}) {
   if (isLoginWall(doc) || isRedirectToLogin(doc, html)) {
     return const GroupData(message: '要先登入才看得到這個群組', needsLogin: true);
   }
@@ -54,7 +54,7 @@ GroupData parseGroup(dom.Document doc, String html, int fid) {
     desc: txt(doc.querySelector('.bm_c dl dd:not(.m):not(.cl)')),
     meta: txt(doc.querySelector('.bm_c dl dd.cl')),
     threads: threads,
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     canJoin: joinable,
     message: threads.isEmpty
         ? (noticeMessage(doc) ??

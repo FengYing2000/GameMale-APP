@@ -25,11 +25,11 @@ Future<SpaceData> fetchSpace(int uid, SpaceTab tab, {int page = 1}) async {
     return SpaceData(tab: tab, message: privacy, restricted: true);
   }
 
-  return parseSpace(doc, tab);
+  return parseSpace(doc, tab, page: page);
 }
 
 /// 純解析，測試直接餵 fixture 用
-SpaceData parseSpace(dom.Document doc, SpaceTab tab) {
+SpaceData parseSpace(dom.Document doc, SpaceTab tab, {int page = 1}) {
   final items = switch (tab) {
     SpaceTab.home => _home(doc),
     SpaceTab.doing => _doing(doc),
@@ -46,7 +46,7 @@ SpaceData parseSpace(dom.Document doc, SpaceTab tab) {
     tab: tab,
     owner: _owner(doc),
     items: items,
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
     message: items.isEmpty ? (notice ?? '沒有${tab.label}') : null,
   );
@@ -275,10 +275,10 @@ Future<AlbumData> fetchAlbum(int uid, int albumId, {int page = 1}) async {
   final q = 'home.php?mod=space&uid=$uid&do=album&id=$albumId'
       '${page > 1 ? '&page=$page' : ''}';
   final doc = toDoc(await Api.instance.get(q, desktop: true));
-  return parseAlbum(doc);
+  return parseAlbum(doc, page: page);
 }
 
-AlbumData parseAlbum(dom.Document doc) {
+AlbumData parseAlbum(dom.Document doc, {int page = 1}) {
   final photos = <AlbumPhoto>[];
   // 照片格是 ul.ml.mlp；只寫 .ml 會連側欄那排小圖一起抓進來
   final grid = doc.querySelectorAll('.mlp li');
@@ -299,7 +299,7 @@ AlbumData parseAlbum(dom.Document doc) {
         txt(doc.querySelector('title')),
     count: RegExp(r'共\s*\d+\s*张图片').firstMatch(head)?.group(0) ?? '',
     photos: photos,
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     message: photos.isEmpty ? (noticeMessage(doc) ?? '這本相冊看不到內容') : null,
   );
 }
@@ -444,7 +444,7 @@ Future<BlogListPage> fetchBlogList(
   return BlogListPage(
     items: items,
     categories: cats,
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     message: items.isEmpty ? (noticeMessage(doc) ?? '這裡沒有日誌') : null,
   );
 }

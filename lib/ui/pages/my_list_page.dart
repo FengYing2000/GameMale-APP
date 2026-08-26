@@ -127,6 +127,15 @@ class _MyListPageState extends State<MyListPage> {
     final isFav = widget.type == 'favorite';
 
     return Scaffold(
+      bottomNavigationBar: (_favForums || d == null || d.list.isEmpty)
+          ? null
+          : StickyPager(
+              pager: d.pager,
+              onGo: (p) {
+                setState(() => _page = p);
+                _load();
+              },
+            ),
       appBar: AppBar(title: Text(tr(_titles[widget.type] ?? '列表'))),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -216,14 +225,6 @@ class _MyListPageState extends State<MyListPage> {
               ),
             if (!(isFav && _favForums) && d != null && d.list.isNotEmpty)
               ThreadListCard(list: d.list, onRemove: isFav ? _remove : null),
-            if (!(isFav && _favForums) && d != null)
-              PagerBar(
-                pager: d.pager,
-                onGo: (p) {
-                  setState(() => _page = p);
-                  _load();
-                },
-              ),
           ],
         ),
       ),

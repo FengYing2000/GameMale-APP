@@ -236,6 +236,28 @@ class Api {
     return [for (final c in cookies) (name: c.name, value: c.value)];
   }
 
+  /// 把某個 cookie 清成空字串。
+  ///
+  /// 論壇的積分提示是靠 `<cookiepre>_creditnotice` 傳的，網頁版顯示完會
+  /// 自己清掉；App 讀完卻沒清，結果每次用內建瀏覽器開論壇頁面，
+  /// 都會再跳一次上一回操作的積分變化。
+  Future<void> clearCookieEndingWith(String suffix) async {
+    await init();
+    final uri = Uri.parse(kOrigin);
+    final cookies = await _jar.loadForRequest(uri);
+    final keep = <Cookie>[];
+    var found = false;
+    for (final c in cookies) {
+      if (c.name.endsWith(suffix)) {
+        found = true;
+        keep.add(Cookie(c.name, '')..path = '/');
+      } else {
+        keep.add(c);
+      }
+    }
+    if (found) await _jar.saveFromResponse(uri, keep);
+  }
+
   Future<String?> cookieEndingWith(String suffix) async {
     await init();
     final cookies = await _jar.loadForRequest(Uri.parse(kOrigin));

@@ -63,7 +63,7 @@ class _ToolsPageState extends State<ToolsPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Text(
-              tr('長按右邊的把手可以拖曳排序，開關決定要不要出現在側邊欄。'),
+              tr('拖左邊的把手可以排序，右邊的開關決定要不要出現在側邊欄。'),
               style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
             ),
           ),
@@ -80,21 +80,38 @@ class _ToolsPageState extends State<ToolsPage> {
                 final id = _order[i];
                 final tool = forumTools.where((t) => t.id == id).firstOrNull;
                 if (tool == null) return SizedBox.shrink(key: ValueKey(id));
-                return SwitchListTile(
+                // 開關本身會吃掉長按，所以另外給一個明顯的拖曳把手
+                return ListTile(
                   key: ValueKey(id),
-                  value: _on.contains(id),
-                  secondary: SizedBox(
-                    width: 26,
-                    child: Text(tool.icon,
-                        style: const TextStyle(fontSize: 17),
-                        textAlign: TextAlign.center),
+                  leading: ReorderableDragStartListener(
+                    index: i,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(Icons.drag_handle, color: faint(context)),
+                    ),
                   ),
-                  title: Text(tr(tool.label),
-                      style: const TextStyle(fontSize: 14.5)),
-                  onChanged: (v) {
-                    setState(() => v ? _on.add(id) : _on.remove(id));
-                    _save();
-                  },
+                  title: Row(
+                    children: [
+                      SizedBox(
+                        width: 26,
+                        child: Text(tool.icon,
+                            style: const TextStyle(fontSize: 17),
+                            textAlign: TextAlign.center),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(tr(tool.label),
+                            style: const TextStyle(fontSize: 14.5)),
+                      ),
+                    ],
+                  ),
+                  trailing: Switch(
+                    value: _on.contains(id),
+                    onChanged: (v) {
+                      setState(() => v ? _on.add(id) : _on.remove(id));
+                      _save();
+                    },
+                  ),
                 );
               },
             ),

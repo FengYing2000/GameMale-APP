@@ -51,7 +51,11 @@ class StickyPager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (pager.total <= 1) return const SizedBox.shrink();
+    // 只給上一頁／下一頁的列表（我的回覆、記錄廣場）total 是猜的，
+    // 不能拿它判斷要不要顯示
+    if (pager.total <= 1 && !pager.hasNext && !pager.hasPrev) {
+      return const SizedBox.shrink();
+    }
     return SafeArea(
       top: false,
       child: Container(
@@ -64,17 +68,26 @@ class StickyPager extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              onPressed: pager.page > 1 ? () => onGo(pager.page - 1) : null,
+              onPressed: (pager.page > 1 || pager.hasPrev)
+                  ? () => onGo(pager.page - 1)
+                  : null,
               icon: const Icon(Icons.chevron_left),
               tooltip: tr('上一頁'),
             ),
             TextButton(
-              onPressed: () => _pick(context),
-              child: Text('${pager.page} / ${pager.total}',
-                  style: const TextStyle(fontSize: 14)),
+              // 沒有頁碼可跳就別給人點開一個假的頁數表
+              onPressed: pager.numbered ? () => _pick(context) : null,
+              child: Text(
+                pager.numbered
+                    ? '${pager.page} / ${pager.total}'
+                    : '${tr('第')} ${pager.page} ${tr('頁')}',
+                style: const TextStyle(fontSize: 14),
+              ),
             ),
             IconButton(
-              onPressed: pager.page < pager.total ? () => onGo(pager.page + 1) : null,
+              onPressed: (pager.hasNext || pager.page < pager.total)
+                  ? () => onGo(pager.page + 1)
+                  : null,
               icon: const Icon(Icons.chevron_right),
               tooltip: tr('下一頁'),
             ),

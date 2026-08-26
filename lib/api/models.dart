@@ -110,7 +110,22 @@ class ThreadItem {
 class PageInfo {
   final int page;
   final int total;
-  const PageInfo({this.page = 1, this.total = 1});
+
+  /// 有些列表（我的回覆、記錄廣場）只給「上一頁／下一頁」，沒有頁碼，
+  /// 這時 total 只是猜的，要靠這兩個旗標決定按鈕能不能按
+  final bool hasNext;
+  final bool hasPrev;
+
+  /// 論壇有給實際頁碼，頁數選擇器才有意義
+  final bool numbered;
+
+  const PageInfo({
+    this.page = 1,
+    this.total = 1,
+    this.hasNext = false,
+    this.hasPrev = false,
+    this.numbered = true,
+  });
 }
 
 class ThreadType {
@@ -533,7 +548,12 @@ class DoingItem {
 class DoingPage {
   final List<DoingItem> items;
   final String formhash;
-  const DoingPage({this.items = const [], this.formhash = ''});
+  final PageInfo pager;
+  const DoingPage({
+    this.items = const [],
+    this.formhash = '',
+    this.pager = const PageInfo(),
+  });
 }
 
 class PollOption {
@@ -972,9 +992,14 @@ class Attachment {
     this.icon = '',
     this.info = '',
     this.price = '',
+    this.permission = '',
+    this.recordUrl = '',
+    this.bought = false,
   });
 
   final String name;
+
+  /// 已買（或免費）時是下載網址，否則是購買頁
   final String url;
   final String icon;
 
@@ -984,7 +1009,17 @@ class Attachment {
   /// 「2 枚金币」，免費的話是空字串
   final String price;
 
-  bool get needsPay => price.isNotEmpty;
+  /// 「阅读权限: 15」
+  final String permission;
+
+  /// 購買紀錄頁
+  final String recordUrl;
+
+  /// 已經買過（或本來就免費）—— 論壇這時把連結換成 mod=attachment 直接下載
+  final bool bought;
+
+  /// 要花錢，而且還沒買
+  bool get needsPay => price.isNotEmpty && !bought;
 
   /// 購買頁網址裡的附件 id
   int? get aid => int.tryParse(

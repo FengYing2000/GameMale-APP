@@ -12,6 +12,7 @@ import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/attachment_sheet.dart';
 import '../widgets/external_link.dart';
 import '../widgets/image_reveal.dart';
 import '../widgets/login_required.dart';
@@ -419,8 +420,13 @@ class _AttachmentCard extends StatelessWidget {
                   leading: Icon(
                     items[i].needsPay
                         ? Icons.lock_outline
-                        : Icons.attach_file,
+                        : (items[i].bought && items[i].price.isNotEmpty
+                            ? Icons.check_circle_outline
+                            : Icons.attach_file),
                     size: 22,
+                    color: items[i].bought && items[i].price.isNotEmpty
+                        ? const Color(0xFF4CAF50)
+                        : null,
                   ),
                   title: Text(items[i].name,
                       maxLines: 2,
@@ -429,21 +435,48 @@ class _AttachmentCard extends StatelessWidget {
                   subtitle: Text(
                     [
                       if (items[i].needsPay) '${tr('售價')} ${items[i].price}',
+                      if (items[i].bought && items[i].price.isNotEmpty)
+                        tr('已購買'),
+                      if (items[i].permission.isNotEmpty)
+                        '${tr('閱讀權限')} ${items[i].permission}',
                       if (items[i].info.isNotEmpty) items[i].info,
                     ].join('　'),
                     style: TextStyle(fontSize: 11.5, color: faint(context)),
                   ),
-                  trailing: Icon(
-                      items[i].needsPay ? Icons.shopping_cart_outlined : Icons.download,
-                      size: 18),
-                  onTap: () => items[i].needsPay
-                      ? _buy(context, items[i])
-                      : confirmExternal(
-                          context,
-                          items[i].url,
-                          title: tr('下載附件'),
-                          note: tr('App 不能直接存檔，下載會交給瀏覽器處理。'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (items[i].recordUrl.isNotEmpty)
+                        IconButton(
+                          tooltip: tr('購買紀錄'),
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                          onPressed: () => openInApp(context, items[i].recordUrl,
+                              title: tr('購買紀錄')),
                         ),
+                      Icon(
+                          items[i].needsPay
+                              ? Icons.shopping_cart_outlined
+                              : Icons.download,
+                          size: 18),
+                    ],
+                  ),
+                  onTap: () {
+                    if (items[i].needsPay) {
+                      _buy(context, items[i]);
+                    } else if (items[i].name.toLowerCase().endsWith('.txt')) {
+                      // 這站的付費附件幾乎都是 .txt（網盤連結），
+                      // 交給瀏覽器只會看到亂碼，直接在 App 裡讀
+                      showAttachmentText(context, items[i]);
+                    } else {
+                      confirmExternal(
+                        context,
+                        items[i].url,
+                        title: tr('下載附件'),
+                        note: tr('App 不能直接存檔，下載會交給瀏覽器處理。'),
+                      );
+                    }
+                  },
                 ),
                 if (i != items.length - 1)
                   const Divider(height: 1, indent: 56, endIndent: 14),

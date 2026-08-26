@@ -63,7 +63,7 @@ Future<SearchResult> search(
   return SearchResult(
     hits: hits,
     summary: txt(doc.querySelector('.sttl h2') ?? doc.querySelector('.thread_tit')),
-    pager: parsePager(doc),
+    pager: parsePager(doc, current: page),
     message: hits.isEmpty ? (noticeMessage(doc) ?? '找不到符合的內容') : null,
   );
 }

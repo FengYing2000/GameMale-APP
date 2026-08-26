@@ -1,5 +1,6 @@
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:provider/provider.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:go_router/go_router.dart';
@@ -77,6 +78,14 @@ class PostBody extends StatelessWidget {
         );
         if (fixed != null) styles['color'] = fixed;
 
+        // 論壇常在區塊上寫死淺色底（引用框、表格）。深色主題下把文字調亮
+        // 之後，那些區塊就變成淺底配亮字，整段等於看不見；反過來在淺色
+        // 主題遇到深色底也一樣。乾脆把跟主題衝突的背景拿掉，用主題自己的。
+        final bg = _backgroundOf(element);
+        if (bg != null && _clashes(bg, isDark)) {
+          styles['background-color'] = 'transparent';
+        }
+
         return styles.isEmpty ? null : styles;
       },
     );
@@ -126,12 +135,34 @@ class PostBody extends StatelessWidget {
 
 /// 論壇很愛用 `<font color="#8b0000">` 這種深色標重點，配深色底幾乎看不見。
 /// 直接拿掉顏色會失去語意，所以保留色相、只把亮度拉進可讀區間。
+/// 元素自己寫死的背景色
+Color? _backgroundOf(dom.Element element) {
+  final attr = element.attributes['bgcolor'];
+  if (attr != null) return _parseColor(attr.trim());
+  final inline = element.attributes['style'];
+  if (inline == null) return null;
+  final m = RegExp(r'(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)')
+      .firstMatch(inline);
+  return m == null ? null : _parseColor(m.group(1)!.trim());
+}
+
+/// 背景跟目前主題是不是反著來
+bool _clashes(Color bg, bool isDark) {
+  final l = HSLColor.fromColor(bg).lightness;
+  return isDark ? l > 0.65 : l < 0.35;
+}
+
+/// 只給測試用
+String? readableForTest(String raw, bool isDark, Color fallback) =>
+    _readable(raw, isDark, fallback);
+
 String? _readable(String? raw, bool isDark, Color fallback) {
   if (raw == null) return null;
   final c = _parseColor(raw.trim());
   if (c == null) return null;
 
   final hsl = HSLColor.fromColor(c);
+  // 純黑／接近黑的字在深色底上等於看不見，一定要換掉
   final tooDark = isDark && hsl.lightness < 0.58;
   final tooLight = !isDark && hsl.lightness > 0.70;
   if (!tooDark && !tooLight) return null; // 本來就夠讀就不要動
@@ -139,6 +170,8 @@ String? _readable(String? raw, bool isDark, Color fallback) {
   // 灰階（低飽和）拉亮度只會變成髒灰，直接換成主題的文字色。
   // 這裡一定要明講顏色 —— 回 null 等於放著不管，元素上的
   // color="#333333" 還是會生效，深色底下就看不見了
+  // 灰階（低飽和）拉亮度只會變成髒灰，直接換成主題的文字色。
+  // 深色底下的黑字就是走這條 —— 這是最常見的情況
   if (hsl.saturation < 0.15) return _hex(fallback);
 
   final out = hsl.withLightness(isDark ? 0.70 : 0.40).toColor();

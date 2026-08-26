@@ -435,6 +435,60 @@ void main() {
     print('  ${pay.name}｜${pay.rows.map((r) => '${r.label} ${r.value}').join('　')}');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
+  test('三種附件都認得，圖片不列入', () async {
+    // 已購買的（連結是 mod=attachment）
+    final bought = await api.fetchThreadExtras(194000);
+    expect(bought.attachments, hasLength(1));
+    expect(bought.attachments.first.bought, isTrue);
+    expect(bought.attachments.first.recordUrl, isNotEmpty);
+
+    // 還沒買的（連結是 action=attachpay），而且是夾在內文中間的 span
+    final unpaid = await api.fetchThreadExtras(194215);
+    expect(unpaid.attachments, hasLength(1));
+    expect(unpaid.attachments.first.bought, isFalse);
+    expect(unpaid.attachments.first.needsPay, isTrue);
+
+    // 「更多圖片」那七張是 dl.tattl.attm，不該被算成附件
+    final images = await api.fetchThreadExtras(184725);
+    expect(images.attachments, hasLength(1));
+    expect(images.attachments.first.name, endsWith('.txt'));
+    // ignore: avoid_print
+    print('  已買 ${bought.attachments.first.name}｜'
+        '未買 ${unpaid.attachments.first.price}｜'
+        '排除圖片後 ${images.attachments.length} 個');
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
+  test('附件內容自己解碼，不會變亂碼', () async {
+    final e = await api.fetchThreadExtras(194000);
+    final a = e.attachments.first;
+    expect(a.bought, isTrue);
+    final text = await api.fetchAttachmentText(a.url);
+    // 伺服器送 octet-stream 又沒帶 charset，瀏覽器會猜錯編碼
+    expect(text, contains('网盘'));
+    expect(text, contains('http'));
+    expect(text, isNot(contains('�')), reason: '有替換字元就是解錯編碼');
+    // ignore: avoid_print
+    print('  ${text.split('\n').first}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('只有上下頁的列表，頁數要跟著我們請求的走', () async {
+    final p1 = await api.fetchMyPosts(677863, type: 'reply');
+    final p2 = await api.fetchMyPosts(677863, type: 'reply', page: 2);
+    expect(p1.pager.page, 1);
+    expect(p2.pager.page, 2, reason: '照 DOM 算會一直停在第 1 頁');
+    expect(p2.pager.hasPrev, isTrue);
+    expect(p1.pager.numbered, isFalse);
+
+    // 版塊有真的頁碼，那條路不能被改壞
+    final f = await api.fetchForum(150, page: 2);
+    expect(f.pager.page, 2);
+    expect(f.pager.numbered, isTrue);
+    expect(f.pager.total, greaterThan(100));
+    // ignore: avoid_print
+    print('  我的回覆 ${p2.pager.page}/${p2.pager.total}（無頁碼）'
+        '｜版塊 ${f.pager.page}/${f.pager.total}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

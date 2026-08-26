@@ -200,18 +200,43 @@ dom.Element? firstChildTag(dom.Element? el, String tag) {
   return null;
 }
 
-PageInfo parsePager(dom.Document doc) {
+/// `current` 是我們**要求**的頁數。有些列表（我的回覆、記錄廣場）的分頁列
+/// 只有「上一頁／下一頁」，既沒有 `<strong>` 標目前頁、也沒有頁碼連結，
+/// 光看 DOM 只會永遠算成第 1 頁，然後把「下一頁」的 page=3 當成總頁數。
+PageInfo parsePager(dom.Document doc, {int current = 1}) {
   final pg = doc.querySelector('.pg');
-  if (pg == null) return const PageInfo();
-  final cur = int.tryParse(txt(pg.querySelector('strong'))) ?? 1;
+  if (pg == null) return PageInfo(page: current);
+
+  final strong = int.tryParse(txt(pg.querySelector('strong')));
+  final cur = strong ?? current;
+
+  var numbered = strong != null;
   var total = cur;
   for (final a in pg.querySelectorAll('a')) {
-    final p = paramInt(a.attributes['href'], 'page') ?? 0;
+    // 上一頁／下一頁不是頁碼，不能拿來當總頁數
+    if (a.classes.contains('nxt') || a.classes.contains('prev')) continue;
+    if (a.parent?.classes.contains('pgb') ?? false) continue;
+    final byHref = paramInt(a.attributes['href'], 'page') ?? 0;
+    final byText = digits(txt(a));
+    // 只有文字本身是數字才算頁碼連結
+    if (byText > 0) numbered = true;
+    final p = byText > 0 ? byText : byHref;
     if (p > total) total = p;
-    final n = digits(txt(a));
-    if (n > total) total = n;
   }
-  return PageInfo(page: cur, total: total);
+
+  final hasNext = pg.querySelector('a.nxt') != null;
+  final hasPrev = pg.querySelector('.pgb a') != null || cur > 1;
+
+  // 沒有頁碼可看的話，總數只能猜：至少還有下一頁
+  if (!numbered && hasNext && total <= cur) total = cur + 1;
+
+  return PageInfo(
+    page: cur,
+    total: total < cur ? cur : total,
+    hasNext: hasNext,
+    hasPrev: hasPrev,
+    numbered: numbered,
+  );
 }
 
 /// 把一小段 HTML 轉純文字。勳章說明藏在 `tip` 屬性裡，是被跳脫過的 HTML

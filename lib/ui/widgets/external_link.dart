@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../api/discuz.dart' as discuz;
 import '../../api/http.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
@@ -81,6 +84,8 @@ Future<void> confirmExternal(
 
 /// 論壇自己的頁面，不必問，直接用內建瀏覽器開
 void openInApp(BuildContext context, String url, {String title = ''}) {
+  // 先把積分提示清掉，否則每開一頁都會再跳一次上次操作的變化
+  unawaited(discuz.dismissCreditNotice());
   context.push(Uri(
     path: '/web',
     queryParameters: {'url': url, if (title.isNotEmpty) 'title': title},

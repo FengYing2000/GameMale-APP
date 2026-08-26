@@ -935,6 +935,47 @@ void main() {
     });
   });
 
+  group('分頁列', () {
+    PageInfo p(String html, {int current = 1}) =>
+        parsePager(toDoc('<div class="pg">$html</div>'), current: current);
+
+    test('有頁碼時照論壇給的算', () {
+      final r = p('<strong>2</strong><a href="?page=1">1</a>'
+          '<a href="?page=3">3</a><a href="?page=9">9</a>'
+          '<a href="?page=3" class="nxt">下一页</a>');
+      expect(r.page, 2);
+      expect(r.total, 9);
+      expect(r.numbered, isTrue);
+      expect(r.hasNext, isTrue);
+    });
+
+    test('只有上下頁時，目前頁數要用我們請求的那一頁', () {
+      // 我的回覆、記錄廣場就是這種：沒有 <strong>，也沒有頁碼連結
+      const only = '<span class="pgb"><a href="?page=1">上一页</a></span>'
+          '<a href="?page=3" class="nxt">下一页</a>';
+      final r = p(only, current: 2);
+      expect(r.page, 2, reason: '照 DOM 算會變成第 1 頁');
+      expect(r.total, greaterThanOrEqualTo(2));
+      expect(r.numbered, isFalse, reason: '沒有真的頁碼，不該給人點頁數表');
+      expect(r.hasNext, isTrue);
+      expect(r.hasPrev, isTrue);
+    });
+
+    test('下一頁的 page=3 不該被當成總頁數', () {
+      final r = p('<a href="?page=2" class="nxt">下一页</a>', current: 1);
+      expect(r.page, 1);
+      // 只知道還有下一頁，總數是猜的
+      expect(r.total, 2);
+      expect(r.numbered, isFalse);
+    });
+
+    test('沒有分頁列就是單頁', () {
+      final r = parsePager(toDoc('<div></div>'), current: 3);
+      expect(r.page, 3);
+      expect(r.hasNext, isFalse);
+    });
+  });
+
   group('工具函式', () {
     test('param 解析查詢字串', () {
       expect(param('forum.php?mod=viewthread&amp;tid=123', 'tid'), '123');
