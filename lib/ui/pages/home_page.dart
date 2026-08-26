@@ -10,9 +10,9 @@ import '../../api/discuz.dart' as api;
 import '../../api/http.dart';
 import '../../api/models.dart';
 import '../../store/session.dart';
+import '../../store/settings.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
-import '../widgets/external_link.dart';
 import '../widgets/quick_menu.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -39,8 +39,12 @@ class _HomePageState extends State<HomePage> {
   /// fid → 子版塊，來自桌面首頁
   Map<int, List<SubForum>> _subforums = const {};
 
+  /// fid → 版主名單，來自桌面首頁
+  Map<int, List<String>> _moderators = const {};
+
 
   int _rev = -1;
+  int _langTick = -1;
 
   @override
   void didChangeDependencies() {
@@ -48,12 +52,16 @@ class _HomePageState extends State<HomePage> {
     // 登入/登出後這個分頁還被保活著，靠 revision 判斷要不要重抓。
     // 第一次只記錄不重抓 —— initState 已經載過了，否則每次開頁都會抓兩遍
     final rev = context.watch<SessionStore>().revision;
+    final lang = context.watch<SettingsStore>().langTick.value;
     if (_rev == -1) {
       _rev = rev;
+      _langTick = lang;
       return;
     }
-    if (_rev != rev) {
+    // 版塊名走 sys()，語言換了要重抓才會跟著變
+    if (_rev != rev || _langTick != lang) {
       _rev = rev;
+      _langTick = lang;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _load();
       });
@@ -112,8 +120,12 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadSubforums() async {
     try {
       final map = await api.fetchIndexSubforums();
-      if (!mounted || map.isEmpty) return;
-      setState(() => _subforums = map);
+      final mods = await api.fetchIndexModerators();
+      if (!mounted) return;
+      setState(() {
+        if (map.isNotEmpty) _subforums = map;
+        if (mods.isNotEmpty) _moderators = mods;
+      });
     } on DiscuzException {
       // 抓不到就用手機版列到的那些
     }
@@ -214,6 +226,9 @@ class _HomePageState extends State<HomePage> {
                           _ForumRow(
                             item: data.groups[i].forums[j],
                             subforums: _subsOf(data.groups[i].forums[j]),
+                            moderators:
+                                _moderators[data.groups[i].forums[j].fid] ??
+                                    data.groups[i].forums[j].moderators,
                             expanded:
                                 _openSubs[data.groups[i].forums[j].fid] ?? false,
                             onToggle: () => setState(() {
@@ -221,9 +236,16 @@ class _HomePageState extends State<HomePage> {
                               _openSubs[fid] = !(_openSubs[fid] ?? false);
                             }),
                           ),
-                          if (_openSubs[data.groups[i].forums[j].fid] ?? false)
+                          if (_openSubs[data.groups[i].forums[j].fid] ?? false) ...[
+                            _ForumExpanded(
+                              item: data.groups[i].forums[j],
+                              moderators:
+                                  _moderators[data.groups[i].forums[j].fid] ??
+                                      data.groups[i].forums[j].moderators,
+                            ),
                             for (final sub in _subsOf(data.groups[i].forums[j]))
                               _SubForumRow(item: sub),
+                          ],
                           if (j != data.groups[i].forums.length - 1)
                             const Divider(indent: 66, endIndent: 14),
                         ],
@@ -353,11 +375,7 @@ class _Collections extends StatelessWidget {
                       margin: EdgeInsets.zero,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () => openInApp(
-                          context,
-                          '$kOrigin/forum.php?mod=collection&action=view&ctid=${c.ctid}',
-                          title: c.name,
-                        ),
+                        onTap: () => context.push('/collection/${c.ctid}'),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                           child: Column(
@@ -467,7 +485,21 @@ class _SubForumRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(66, 9, 14, 9),
         child: Row(
           children: [
-            Icon(LucideIcons.cornerDownRight, size: 15, color: faint(context)),
+            if (item.icon.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: CachedNetworkImage(
+                  imageUrl: item.icon,
+                  httpHeaders: Api.imageHeaders,
+                  width: 26,
+                  height: 20,
+                  fit: BoxFit.cover,
+                  errorWidget: (c, _, _) =>
+                      Icon(LucideIcons.cornerDownRight, size: 15, color: faint(c)),
+                ),
+              )
+            else
+              Icon(LucideIcons.cornerDownRight, size: 15, color: faint(context)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(item.name,
@@ -485,16 +517,32 @@ class _ForumRow extends StatelessWidget {
   const _ForumRow({
     required this.item,
     this.subforums = const [],
+    this.moderators = const [],
     this.expanded = false,
     this.onToggle,
   });
   final ForumItem item;
   final List<SubForum> subforums;
+  final List<String> moderators;
   final bool expanded;
   final VoidCallback? onToggle;
 
+  /// 41412 → 4.1萬，讓回覆數不要一長串
+  static String _short(String raw) {
+    final n = int.tryParse(raw.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (n == null) return raw;
+    if (n >= 10000) {
+      final w = n / 10000;
+      return '${w.toStringAsFixed(w >= 100 ? 0 : 1)}萬';
+    }
+    return '$n';
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 有子版塊、簡介或版主，就給一顆展開鈕把它們收起來，別擠在列表裡
+    final canExpand =
+        subforums.isNotEmpty || item.desc.isNotEmpty || moderators.isNotEmpty;
     return InkWell(
       onTap: () => context.push('/f/${item.fid}'),
       child: Padding(
@@ -522,33 +570,25 @@ class _ForumRow extends StatelessWidget {
                 children: [
                   Text(item.name,
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                  if (item.desc.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(item.desc,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12.5, color: faint(context))),
-                  ],
+                  const SizedBox(height: 3),
+                  Text(
+                    [
+                      if (item.threads.isNotEmpty) '${item.threads} ${tr('主題')}',
+                      if (item.posts.isNotEmpty) '${_short(item.posts)} ${tr('回覆')}',
+                    ].join(' · '),
+                    style: TextStyle(fontSize: 11.5, color: faint(context)),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(item.threads,
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: subtle(context))),
-                Text(tr('主題'), style: TextStyle(fontSize: 10.5, color: faint(context))),
-              ],
-            ),
-            // 有子版塊就變成展開/收合，沒有就維持一個指向內頁的箭頭
-            if (subforums.isEmpty)
+            // 有子版塊／簡介／版主就變成展開鈕，沒有就維持指向內頁的箭頭
+            if (!canExpand)
               Icon(LucideIcons.chevronRight, size: 18, color: faint(context))
             else
               IconButton(
                 visualDensity: VisualDensity.compact,
-                tooltip: expanded ? tr('收合子版塊') : tr('展開子版塊'),
+                tooltip: expanded ? tr('收合') : tr('展開簡介與子版塊'),
                 icon: Icon(
                     expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                     size: 20),
@@ -568,4 +608,42 @@ class _ForumRow extends StatelessWidget {
         child: Text(name.isEmpty ? '?' : name.characters.first,
             style: TextStyle(fontWeight: FontWeight.w600, color: faint(c))),
       );
+}
+
+/// 展開後的版塊簡介與版主
+class _ForumExpanded extends StatelessWidget {
+  const _ForumExpanded({required this.item, this.moderators = const []});
+  final ForumItem item;
+  final List<String> moderators;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.desc.isEmpty && moderators.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: .5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (moderators.isNotEmpty)
+            Text('${tr('版主')}：${moderators.join('、')}',
+                style: TextStyle(fontSize: 12, color: subtle(context))),
+          if (item.desc.isNotEmpty) ...[
+            if (moderators.isNotEmpty) const SizedBox(height: 6),
+            Text(item.desc,
+                style: TextStyle(
+                    fontSize: 12.5, height: 1.6, color: subtle(context))),
+          ],
+        ],
+      ),
+    );
+  }
 }

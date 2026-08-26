@@ -1017,4 +1017,94 @@ void main() {
       expect(digits('回覆 362 則'), 362);
     });
   });
+
+  group('淘帖列表', () {
+    final doc = _load('collection_index.html');
+    if (doc == null) return;
+    final r = api.parseCollectionIndex(doc);
+
+    test('解析出專輯', () => expect(r.items.length, greaterThan(3)));
+    test('每個專輯有 ctid 與名稱', () {
+      expect(r.items.every((c) => c.ctid > 0 && c.name.isNotEmpty), isTrue);
+    });
+    test('有主題數與訂閱資訊',
+        () => expect(r.items.any((c) => c.threads.isNotEmpty && c.meta.isNotEmpty), isTrue));
+  });
+
+  group('淘專輯內頁', () {
+    final doc = _load('collection_view.html');
+    if (doc == null) return;
+    final v = api.parseCollectionView(doc, 452);
+
+    test('有專輯名稱', () => expect(v.name.isNotEmpty, isTrue));
+    test('有收錄主題', () => expect(v.list.length, greaterThan(3)));
+    test('每筆主題有 tid 與標題',
+        () => expect(v.list.every((t) => t.tid > 0 && t.title.isNotEmpty), isTrue));
+    test('認得出已訂閱狀態（取消訂閱＝已訂閱）', () => expect(v.following, isTrue));
+  });
+
+  group('記錄廣場（桌面）', () {
+    final doc = _load('doing_desktop.html');
+    if (doc == null) return;
+    final d = api.parseDoingPage(doc);
+
+    test('解析出記錄', () => expect(d.items.isNotEmpty, isTrue));
+    test('每則有 doid 與正文',
+        () => expect(d.items.every((x) => x.doid > 0), isTrue));
+    final withComments = d.items.where((x) => x.comments.isNotEmpty).toList();
+    test('有帶回覆的記錄', () => expect(withComments.isNotEmpty, isTrue));
+    test('回覆有時間（不是空括號）', () {
+      final cs = withComments.expand((x) => x.comments);
+      expect(cs.any((c) => c.time.isNotEmpty), isTrue);
+    });
+    test('回覆有作者', () {
+      final cs = withComments.expand((x) => x.comments);
+      expect(cs.every((c) => c.author.isNotEmpty), isTrue);
+    });
+  });
+
+  group('簽到排行', () {
+    final xml = _f('sign_rank.xml');
+    if (!xml.existsSync()) return;
+    final doc = toDoc(api.unwrapAjax(xml.readAsStringSync()));
+    final rows = api.parseSignRank(doc);
+
+    test('解析出排行列', () => expect(rows.length, greaterThan(3)));
+    test('每列有暱稱與天數',
+        () => expect(rows.every((r) => r.name.isNotEmpty && r.totalDays.isNotEmpty), isTrue));
+    test('等級有解出',
+        () => expect(rows.any((r) => r.level.contains('LV')), isTrue));
+  });
+
+  group('道具彈窗', () {
+    final xml = _f('magic_buy.xml');
+    if (!xml.existsSync()) return;
+    final doc = toDoc(api.unwrapAjax(xml.readAsStringSync()));
+    final op = api.parseMagicOp(doc);
+
+    test('解析成功（有表單）', () => expect(op.ready, isTrue));
+    test('帶得出 mid 與 formhash', () {
+      expect(op.fields['mid'], isNotNull);
+      expect((op.fields['formhash'] ?? '').isNotEmpty, isTrue);
+    });
+    test('是購買、有數量欄與送出旗標', () {
+      expect(op.operation, 'buy');
+      expect(op.hasNum, isTrue);
+      expect(op.submitName, 'operatesubmit');
+    });
+    test('有售價之類的說明行',
+        () => expect(op.lines.any((l) => l.contains('售價') || l.contains('售价')), isTrue));
+  });
+
+  group('淘帖表單', () {
+    final xml = _f('addthread.xml');
+    if (!xml.existsSync()) return;
+    final doc = toDoc(api.unwrapAjax(xml.readAsStringSync()));
+
+    test('解析出我的專輯選項', () {
+      final opts = doc.querySelectorAll('#selectCollection option');
+      expect(opts.isNotEmpty, isTrue);
+      expect(int.tryParse(opts.first.attributes['value'] ?? ''), isNotNull);
+    });
+  });
 }

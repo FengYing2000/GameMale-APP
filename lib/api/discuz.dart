@@ -91,7 +91,7 @@ IndexData parseIndex(dom.Document doc) {
         posts: attr(count?.querySelector('span[title]'), 'title').isNotEmpty
             ? attr(count?.querySelector('span[title]'), 'title')
             : (nums.length > 1 ? nums[1] : ''),
-        desc: desc.length > 90 ? desc.substring(0, 90) : desc,
+        desc: desc,
         subforums: subs,
       ));
     }
@@ -107,13 +107,28 @@ IndexData parseIndex(dom.Document doc) {
 /// 首頁的子版塊。手機模板只列出一部分（勳章公會的「勳章博物館」就漏了），
 /// 桌面模板才完整。gzip 後約 35 KB，一個 App 生命週期抓一次就好。
 Map<int, List<SubForum>>? _subforumCache;
+Map<int, List<String>>? _moderatorCache;
+
+/// 語言切換後，之前用舊語言 sys() 過的首頁快取要作廢，重抓才會跟著變
+void clearIndexCache() {
+  _subforumCache = null;
+  _moderatorCache = null;
+}
 
 Future<Map<int, List<SubForum>>> fetchIndexSubforums({bool force = false}) async {
   if (!force && _subforumCache != null) return _subforumCache!;
   final doc = toDoc(await Api.instance.get('forum.php', desktop: true));
   final map = parseIndexSubforums(doc);
   if (map.isNotEmpty) _subforumCache = map;
+  _moderatorCache = parseIndexModerators(doc);
   return map;
+}
+
+/// 首頁各版塊的版主。跟子版塊共用同一次桌面首頁抓取
+Future<Map<int, List<String>>> fetchIndexModerators({bool force = false}) async {
+  if (!force && _moderatorCache != null) return _moderatorCache!;
+  await fetchIndexSubforums(force: force);
+  return _moderatorCache ?? const {};
 }
 
 Map<int, List<SubForum>> parseIndexSubforums(dom.Document doc) {
@@ -135,9 +150,34 @@ Map<int, List<SubForum>> parseIndexSubforums(dom.Document doc) {
       final name = txt(a).replaceAll(RegExp(r'^\[|\]$'), '').trim();
       if (name.isEmpty) continue;
       if (subs.any((x) => x.fid == sid)) continue;
-      subs.add(SubForum(fid: sid, name: sys(name)));
+      // 子版塊連結裡常帶一張小圖示
+      subs.add(SubForum(
+        fid: sid,
+        name: sys(name),
+        icon: absolute(attr(a.querySelector('img'), 'src')),
+      ));
     }
     if (subs.isNotEmpty) out[fid] = subs;
+  }
+  return out;
+}
+
+/// 首頁各版塊的版主名單（桌面模板的「版主:」那一行）
+Map<int, List<String>> parseIndexModerators(dom.Document doc) {
+  final out = <int, List<String>>{};
+  for (final td in doc.querySelectorAll('td, .fl_g, .fl_row')) {
+    final head = td.querySelector('h2 a') ?? td.querySelector('dt a');
+    final fid = _fidOf(attr(head, 'href'));
+    if (fid == null) continue;
+    // 版主寫在 <span class="xi2"> 裡，用 space-username 連結認人
+    final mods = <String>[];
+    for (final span in td.querySelectorAll('span.xi2')) {
+      for (final a in span.querySelectorAll('a[href*="space-username"], a[href*="space-uid"]')) {
+        final n = txt(a);
+        if (n.isNotEmpty && !mods.contains(n)) mods.add(n);
+      }
+    }
+    if (mods.isNotEmpty) out.putIfAbsent(fid, () => mods);
   }
   return out;
 }
@@ -776,7 +816,185 @@ Future<List<CollectionItem>> fetchCollections() async {
   return out;
 }
 
-/// 版塊的版規、版主與「收藏本版」。手機模板沒有這些，所以另外抓桌面頁
+/// 淘帖列表：推薦／所有／我的。op 空字串是推薦
+Future<({List<CollectionItem> items, PageInfo pager})> fetchCollectionIndex({
+  String op = '',
+  int page = 1,
+}) async {
+  final q = StringBuffer('forum.php?mod=collection');
+  if (op.isNotEmpty) q.write('&op=$op');
+  if (page > 1) q.write('&page=$page');
+  return parseCollectionIndex(
+      toDoc(await Api.instance.get(q.toString(), desktop: true)),
+      page: page);
+}
+
+({List<CollectionItem> items, PageInfo pager}) parseCollectionIndex(
+    dom.Document doc,
+    {int page = 1}) {
+  final out = <CollectionItem>[];
+  for (final dl in doc.querySelectorAll('.clct_list dl')) {
+    final a = dl.querySelector('dt a[href*="ctid="]');
+    final ctid = paramInt(attr(a, 'href'), 'ctid');
+    if (a == null || ctid == null) continue;
+    final ps = dl.querySelectorAll('dd p');
+    final latest = dl.querySelector('a[href*="thread-"]');
+    out.add(CollectionItem(
+      ctid: ctid,
+      name: txt(a),
+      threads: txt(dl.querySelector('dd.m strong')),
+      desc: ps.isNotEmpty ? txt(ps[0]) : '',
+      meta: ps.length > 1 ? txt(ps[1]) : '',
+      author: txt(dl.querySelector('a[href*="space-uid"]')),
+      latest: txt(latest),
+      latestTid: int.tryParse(
+          RegExp(r'thread-(\d+)').firstMatch(attr(latest, 'href'))?.group(1) ??
+              ''),
+    ));
+  }
+  return (items: out, pager: parsePager(doc, current: page));
+}
+
+/// 淘專輯內頁：專輯資訊 + 收錄的主題清單
+Future<CollectionView> fetchCollectionThreads(int ctid, {int page = 1}) async {
+  final doc = toDoc(await Api.instance.get(
+      'forum.php?mod=collection&action=view&ctid=$ctid'
+      '${page > 1 ? '&page=$page' : ''}',
+      desktop: true));
+  return parseCollectionView(doc, ctid, page: page);
+}
+
+CollectionView parseCollectionView(dom.Document doc, int ctid, {int page = 1}) {
+  final head = doc.querySelector('.bm_h h2 a') ?? doc.querySelector('.bm_h h2');
+  final follow = doc.querySelector('#followlink');
+
+  final list = <ThreadItem>[];
+  for (final tr in doc.querySelectorAll('.tl .bm_c table tr')) {
+    final a = tr.querySelector('th a.xst') ?? tr.querySelector('th a');
+    final tid = paramInt(attr(a, 'href'), 'tid') ??
+        int.tryParse(RegExp(r'thread-(\d+)').firstMatch(attr(a, 'href'))?.group(1) ?? '');
+    if (a == null || tid == null) continue;
+    final bys = tr.querySelectorAll('td.by');
+    final num = tr.querySelector('td.num');
+    list.add(ThreadItem(
+      tid: tid,
+      title: txt(a),
+      author: bys.isNotEmpty ? txt(bys[0].querySelector('cite')) : '',
+      date: bys.isNotEmpty ? txt(bys[0].querySelector('em')) : '',
+      replies: int.tryParse(txt(num?.querySelector('a'))) ?? 0,
+      views: int.tryParse(txt(num?.querySelector('em'))) ?? 0,
+    ));
+  }
+
+  return CollectionView(
+    ctid: ctid,
+    name: txt(head),
+    desc: txt(doc.querySelector('.bm_c .mbn') ?? doc.querySelector('.bm_c > div:last-child')),
+    author: txt(doc.querySelector('.bm_c a[href*="space-uid"]')),
+    rating: txt(doc.querySelector('.clct_ratestar')?.parent),
+    follows: txt(doc.getElementById('follownum_display')),
+    followUrl: '',
+    following: txt(follow).contains('取消'),
+    list: list,
+    pager: parsePager(doc, current: page),
+    message: list.isEmpty ? (noticeMessage(doc) ?? '這個專輯還沒有主題') : null,
+  );
+}
+
+/// 訂閱／取消訂閱某個淘專輯
+Future<SubmitResult> followCollection(int ctid, {required bool follow}) async {
+  await _ensureFormhash();
+  // 論壇的 op 是 follow / unfo（不是 unfollow）
+  final op = follow ? 'follow' : 'unfo';
+  final html = await Api.instance.get(
+      'forum.php?mod=collection&action=follow&op=$op&ctid=$ctid'
+      '&formhash=$_formhash&inajax=1',
+      desktop: true);
+  return _submitResult(html, follow ? '訂閱' : '取消訂閱');
+}
+
+/// 淘帖：把主題加進哪個專輯。先抓表單拿到我的專輯清單與 formhash
+Future<({List<({int ctid, String name})> collections, String formhash})>
+    fetchAddThreadCollections(int tid) async {
+  final xml = await Api.instance.get(
+      'forum.php?mod=collection&action=edit&op=addthread&tid=$tid&inajax=1',
+      desktop: true);
+  final doc = toDoc(_unwrapAjax(xml));
+  final out = <({int ctid, String name})>[];
+  for (final o in doc.querySelectorAll('#selectCollection option')) {
+    final ctid = int.tryParse(attr(o, 'value'));
+    if (ctid == null) continue;
+    out.add((ctid: ctid, name: txt(o)));
+  }
+  return (collections: out, formhash: formhashOf(doc) ?? _formhash ?? '');
+}
+
+/// 把主題加進指定的淘專輯
+Future<SubmitResult> addThreadToCollection(
+  int tid,
+  int ctid, {
+  String reason = '',
+  String formhash = '',
+}) async {
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final html = await Api.instance.post(
+    'forum.php?mod=collection&action=edit&op=addthread&inajax=1',
+    {
+      'formhash': hash,
+      'ctid': '$ctid',
+      'tids[]': '$tid',
+      'reason': reason,
+      'addthread': '1',
+      'submitaddthread': 'true',
+    },
+    desktop: true,
+  );
+  return _submitResult(html, '淘帖');
+}
+
+/// 頂／踩一個主題（推薦）
+Future<SubmitResult> recommendThread(int tid, {required bool up}) async {
+  await _ensureFormhash();
+  final html = await Api.instance.get(
+      'forum.php?mod=misc&action=recommend&do=${up ? 'add' : 'subtract'}'
+      '&tid=$tid&hash=$_formhash&inajax=1');
+  final text = txt(toDoc(_unwrapAjax(html)).body);
+  return SubmitResult(
+      ok: !_failurePatterns.hasMatch(text),
+      message: sys(text.isEmpty ? (up ? '已頂' : '已踩') : text));
+}
+
+/// 舉報一則帖子
+Future<SubmitResult> reportPost({
+  required int pid,
+  required int tid,
+  required int fid,
+  required String reason,
+}) async {
+  await _ensureFormhash();
+  final html = await Api.instance.post('misc.php?mod=report&inajax=1', {
+    'formhash': _formhash ?? '',
+    'rtype': 'post',
+    'rid': '$pid',
+    'tid': '$tid',
+    'fid': '$fid',
+    'message': reason,
+    'reportsubmit': 'true',
+  });
+  return _submitResult(html, '舉報');
+}
+
+/// 收藏版塊。跟收藏主題一樣是一步 GET，不是刪除那種兩步驟。
+/// （論壇的「收藏本版」連結一律指向新增，已收藏時會回「请勿重复收藏」，
+///   所以要不要顯示成已收藏，得靠收藏清單判斷。）
+Future<SubmitResult> favoriteForum(int fid) async {
+  await _ensureFormhash();
+  final html = await Api.instance.get(
+      'home.php?mod=spacecp&ac=favorite&type=forum&id=$fid'
+      '&handlekey=favoriteforum&formhash=$_formhash&inajax=1',
+      desktop: true);
+  return _submitResult(html, '收藏本版');
+}
 Future<ForumExtras> fetchForumExtras(int fid) async {
   final doc =
       toDoc(await Api.instance.get('forum-$fid-1.html', desktop: true));
@@ -870,6 +1088,131 @@ Future<List<SignMagic>> fetchSignMagics() async {
       detail: ps.length > 1 ? sys(txt(ps[1])) : '',
       useUrl: absolute(attr(dl.querySelector('a[id\$="_bq"]'), 'href')),
       buyUrl: absolute(attr(dl.querySelector('a[id\$="_buy"]'), 'href')),
+    ));
+  }
+  return out;
+}
+
+/// 道具彈窗（補簽卡的補簽／購買、帖子的提升泵／亮色刷…）。
+/// 論壇對「買」跟「用」都回同一種 magicform，把整張表單收下來，
+/// 送出時原封帶回。沒有表單就代表論壇直接回了錯誤（沒有道具、缺貨）。
+Future<MagicOp> fetchMagicOp(String url) async {
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  path = path.replaceFirst(RegExp(r'^/'), '');
+  final sep = path.contains('?') ? '&' : '?';
+  final xml =
+      await Api.instance.get('$path${sep}inajax=1', desktop: true);
+  return parseMagicOp(toDoc(_unwrapAjax(xml)));
+}
+
+/// 從道具彈窗的 HTML 解析出 MagicOp（買／用共用一種 magicform）
+MagicOp parseMagicOp(dom.Document doc) {
+  final form = doc.querySelector('#magicform') ?? doc.querySelector('form');
+  if (form == null) {
+    // 沒表單＝論壇直接給了提示（例如「没有该道具」）
+    final body = txt(doc.body);
+    return MagicOp(
+      action: '',
+      operation: '',
+      submitName: '',
+      fields: const {},
+      error: sys(noticeMessage(doc) ?? (body.isEmpty ? '拿不到道具資訊' : body)),
+    );
+  }
+
+  final fields = <String, String>{};
+  for (final input in form.querySelectorAll('input')) {
+    final name = attr(input, 'name');
+    if (name.isEmpty) continue;
+    fields[name] = attr(input, 'value');
+  }
+
+  // 送出鈕的 name 才是論壇認的送出旗標
+  var submitName = '';
+  for (final b in form.querySelectorAll('button[type="submit"], input[type="submit"]')) {
+    final n = attr(b, 'name');
+    if (n.isNotEmpty) {
+      submitName = n;
+      break;
+    }
+  }
+  final operation = fields['operation'] ?? '';
+  if (submitName.isEmpty) {
+    submitName = operation == 'use' ? 'usesubmit' : 'operatesubmit';
+  }
+
+  // 標題：dt 裡第一個 <p>，退而求其次用 dt 的文字
+  final dt = form.querySelector('dt');
+  final titleP = dt?.querySelector('p');
+  final name = sys(txt(titleP).isNotEmpty ? txt(titleP) : txt(dt));
+
+  // 說明各行（售價／我目前有／庫存／本月還能用…），跳過標題那行
+  final lines = <String>[];
+  for (final p in dt?.querySelectorAll('p') ?? const <dom.Element>[]) {
+    final t = sys(txt(p));
+    if (t.isEmpty || t == name) continue;
+    lines.add(t);
+  }
+
+  return MagicOp(
+    action: attr(form, 'action').replaceAll('&amp;', '&'),
+    operation: operation,
+    submitName: submitName,
+    fields: fields,
+    name: name,
+    icon: absolute(attr(form.querySelector('dd img') ?? form.querySelector('img'), 'src')),
+    lines: lines,
+    hasNum: form.querySelector('#magicnum') != null,
+    error: null,
+  );
+}
+
+/// 送出道具操作。把彈窗裡的隱藏欄位原樣送回，補上數量與送出旗標。
+Future<SubmitResult> submitMagicOp(MagicOp op, {int num = 1}) async {
+  final fields = <String, String>{...op.fields};
+  if (op.hasNum) fields['magicnum'] = '$num';
+  fields[op.submitName] = 'true';
+
+  var target = op.action.isEmpty
+      ? 'home.php?mod=magic&action=shop&infloat=yes'
+      : op.action;
+  if (target.startsWith(kOrigin)) target = target.substring(kOrigin.length);
+  target = target.replaceFirst(RegExp(r'^/'), '');
+
+  final html = await Api.instance.post(
+      '$target${target.contains('?') ? '&' : '?'}inajax=1', fields,
+      desktop: true);
+  return _submitResult(html, op.operation == 'use' ? '使用道具' : '購買道具');
+}
+
+/// 簽到排行榜。今日／本月／總／獎勵四種，op 空字串是今日
+Future<List<SignRankRow>> fetchSignRank({String op = '', int page = 1}) async {
+  final q = StringBuffer('plugin.php?id=k_misign:sign&operation=list');
+  if (op.isNotEmpty) q.write('&op=$op');
+  if (page > 1) q.write('&page=$page');
+  return parseSignRank(
+      toDoc(_unwrapAjax(await Api.instance.get(q.toString(), desktop: true))));
+}
+
+List<SignRankRow> parseSignRank(dom.Document doc) {
+  final out = <SignRankRow>[];
+  for (final tr in doc.querySelectorAll('#J_list_detail tr')) {
+    final tds = tr.querySelectorAll('td');
+    if (tds.length < 6) continue; // 跳過表頭與分頁列
+    final a = tds[0].querySelector('a');
+    final name = txt(a);
+    if (name.isEmpty) continue;
+    out.add(SignRankRow(
+      name: name,
+      uid: paramInt(attr(a, 'href'), 'uid') ??
+          int.tryParse(
+              RegExp(r'space-uid-(\d+)').firstMatch(attr(a, 'href'))?.group(1) ?? ''),
+      totalDays: txt(tds[1]),
+      monthDays: txt(tds[2]),
+      lastTime: txt(tds[3]),
+      level: sys(txt(tds[4])),
+      reward: sys(txt(tds[5])),
     ));
   }
   return out;
@@ -1781,10 +2124,15 @@ const doingViews = <({String key, String name, bool needsLogin})>[
   (key: 'me', name: '我的記錄', needsLogin: true),
 ];
 
-/// 記錄沒有手機版，帶 forcemobile=1 拿桌面模板來解析
+/// 記錄沒有手機模板。桌面版才把每則回覆連同時間、縮排（版主回覆）
+/// 都內嵌在頁面裡，手機版的回覆是空的要另外 ajax，所以走桌面版。
 Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
   final doc = await _page('home.php?mod=space&do=doing&view=$view'
-      '&forcemobile=1${page > 1 ? '&page=$page' : ''}');
+      '&mobile=no${page > 1 ? '&page=$page' : ''}');
+  return parseDoingPage(doc, page: page);
+}
+
+DoingPage parseDoingPage(dom.Document doc, {int page = 1}) {
   final items = <DoingItem>[];
 
   for (final dl in doc.querySelectorAll('.xld dl')) {
@@ -1797,10 +2145,11 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
     final href = attr(link, 'href');
     final span = body?.querySelector('span');
 
-    // 回覆掛在 dd.cmt 底下，每則的刪除連結帶著 cid
+    // 桌面版的回覆在 dd.cmt > ul > li，帶時間、可縮排（版主回覆別人）
     final comments = <DoingComment>[];
     for (final li in dl.querySelectorAll('dd.cmt li')) {
       final who = li.querySelector('a.lit');
+      if (who == null) continue;
       final del = li.querySelector('a[href*="op=delete"]');
       final cid = paramInt(attr(del, 'href'), 'id') ??
           int.tryParse(
@@ -1812,9 +2161,13 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
       final time = txt(li.querySelector('span.xg1'))
           .replaceAll(RegExp(r'^\(|\)$'), '');
       var text = txt(li);
-      for (final drop in [txt(who), time, '回复', '删除', '回覆', '刪除']) {
+      for (final drop in [txt(who), '($time)', time, '回复', '删除', '回覆', '刪除']) {
         if (drop.isNotEmpty) text = text.replaceFirst(drop, '');
       }
+      // 縮排一層＝回覆別人的那一則（padding-left / dtls）
+      final style = attr(li, 'style');
+      final indented = li.classes.contains('dtls') ||
+          RegExp(r'padding-left:\s*([1-9])').hasMatch(style);
       comments.add(DoingComment(
         cid: cid ?? 0,
         author: txt(who),
@@ -1826,6 +2179,7 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
                     ''),
         text: text.replaceFirst(RegExp(r'^[:：]\s*'), '').trim(),
         time: time,
+        isReply: indented,
         deleteUrl: absolute(attr(del, 'href')),
       ));
     }
@@ -1837,6 +2191,8 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
       if ((param(h, 'id') ?? '').isEmpty) selfDelete = absolute(h);
     }
 
+    // 時間優先取 title 上的絕對時間（「7 天前」不好對照）
+    final timeEl = dl.querySelector('.ptn .y span[title]');
     items.add(DoingItem(
       doid: doid,
       uid: int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(href)?.group(1) ?? '') ??
@@ -1845,7 +2201,9 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
       avatar: attr(dl.querySelector('.avt img'), 'src'),
       html: span == null ? '' : sanitizeContent(span),
       message: txt(span),
-      time: txt(dl.querySelector('.ptn .y')),
+      time: attr(timeEl, 'title').isNotEmpty
+          ? attr(timeEl, 'title')
+          : txt(dl.querySelector('.ptn .y')),
       comments: comments,
       deleteUrl: selfDelete,
     ));
@@ -1853,7 +2211,7 @@ Future<DoingPage> fetchDoing({String view = 'all', int page = 1}) async {
 
   return DoingPage(
     items: items,
-    formhash: attr(doc.querySelector('#mood_addform input[name="formhash"]'), 'value'),
+    formhash: formhashOf(doc) ?? '',
     pager: parsePager(doc, current: page),
   );
 }

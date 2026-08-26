@@ -40,6 +40,13 @@ Future<void> main() async {
     'space_friend.html': 'home.php?mod=space&uid=610657&do=friend&view=me&mobile=no',
     'smilies.js': 'data/cache/common_smilies_var.js',
     'register.html': 'plugin.php?id=k_qareg:k_qareg&mobile=2',
+    // 淘帖、記錄廣場、簽到排行、道具彈窗（都只有桌面模板）
+    'collection_index.html': 'forum.php?mod=collection&mobile=no',
+    'collection_view.html': 'forum.php?mod=collection&action=view&ctid=452&mobile=no',
+    'doing_desktop.html': 'home.php?mod=space&do=doing&view=me&mobile=no',
+    'sign_rank.xml': 'plugin.php?id=k_misign:sign&operation=list&mobile=no',
+    'magic_buy.xml': 'home.php?mod=magic&action=shop&operation=buy&mid=k_misign:k_misign_bq&inajax=1&mobile=no',
+    'addthread.xml': 'forum.php?mod=collection&action=edit&op=addthread&tid=194232&inajax=1&mobile=no',
   };
 
   final dir = Directory('test/fixtures')..createSync(recursive: true);

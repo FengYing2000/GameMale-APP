@@ -55,8 +55,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   trailingNote: settings.lang == AppLang.auto
                       ? (settings.toTraditional ? tr('目前：繁體') : tr('目前：简体'))
                       : null,
-                  note: tr('只影響 App 介面。帖子內容一律保留論壇原文，'
-                      '想看繁體請在帖子頁按右上角的翻譯'),
+                  note: settings.toTraditional
+                      ? tr('只影響 App 介面。帖子內容一律保留論壇原文，'
+                          '想看繁體請在帖子頁按右上角的翻譯')
+                      : tr('只影響 App 介面。帖子內容一律保留論壇原文'),
                 ),
                 const Divider(indent: 56, endIndent: 14),
                 _choice<ThemeMode>(

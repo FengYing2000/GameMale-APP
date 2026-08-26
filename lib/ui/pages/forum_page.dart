@@ -33,6 +33,10 @@ class _ForumPageState extends State<ForumPage> {
   ForumExtras? _extras;
   final _scroll = ScrollController();
 
+  /// 這個版塊有沒有被我收藏，以及取消時要用的 favid
+  bool _faved = false;
+  int? _favid;
+
   /// 論壇自己的四個分頁 + 網頁版才有的「熱帖」
   static const _tabs = <({String value, String label})>[
     (value: '', label: '全部'),
@@ -82,17 +86,46 @@ class _ForumPageState extends State<ForumPage> {
     } on DiscuzException {
       // 抓不到就不顯示那兩顆按鈕
     }
+    _loadFavState();
+  }
+
+  /// 這個版塊有沒有被我收藏 —— 論壇的「收藏本版」連結一律指向新增，
+  /// 已收藏時只會回「请勿重复收藏」，所以只能靠收藏清單判斷。
+  Future<void> _loadFavState() async {
+    final uid = context.read<SessionStore>().uid;
+    if (uid == null) return;
+    try {
+      final list = await api.fetchFavoriteForums(uid);
+      if (!mounted) return;
+      final hit = list.where((f) => f.fid == widget.fid).firstOrNull;
+      setState(() {
+        _faved = hit != null;
+        _favid = hit?.favid;
+      });
+    } on DiscuzException {
+      // 抓不到就當作未收藏
+    }
   }
 
   Future<void> _favorite() async {
-    final url = _extras?.favoriteUrl ?? '';
-    if (url.isEmpty) return;
     if (!await requireLogin(context, action: tr('收藏版塊'))) return;
     if (!mounted) return;
     try {
-      final r = await api.confirmAndSubmit(url, tr('收藏本版'));
-      if (!mounted) return;
-      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (_faved && _favid != null) {
+        final r = await api.unfavorite(_favid!);
+        if (!mounted) return;
+        toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+        if (r.ok) setState(() { _faved = false; _favid = null; });
+      } else {
+        final r = await api.favoriteForum(widget.fid);
+        if (!mounted) return;
+        toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+        // 收藏成功或「已收藏」都當作已收藏，補抓 favid 才取消得掉
+        if (r.ok || r.message.contains('已收藏')) {
+          setState(() => _faved = true);
+          await _loadFavState();
+        }
+      }
     } on DiscuzException catch (e) {
       if (mounted) toast(context, '${tr('收藏失敗：')}${e.message}');
     }
@@ -288,10 +321,13 @@ class _ForumPageState extends State<ForumPage> {
               tooltip: tr('版規'),
               onPressed: _showRules,
             ),
-          if ((_extras?.favoriteUrl ?? '').isNotEmpty)
+          if (context.watch<SessionStore>().loggedIn)
             IconButton(
-              icon: const Icon(LucideIcons.star),
-              tooltip: '${tr('收藏本版')} ${_extras!.favoriteCount}',
+              icon: Icon(LucideIcons.star,
+                  color: _faved ? const Color(0xFFF6B93B) : null),
+              tooltip: _faved
+                  ? tr('取消收藏本版')
+                  : '${tr('收藏本版')} ${_extras?.favoriteCount ?? ''}',
               onPressed: _favorite,
             ),
           IconButton(

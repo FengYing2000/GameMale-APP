@@ -8,6 +8,7 @@ import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/magic_dialog.dart';
 import '../widgets/post_body.dart';
 import '../widgets/require_login.dart';
 import '../widgets/smart_image.dart';
@@ -142,6 +143,7 @@ class _SignPageState extends State<SignPage> {
                     ),
                   ),
                 ),
+              const _RankCard(),
             ],
           ],
         ),
@@ -376,16 +378,9 @@ class _MagicsViewState extends State<_MagicsView> {
   }
 
   Future<void> _act(String url, String what) async {
-    if (!await requireLogin(context, action: what)) return;
-    if (!mounted) return;
-    try {
-      final r = await api.confirmAndSubmit(url, what);
-      if (!mounted) return;
-      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
-      if (r.ok) _load();
-    } on DiscuzException catch (e) {
-      if (mounted) toast(context, '$what${tr('失敗：')}${e.message}');
-    }
+    // 補簽／購買都開道具彈窗 —— 沒有補簽卡時論壇會自動改成購買視窗
+    final ok = await showMagicOp(context, url, action: what);
+    if (ok && mounted) _load();
   }
 
   @override
@@ -463,6 +458,135 @@ class _MagicsViewState extends State<_MagicsView> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// 簽到排行榜。今日／本月／總／獎勵四種
+class _RankCard extends StatefulWidget {
+  const _RankCard();
+
+  @override
+  State<_RankCard> createState() => _RankCardState();
+}
+
+class _RankCardState extends State<_RankCard> {
+  String _op = '';
+  List<SignRankRow>? _rows;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final r = await api.fetchSignRank(op: _op);
+      if (mounted) setState(() => _rows = r);
+    } on DiscuzException {
+      if (mounted) setState(() => _rows = const []);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _rows;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
+            child: Row(
+              children: [
+                Icon(LucideIcons.trophy,
+                    size: 17, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(tr('簽到排行'),
+                    style: const TextStyle(
+                        fontSize: 14.5, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 46,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+              children: [
+                for (final t in signRankTabs)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(tr(t.name)),
+                      selected: _op == t.op,
+                      onSelected: (_) {
+                        setState(() => _op = t.op);
+                        _load();
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (rows == null || rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text(tr('暫時沒有排行'),
+                    style: TextStyle(fontSize: 13, color: faint(context))),
+              ),
+            )
+          else
+            for (var i = 0; i < rows.length; i++)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 26,
+                      child: Text('${i + 1}',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: i < 3
+                                  ? Theme.of(context).colorScheme.primary
+                                  : faint(context))),
+                    ),
+                    Expanded(
+                      child: Text(rows[i].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13.5)),
+                    ),
+                    if (rows[i].level.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: Text(rows[i].level,
+                            style: TextStyle(
+                                fontSize: 11.5, color: faint(context))),
+                      ),
+                    Text(
+                      _op == 'rewardlist' ? rows[i].reward : '${rows[i].totalDays} ${tr('天')}',
+                      style: TextStyle(fontSize: 12, color: subtle(context)),
+                    ),
+                  ],
+                ),
+              ),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 }

@@ -29,11 +29,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
   bool _loading = true;
   String? _err;
   int _page = 1;
+  final _scroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<void> _load({int? page}) async {
@@ -61,7 +68,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      }
     }
   }
 
@@ -135,6 +145,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.only(bottom: 24),
           children: [
             SizedBox(

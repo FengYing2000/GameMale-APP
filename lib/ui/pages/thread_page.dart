@@ -17,6 +17,7 @@ import '../widgets/attachment_sheet.dart';
 import '../widgets/external_link.dart';
 import '../widgets/image_reveal.dart';
 import '../widgets/login_required.dart';
+import '../widgets/magic_dialog.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/poll_card.dart';
 import '../widgets/post_body.dart';
@@ -180,6 +181,167 @@ class _ThreadPageState extends State<ThreadPage> {
 
   PostItem _zhPost(PostItem p) => p.mapText(S2T.instance.convert);
 
+  /// 頂／踩一個主題
+  Future<void> _recommend(bool up) async {
+    if (!await requireLogin(context, action: up ? tr('頂') : tr('踩'))) return;
+    if (!mounted) return;
+    try {
+      final r = await api.recommendThread(widget.tid, up: up);
+      if (mounted) toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  /// 淘帖：把這帖加進某個淘專輯
+  Future<void> _taotie() async {
+    if (!await requireLogin(context, action: tr('淘帖'))) return;
+    if (!mounted) return;
+    ({List<({int ctid, String name})> collections, String formhash}) data;
+    try {
+      data = await api.fetchAddThreadCollections(widget.tid);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+      return;
+    }
+    if (!mounted) return;
+    if (data.collections.isEmpty) {
+      toast(context, tr('你還沒有淘專輯，請先在網頁建立一個'), kind: ToastKind.warn);
+      return;
+    }
+    int ctid = data.collections.first.ctid;
+    final reason = TextEditingController();
+    final go = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            18, 0, 18, MediaQuery.of(c).viewInsets.bottom + 18),
+        child: StatefulBuilder(
+          builder: (c, setSheet) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('淘帖'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              Text(tr('選擇淘專輯'),
+                  style: TextStyle(fontSize: 12.5, color: faint(c))),
+              const SizedBox(height: 6),
+              DropdownButton<int>(
+                value: ctid,
+                isExpanded: true,
+                items: [
+                  for (final col in data.collections)
+                    DropdownMenuItem(value: col.ctid, child: Text(col.name)),
+                ],
+                onChanged: (v) => setSheet(() => ctid = v ?? ctid),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reason,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: tr('淘帖理由（可留空）'),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text(tr('加入淘專輯')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (go != true || !mounted) return;
+    try {
+      final r = await api.addThreadToCollection(widget.tid, ctid,
+          reason: reason.text.trim(), formhash: data.formhash);
+      if (mounted) toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  /// 使用道具（帖子適用的：提升泵、亮色刷）
+  Future<void> _useMagic() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.arrowUpNarrowWide),
+              title: Text(tr('提升泵')),
+              subtitle: Text(tr('把主題的顯示順序提前')),
+              onTap: () => Navigator.pop(c, 'bump'),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.highlighter),
+              title: Text(tr('亮色刷')),
+              subtitle: Text(tr('把標題變色高亮')),
+              onTap: () => Navigator.pop(c, 'highlight'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await showMagicOp(
+        context,
+        'home.php?mod=magic&mid=$choice&idtype=tid&id=${widget.tid}',
+        action: tr('使用道具'));
+  }
+
+  /// 舉報一則帖子
+  Future<void> _report(int? pid) async {
+    if (pid == null) return;
+    if (!await requireLogin(context, action: tr('舉報'))) return;
+    if (!mounted) return;
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(tr('舉報理由'),
+                  style: TextStyle(fontSize: 12, color: faint(c))),
+            ),
+            for (final r in reportReasons)
+              ListTile(
+                title: Text(tr(r), style: const TextStyle(fontSize: 15)),
+                onTap: () => Navigator.pop(c, r),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (reason == null || !mounted) return;
+    try {
+      final r = await api.reportPost(
+          pid: pid, tid: widget.tid, fid: _data?.fid ?? 0, reason: reason);
+      if (mounted) toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -334,6 +496,14 @@ class _ThreadPageState extends State<ThreadPage> {
                       tid: widget.tid,
                       onBought: _loadExtras,
                     ),
+                  // 頂／踩／淘帖／使用道具／舉報
+                  _ThreadActions(
+                    onUp: () => _recommend(true),
+                    onDown: () => _recommend(false),
+                    onTaotie: _taotie,
+                    onMagic: _useMagic,
+                    onReport: () => _report(d.posts[i].pid),
+                  ),
                 ],
               ],
             ],
@@ -895,4 +1065,58 @@ class _PaymentsSheetState extends State<_PaymentsSheet> {
       ),
     );
   }
+}
+
+/// 帖子底下的一排動作：頂／踩／淘帖／使用道具／舉報
+class _ThreadActions extends StatelessWidget {
+  const _ThreadActions({
+    required this.onUp,
+    required this.onDown,
+    required this.onTaotie,
+    required this.onMagic,
+    required this.onReport,
+  });
+
+  final VoidCallback onUp;
+  final VoidCallback onDown;
+  final VoidCallback onTaotie;
+  final VoidCallback onMagic;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _btn(context, LucideIcons.thumbsUp, tr('頂'), onUp),
+            _btn(context, LucideIcons.thumbsDown, tr('踩'), onDown),
+            _btn(context, LucideIcons.bookmarkPlus, tr('淘帖'), onTaotie),
+            _btn(context, LucideIcons.wand, tr('使用道具'), onMagic),
+            _btn(context, LucideIcons.flag, tr('舉報'), onReport),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _btn(BuildContext c, IconData icon, String label, VoidCallback onTap) =>
+      InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: subtle(c)),
+              const SizedBox(height: 3),
+              Text(label,
+                  style: TextStyle(fontSize: 11, color: faint(c))),
+            ],
+          ),
+        ),
+      );
 }

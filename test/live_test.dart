@@ -611,6 +611,47 @@ void main() {
     print('  ${pays.length} 筆紀錄，例如 ${pays.first.user}｜檔案 ${bytes.length} bytes');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
+  test('淘帖列表、專輯內頁、記錄廣場、簽到排行、道具彈窗', () async {
+    // 淘帖列表（推薦）
+    final idx = await api.fetchCollectionIndex();
+    expect(idx.items, isNotEmpty);
+    expect(idx.items.every((c) => c.ctid > 0 && c.name.isNotEmpty), isTrue);
+
+    // 專輯內頁 + 收錄的主題
+    final view = await api.fetchCollectionThreads(452);
+    expect(view.name, isNotEmpty);
+    expect(view.list, isNotEmpty);
+    expect(view.list.every((t) => t.tid > 0 && t.title.isNotEmpty), isTrue);
+
+    // 記錄廣場（桌面版才有內嵌回覆與時間）
+    final doing = await api.fetchDoing(view: 'me');
+    expect(doing.items, isNotEmpty);
+    final cmts = doing.items.expand((x) => x.comments).toList();
+    if (cmts.isNotEmpty) {
+      expect(cmts.any((c) => c.time.isNotEmpty), isTrue, reason: '回覆要有時間');
+      expect(cmts.every((c) => c.author.isNotEmpty), isTrue);
+    }
+
+    // 簽到排行
+    final rank = await api.fetchSignRank();
+    expect(rank, isNotEmpty);
+    expect(rank.every((r) => r.name.isNotEmpty), isTrue);
+
+    // 道具彈窗（補簽卡購買）
+    final op = await api.fetchMagicOp(
+        'home.php?mod=magic&action=shop&operation=buy&mid=k_misign:k_misign_bq');
+    expect(op.ready, isTrue, reason: '要解析出購買表單');
+    expect(op.fields['mid'], 'k_misign:k_misign_bq');
+
+    // 淘帖表單（我的專輯清單）
+    final add = await api.fetchAddThreadCollections(194232);
+    expect(add.formhash, isNotEmpty);
+
+    // ignore: avoid_print
+    print('  專輯 ${idx.items.length}｜《${view.name}》${view.list.length} 帖'
+        '｜記錄 ${doing.items.length}｜排行 ${rank.length}｜道具 ${op.name}');
+  }, timeout: const Timeout(Duration(seconds: 150)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

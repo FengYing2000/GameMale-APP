@@ -50,6 +50,9 @@ class ForumItem {
   final String posts;
   final String desc;
 
+  /// 版主名單（首頁桌面模板才有）
+  final List<String> moderators;
+
   /// 首頁的子版塊藏在簡介裡（「子版块>>」後面那幾個連結）
   final List<SubForum> subforums;
 
@@ -60,6 +63,7 @@ class ForumItem {
     this.threads = '',
     this.posts = '',
     this.desc = '',
+    this.moderators = const [],
     this.subforums = const [],
   });
 }
@@ -166,11 +170,19 @@ class SubForum {
   final int fid;
   final String name;
 
+  /// 子版塊圖示（首頁桌面模板才有）
+  final String icon;
+
   /// 只有「收藏的版塊」才有，用來取消收藏
   final int? favid;
   final String favTime;
 
-  const SubForum({required this.fid, required this.name, this.favid, this.favTime = ''});
+  const SubForum(
+      {required this.fid,
+      required this.name,
+      this.icon = '',
+      this.favid,
+      this.favTime = ''});
 }
 
 class ForumData {
@@ -547,6 +559,7 @@ class DoingComment {
     this.uid,
     this.text = '',
     this.time = '',
+    this.isReply = false,
     this.deleteUrl = '',
   });
 
@@ -555,6 +568,9 @@ class DoingComment {
   final int? uid;
   final String text;
   final String time;
+
+  /// 版主／記錄主人回覆別人時，論壇會縮排一層（padding-left / dtls）
+  final bool isReply;
 
   /// 只有自己的記錄／自己的回覆才有
   final String deleteUrl;
@@ -1543,3 +1559,127 @@ class FavoriteItem {
   /// tid / fid / blogid…
   final int? targetId;
 }
+
+/// 道具的購買／使用彈窗。論壇對「買」跟「用」回的是同一種 magicform，
+/// 差別在 operation 與送出欄位名。把所有隱藏欄位原封收下來，送出時照樣帶回。
+class MagicOp {
+  const MagicOp({
+    required this.action,
+    required this.operation,
+    required this.submitName,
+    required this.fields,
+    this.name = '',
+    this.icon = '',
+    this.lines = const [],
+    this.hasNum = false,
+    this.error,
+  });
+
+  /// 表單 action（相對網址）
+  final String action;
+
+  /// buy / use
+  final String operation;
+
+  /// operatesubmit / usesubmit —— 論壇靠它判斷真的按了送出
+  final String submitName;
+
+  /// 表單裡所有隱藏欄位（formhash、mid、idtype、id…），送出時原樣帶回
+  final Map<String, String> fields;
+
+  final String name;
+  final String icon;
+
+  /// 售價／餘額／庫存／「本月還能用幾次」那幾行說明，直接照論壇的話顯示
+  final List<String> lines;
+
+  /// 買的表單才有數量輸入
+  final bool hasNum;
+
+  /// 論壇直接回了錯誤（例如沒有這個道具、缺貨），就沒有可送出的表單
+  final String? error;
+
+  bool get ready => error == null && action.isNotEmpty;
+}
+
+/// 簽到排行榜的一列
+class SignRankRow {
+  const SignRankRow({
+    required this.name,
+    this.uid,
+    this.totalDays = '',
+    this.monthDays = '',
+    this.lastTime = '',
+    this.level = '',
+    this.reward = '',
+  });
+
+  final String name;
+  final int? uid;
+  final String totalDays;
+  final String monthDays;
+  final String lastTime;
+  final String level;
+  final String reward;
+}
+
+/// 簽到排行榜有幾種切換
+const signRankTabs = <({String op, String name})>[
+  (op: '', name: '今日排行'),
+  (op: 'month', name: '本月排行'),
+  (op: 'zong', name: '總排行'),
+  (op: 'rewardlist', name: '獎勵排行'),
+];
+
+/// 淘帖（收藏專輯）分頁
+const collectionTabs = <({String op, String name})>[
+  (op: '', name: '推薦專輯'),
+  (op: 'all', name: '所有專輯'),
+  (op: 'my', name: '我的專輯'),
+];
+
+/// 淘專輯內頁：專輯資訊 + 收錄的主題清單
+class CollectionView {
+  const CollectionView({
+    required this.ctid,
+    this.name = '',
+    this.desc = '',
+    this.author = '',
+    this.rating = '',
+    this.follows = '',
+    this.followUrl = '',
+    this.following = false,
+    this.list = const [],
+    this.pager = const PageInfo(),
+    this.message,
+  });
+
+  final int ctid;
+  final String name;
+  final String desc;
+  final String author;
+
+  /// 「(共 3 次打分)」之類
+  final String rating;
+  final String follows;
+
+  /// 訂閱／取消訂閱的連結
+  final String followUrl;
+  final bool following;
+
+  final List<ThreadItem> list;
+  final PageInfo pager;
+  final String? message;
+}
+
+/// 舉報理由（論壇 k_qareg 那套固定選項）
+const reportReasons = <String>[
+  '廣告垃圾',
+  '違規內容',
+  '惡意灌水',
+  '重複發帖',
+  '版塊錯誤',
+  '資源失效',
+  '資源撞車',
+  '其他',
+];

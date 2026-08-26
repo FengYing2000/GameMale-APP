@@ -30,6 +30,7 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final _ctrl = TextEditingController();
   final _authorCtrl = TextEditingController();
+  final _scroll = ScrollController();
   SearchScope _scope = SearchScope.forum;
   bool _thisForumOnly = false;
   SearchResult? _data;
@@ -54,6 +55,7 @@ class _SearchPageState extends State<SearchPage> {
   void dispose() {
     _ctrl.dispose();
     _authorCtrl.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -83,7 +85,10 @@ class _SearchPageState extends State<SearchPage> {
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      }
     }
   }
 
@@ -236,6 +241,7 @@ class _SearchPageState extends State<SearchPage> {
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusScope.of(context).unfocus(),
         child: ListView(
+          controller: _scroll,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.only(bottom: 24),
           children: [

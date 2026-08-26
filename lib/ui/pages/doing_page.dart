@@ -30,6 +30,13 @@ class _DoingPageViewState extends State<DoingPageView> {
   int _page = 1;
   bool _busy = false;
   String? _err;
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -49,7 +56,10 @@ class _DoingPageViewState extends State<DoingPageView> {
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      }
     }
   }
 
@@ -91,14 +101,15 @@ class _DoingPageViewState extends State<DoingPageView> {
     }
   }
 
-  Future<void> _reply(DoingItem item) async {
+  Future<void> _reply(DoingItem item, {DoingComment? replyTo}) async {
     if (!await requireLogin(context, action: tr('回覆記錄'))) return;
     if (!mounted) return;
     final ctrl = TextEditingController();
+    final who = replyTo?.author ?? item.name;
     final text = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('${tr('回覆')} ${item.name}'),
+        title: Text('${tr('回覆')} $who'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -115,8 +126,10 @@ class _DoingPageViewState extends State<DoingPageView> {
       ),
     );
     if (text == null || text.isEmpty || !mounted) return;
+    // 回覆某一則留言時，把對象 @ 出來，論壇的記錄留言本身是平的
+    final msg = replyTo != null ? '@${replyTo.author} $text' : text;
     try {
-      final r = await api.replyDoing(item.doid, text,
+      final r = await api.replyDoing(item.doid, msg,
           formhash: _data?.formhash ?? '');
       if (!mounted) return;
       toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
@@ -171,6 +184,7 @@ class _DoingPageViewState extends State<DoingPageView> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.only(bottom: 90),
           children: [
             SizedBox(
@@ -212,6 +226,8 @@ class _DoingPageViewState extends State<DoingPageView> {
                       _DoingRow(
                         item: d.items[i],
                         onReply: () => _reply(d.items[i]),
+                        onReplyComment: (c) =>
+                            _reply(d.items[i], replyTo: c),
                         onDelete: d.items[i].deleteUrl.isEmpty
                             ? null
                             : () => _delete(d.items[i].deleteUrl, tr('刪除記錄')),
@@ -235,11 +251,13 @@ class _DoingRow extends StatelessWidget {
   const _DoingRow({
     required this.item,
     required this.onReply,
+    required this.onReplyComment,
     this.onDelete,
     required this.onDeleteComment,
   });
   final DoingItem item;
   final VoidCallback onReply;
+  final void Function(DoingComment) onReplyComment;
   final VoidCallback? onDelete;
   final void Function(DoingComment) onDeleteComment;
 
@@ -297,10 +315,17 @@ class _DoingRow extends StatelessWidget {
                       children: [
                         for (final c in item.comments)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            padding: EdgeInsets.fromLTRB(
+                                c.isReply ? 18 : 0, 3, 0, 3),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                if (c.isReply)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2, right: 4),
+                                    child: Icon(LucideIcons.cornerDownRight,
+                                        size: 13, color: faint(context)),
+                                  ),
                                 Expanded(
                                   child: Text.rich(
                                     TextSpan(children: [
@@ -314,7 +339,7 @@ class _DoingRow extends StatelessWidget {
                                       TextSpan(text: c.text),
                                       if (c.time.isNotEmpty)
                                         TextSpan(
-                                          text: '  ${c.time}',
+                                          text: '  (${c.time})',
                                           style: TextStyle(
                                               fontSize: 11,
                                               color: faint(context)),
@@ -324,12 +349,24 @@ class _DoingRow extends StatelessWidget {
                                         fontSize: 13, height: 1.5),
                                   ),
                                 ),
+                                GestureDetector(
+                                  onTap: () => onReplyComment(c),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                        left: 8, top: 2),
+                                    child: Icon(LucideIcons.reply,
+                                        size: 14,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary),
+                                  ),
+                                ),
                                 if (c.deleteUrl.isNotEmpty)
                                   GestureDetector(
                                     onTap: () => onDeleteComment(c),
                                     child: Padding(
                                       padding: const EdgeInsets.only(
-                                          left: 8, top: 2),
+                                          left: 10, top: 2),
                                       child: Icon(LucideIcons.x,
                                           size: 14, color: faint(context)),
                                     ),

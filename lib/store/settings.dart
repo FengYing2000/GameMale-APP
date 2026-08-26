@@ -55,6 +55,10 @@ class SettingsStore extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   Accent accent = Accent.blue;
 
+  /// 語言改變時 tick 一下，讓 GoRouter 重建整個頁面堆疊，
+  /// 既有頁面才會用新語言重新 render（否則要下拉刷新才會變）
+  final ValueNotifier<int> langTick = ValueNotifier<int>(0);
+
   /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇
   bool markReplied = true;
 
@@ -145,7 +149,10 @@ class SettingsStore extends ChangeNotifier {
 
   Future<void> setLang(AppLang v) async {
     lang = v;
+    // 先讓 _applyLang 之類的 listener 把解析層／UiLang 切好，
+    // 再 tick 讓 GoRouter 用新語言重建頁面
     notifyListeners();
+    langTick.value++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kLang, v.name);
   }

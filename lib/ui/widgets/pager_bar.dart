@@ -76,12 +76,12 @@ class StickyPager extends StatelessWidget {
               tooltip: tr('上一頁'),
             ),
             TextButton(
-              // 沒有頁碼可跳就別給人點開一個假的頁數表
+              // 沒有頁碼可跳就別給人點開一個假的頁數表，但顯示樣式跟其他列表一致
               onPressed: pager.numbered ? () => _pick(context) : null,
               child: Text(
                 pager.numbered
                     ? '${pager.page} / ${pager.total}'
-                    : '${tr('第')} ${pager.page} ${tr('頁')}',
+                    : '${pager.page}${pager.hasNext ? ' / ${pager.page + 1}+' : ''}',
                 style: const TextStyle(fontSize: 14),
               ),
             ),

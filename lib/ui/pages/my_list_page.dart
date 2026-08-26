@@ -39,6 +39,13 @@ class _MyListPageState extends State<MyListPage> {
   /// 版塊篩選（我的主題／回覆才有），0 = 全部
   int _filterFid = 0;
   List<ForumGroup> _forumTree = const [];
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -75,7 +82,11 @@ class _MyListPageState extends State<MyListPage> {
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        // 切頁後回到最上面，別停在上一頁滑到的位置
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      }
     }
   }
 
@@ -222,6 +233,7 @@ class _MyListPageState extends State<MyListPage> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.only(bottom: 24),
           children: [
             if (!isFav)

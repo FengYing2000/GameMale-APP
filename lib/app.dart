@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'api/parse.dart' as parse;
+import 'api/discuz.dart' as api;
 import 'i18n/s2t.dart';
 import 'api/http.dart';
 import 'store/favorites.dart';
@@ -28,6 +29,7 @@ import 'ui/pages/profile_page.dart';
 import 'ui/pages/album_page.dart';
 import 'ui/pages/blog_list_page.dart';
 import 'ui/pages/blog_page.dart';
+import 'ui/pages/collection_page.dart';
 import 'ui/pages/favorites_page.dart';
 import 'ui/pages/group_page.dart';
 import 'ui/pages/groups_page.dart';
@@ -62,7 +64,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     _settings = SettingsStore();
     _replied = RepliedStore();
     _favorites = FavoriteStore();
-    _router = _buildRouter(_session);
+    _router = _buildRouter(_session, _settings);
     _boot();
   }
 
@@ -89,6 +91,8 @@ class _GameMaleAppState extends State<GameMaleApp> {
     parse.uiTraditional = want;   // 系統文字跟著介面語言
     S2T.instance.useTaiwanWords = true;
     UiLang.instance.simplified = !want;      // 介面文字
+    // 首頁子版塊／版主是用舊語言 sys() 過並快取的，換語言要丟掉重抓
+    api.clearIndexCache();
     if (changed && mounted) setState(() {});
   }
 
@@ -135,10 +139,11 @@ class _GameMaleAppState extends State<GameMaleApp> {
   }
 }
 
-GoRouter _buildRouter(SessionStore session) {
+GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
   return GoRouter(
     initialLocation: '/',
-    refreshListenable: session,
+    // 換帳號要重導；換語言要讓整個頁面堆疊用新語言重建
+    refreshListenable: Listenable.merge([session, settings.langTick]),
     redirect: (context, state) {
       // 論壇本身允許訪客瀏覽，所以不強制導向登入頁 ——
       // 之前只要 session 一失效就被鎖在登入頁，連返回都沒有，只能關掉 App。
@@ -160,6 +165,11 @@ GoRouter _buildRouter(SessionStore session) {
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/settings/tools', builder: (c, s) => const ToolsPage()),
       GoRoute(path: '/blogs', builder: (c, s) => const BlogListPageView()),
+      GoRoute(path: '/collections', builder: (c, s) => const CollectionListPage()),
+      GoRoute(
+        path: '/collection/:ctid',
+        builder: (c, s) => CollectionViewPage(ctid: _int(s, 'ctid')),
+      ),
       GoRoute(path: '/favorites', builder: (c, s) => const FavoritesPage()),
       GoRoute(path: '/groups', builder: (c, s) => const GroupsPage()),
       GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),

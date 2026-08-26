@@ -9,6 +9,8 @@ import 'package:gamemale/store/replied.dart';
 import 'package:gamemale/store/session.dart';
 import 'package:gamemale/store/settings.dart';
 import 'package:gamemale/ui/pages/edit_post_page.dart';
+import 'package:gamemale/ui/pages/collection_page.dart';
+import 'package:gamemale/ui/pages/doing_page.dart';
 import 'package:gamemale/ui/pages/favorites_page.dart';
 import 'package:gamemale/ui/pages/forum_page.dart';
 import 'package:gamemale/ui/pages/group_page.dart';
@@ -91,6 +93,9 @@ void main() {
     '群組列表': const GroupsPage(),
     '我的收藏': const FavoritesPage(),
     '我的主題': const MyListPage(type: 'thread'),
+    '記錄廣場': const DoingPageView(),
+    '淘帖列表': const CollectionListPage(),
+    '淘專輯內頁': const CollectionViewPage(ctid: 452),
     '簽到': const SignPage(),
     '設定': const SettingsPage(),
     '編輯帖子': const EditPostPage(fid: 150, tid: 1, pid: 1),
