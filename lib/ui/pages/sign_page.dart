@@ -10,6 +10,7 @@ import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_body.dart';
 import '../widgets/require_login.dart';
+import '../widgets/smart_image.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -94,7 +95,11 @@ class _SignPageState extends State<SignPage> {
                 ),
               ),
               const Divider(height: 1),
-              Expanded(child: _RulesView(key: ValueKey(op), op: op)),
+              Expanded(
+                child: op == 'magics'
+                    ? const _MagicsView()
+                    : _RulesView(key: ValueKey(op), op: op),
+              ),
             ],
           ),
         ),
@@ -337,6 +342,126 @@ class _RulesViewState extends State<_RulesView> {
               ),
             ),
         ],
+      ],
+    );
+  }
+}
+
+/// 道具擴展。論壇這頁不是說明文字，是可以直接補簽或買補簽卡的
+class _MagicsView extends StatefulWidget {
+  const _MagicsView();
+
+  @override
+  State<_MagicsView> createState() => _MagicsViewState();
+}
+
+class _MagicsViewState extends State<_MagicsView> {
+  List<SignMagic>? _items;
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _err = null);
+    try {
+      final m = await api.fetchSignMagics();
+      if (mounted) setState(() => _items = m);
+    } on DiscuzException catch (e) {
+      if (mounted) setState(() => _err = e.message);
+    }
+  }
+
+  Future<void> _act(String url, String what) async {
+    if (!await requireLogin(context, action: what)) return;
+    if (!mounted) return;
+    try {
+      final r = await api.confirmAndSubmit(url, what);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '$what${tr('失敗：')}${e.message}');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items;
+    if (_err != null) {
+      return Center(
+        child: TextButton(onPressed: _load, child: Text(tr('重試'))),
+      );
+    }
+    if (items == null) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (items.isEmpty) {
+      return Center(
+        child: Text(tr('目前沒有可用的道具'),
+            style: TextStyle(fontSize: 13, color: faint(context))),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        for (final m in items)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (m.icon.isNotEmpty) ...[
+                        SmartImage(src: m.icon, height: 32),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: Text(m.name,
+                            style: const TextStyle(
+                                fontSize: 14.5, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                  if (m.desc.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(m.desc,
+                        style: TextStyle(
+                            fontSize: 13, height: 1.6, color: subtle(context))),
+                  ],
+                  if (m.detail.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(m.detail,
+                        style: TextStyle(
+                            fontSize: 12.5, height: 1.7, color: faint(context))),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (m.useUrl.isNotEmpty)
+                        FilledButton(
+                          onPressed: () => _act(m.useUrl, tr('補簽')),
+                          child: Text(tr('補簽')),
+                        ),
+                      if (m.buyUrl.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        OutlinedButton(
+                          onPressed: () => _act(m.buyUrl, tr('購買')),
+                          child: Text(tr('購買補簽卡')),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }

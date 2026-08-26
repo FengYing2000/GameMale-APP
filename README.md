@@ -10,7 +10,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Tests](https://img.shields.io/badge/測試-242%20項-4CAF50)](#測試策略)
+[![Tests](https://img.shields.io/badge/測試-245%20項-4CAF50)](#測試策略)
 [![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -73,6 +73,8 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 | **附件內容自己解碼** | 伺服器送 `octet-stream` 又不帶 charset，瀏覽器在繁中系統會猜成 Big5，UTF-8 檔就變亂碼 |
 | **分頁要記住請求的頁數** | 有些列表只給「上一頁／下一頁」，照 DOM 算會永遠停在第 1 頁，還把下一頁的 `page=3` 當成總頁數 |
 | **刪除都是兩步驟** | 先 GET 拿確認表單（formhash 跟頁面上的不同），再 POST 才真的刪；抽成 `confirmAndSubmit` 共用 |
+| **系統文字才跟著介面語言** | 版塊名、積分名、論壇提示用 `sys()` 轉；帖子標題與內文一律原文，要看繁體按帖子頁的翻譯 |
+| **附件的數字 id 不在下載連結裡** | 已購買的連結帶的是 base64 的 `aid`，數字版要從 `span#attach_N` 或購買紀錄連結拿 |
 | **群組是另一套頁面** | `group-<fid>-1.html` 只有桌面模板，用 `/f/<fid>` 進去會顯示「沒有主題」 |
 | **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
 
@@ -141,10 +143,10 @@ tool/
 | `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 30 |
 | `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
 | `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
-| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 43 |
+| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 45 |
 
 ```bash
-flutter test                        # 242 項離線測試
+flutter test                        # 245 項離線測試
 flutter analyze                     # 零問題
 ```
 

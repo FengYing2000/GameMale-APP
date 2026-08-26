@@ -10,8 +10,11 @@ import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/login_required.dart';
 import '../widgets/pager_bar.dart';
+import '../widgets/post_body.dart';
+import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';
+import '../widgets/toast.dart';
 
 class ForumPage extends StatefulWidget {
   const ForumPage({super.key, required this.fid});
@@ -27,6 +30,7 @@ class _ForumPageState extends State<ForumPage> {
   String? _err;
   int _page = 1;
   ForumQuery _q = const ForumQuery();
+  ForumExtras? _extras;
   final _scroll = ScrollController();
 
   /// 論壇自己的四個分頁 + 網頁版才有的「熱帖」
@@ -66,6 +70,71 @@ class _ForumPageState extends State<ForumPage> {
         if (_scroll.hasClients) _scroll.jumpTo(0);
       }
     }
+    _loadExtras();
+  }
+
+  /// 版規、版主、收藏本版只有桌面模板有，另外抓一次
+  Future<void> _loadExtras() async {
+    if (_extras != null) return;
+    try {
+      final e = await api.fetchForumExtras(widget.fid);
+      if (mounted) setState(() => _extras = e);
+    } on DiscuzException {
+      // 抓不到就不顯示那兩顆按鈕
+    }
+  }
+
+  Future<void> _favorite() async {
+    final url = _extras?.favoriteUrl ?? '';
+    if (url.isEmpty) return;
+    if (!await requireLogin(context, action: tr('收藏版塊'))) return;
+    if (!mounted) return;
+    try {
+      final r = await api.confirmAndSubmit(url, tr('收藏本版'));
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '${tr('收藏失敗：')}${e.message}');
+    }
+  }
+
+  void _showRules() {
+    final e = _extras;
+    if (e == null || !e.hasRules) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => SizedBox(
+        height: MediaQuery.of(c).size.height * .75,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(tr('版規'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            if (e.moderators.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  '${tr('版主')}：${e.moderators.map((m) => m.name).join('、')}',
+                  style: TextStyle(fontSize: 12.5, color: faint(c)),
+                ),
+              ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: PostBody(e.rulesHtml),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _apply(ForumQuery q) {
@@ -213,6 +282,18 @@ class _ForumPageState extends State<ForumPage> {
       appBar: AppBar(
         title: Text(d?.name ?? tr('板塊')),
         actions: [
+          if (_extras?.hasRules ?? false)
+            IconButton(
+              icon: const Icon(LucideIcons.scrollText),
+              tooltip: tr('版規'),
+              onPressed: _showRules,
+            ),
+          if ((_extras?.favoriteUrl ?? '').isNotEmpty)
+            IconButton(
+              icon: const Icon(LucideIcons.star),
+              tooltip: '${tr('收藏本版')} ${_extras!.favoriteCount}',
+              onPressed: _favorite,
+            ),
           IconButton(
             icon: const Icon(LucideIcons.search),
             tooltip: tr('在本版搜尋'),

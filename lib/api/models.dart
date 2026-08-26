@@ -1042,6 +1042,7 @@ class Attachment {
     this.permission = '',
     this.recordUrl = '',
     this.bought = false,
+    this.aid,
   });
 
   final String name;
@@ -1068,9 +1069,9 @@ class Attachment {
   /// 要花錢，而且還沒買
   bool get needsPay => price.isNotEmpty && !bought;
 
-  /// 購買頁網址裡的附件 id
-  int? get aid => int.tryParse(
-      RegExp(r'[?&]aid=(\d+)').firstMatch(url)?.group(1) ?? '');
+  /// 附件的數字 id。已購買的下載連結帶的是 base64 的 aid，
+  /// 數字版要從 span 的 id 或購買／紀錄連結拿
+  final int? aid;
 }
 
 /// 購買附件的確認資訊
@@ -1444,3 +1445,101 @@ const signRulePages = <({String op, String name})>[
   (op: 'leval', name: '簽到等級'),
   (op: 'magics', name: '道具擴展'),
 ];
+
+/// 淘帖專輯（我訂閱的專輯）
+class CollectionItem {
+  const CollectionItem({
+    required this.ctid,
+    required this.name,
+    this.desc = '',
+    this.threads = '',
+    this.meta = '',
+    this.author = '',
+    this.latest = '',
+    this.latestTid,
+  });
+
+  final int ctid;
+  final String name;
+  final String desc;
+
+  /// 主題數
+  final String threads;
+
+  /// 「订阅 26, 评论 13」
+  final String meta;
+  final String author;
+  final String latest;
+  final int? latestTid;
+}
+
+/// 版塊的額外資訊：版規、版主、收藏本版
+class ForumExtras {
+  const ForumExtras({
+    this.rulesHtml = '',
+    this.moderators = const [],
+    this.favoriteUrl = '',
+    this.favoriteCount = '',
+  });
+
+  final String rulesHtml;
+  final List<ProfileLink> moderators;
+  final String favoriteUrl;
+  final String favoriteCount;
+
+  bool get hasRules => rulesHtml.trim().isNotEmpty;
+}
+
+/// 簽到的道具（補簽卡）
+class SignMagic {
+  const SignMagic({
+    required this.name,
+    this.icon = '',
+    this.desc = '',
+    this.detail = '',
+    this.useUrl = '',
+    this.buyUrl = '',
+  });
+
+  final String name;
+  final String icon;
+  final String desc;
+
+  /// 「03-20 到 03-23 期間，您共有 2 天可補簽…」
+  final String detail;
+  final String useUrl;
+  final String buyUrl;
+}
+
+/// 收藏的分類，論壇左側那排
+const favoriteTypes = <({String type, String name})>[
+  (type: 'all', name: '全部收藏'),
+  (type: 'thread', name: '帖子'),
+  (type: 'forum', name: '版塊'),
+  (type: 'group', name: '群組'),
+  (type: 'blog', name: '日誌'),
+  (type: 'album', name: '相冊'),
+];
+
+/// 收藏清單的一項（各種型別混在一起）
+class FavoriteItem {
+  const FavoriteItem({
+    required this.favid,
+    required this.title,
+    this.type = '',
+    this.url = '',
+    this.date = '',
+    this.targetId,
+  });
+
+  final int favid;
+  final String title;
+
+  /// thread / forum / group / blog / album
+  final String type;
+  final String url;
+  final String date;
+
+  /// tid / fid / blogid…
+  final int? targetId;
+}

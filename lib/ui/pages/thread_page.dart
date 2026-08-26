@@ -25,11 +25,19 @@ import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
 class ThreadPage extends StatefulWidget {
-  const ThreadPage({super.key, required this.tid, this.initialPage = 1});
+  const ThreadPage({
+    super.key,
+    required this.tid,
+    this.initialPage = 1,
+    this.focusPid,
+  });
   final int tid;
 
   /// 從「我的回覆」點進來時，直接跳到自己那一樓所在的頁
   final int initialPage;
+
+  /// 那一頁還有二三十樓，只翻到頁還不夠 —— 要捲到這一樓並標出來
+  final int? focusPid;
 
   @override
   State<ThreadPage> createState() => _ThreadPageState();
@@ -47,6 +55,10 @@ class _ThreadPageState extends State<ThreadPage> {
   String? _err;
   late int _page = widget.initialPage;
   final _scroll = ScrollController();
+
+  /// 要跳到的那一樓，捲過去之後閃一下就清掉
+  final _focusKey = GlobalKey();
+  late final int? _focusPid = widget.focusPid;
 
   @override
   void initState() {
@@ -74,7 +86,11 @@ class _ThreadPageState extends State<ThreadPage> {
     } finally {
       if (mounted) {
         setState(() => _loading = false);
-        if (_scroll.hasClients) _scroll.jumpTo(0);
+        if (_focusPid != null) {
+          _scrollToFocus();
+        } else if (_scroll.hasClients) {
+          _scroll.jumpTo(0);
+        }
       }
     }
     _loadExtras();
@@ -143,6 +159,20 @@ class _ThreadPageState extends State<ThreadPage> {
       if (_data?.title.isNotEmpty ?? false) 'title': _data!.title,
     });
     context.push(uri.toString());
+  }
+
+  /// 捲到指定的那一樓。畫面要先排好版才量得到位置，所以等一幀
+  void _scrollToFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _focusKey.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+    });
   }
 
   /// 開了翻譯才轉，沒開就原樣回去
@@ -260,6 +290,9 @@ class _ThreadPageState extends State<ThreadPage> {
               // 投票與附件都是樓主帖的一部分，排在第一樓底下才合理
               for (var i = 0; i < d.posts.length; i++) ...[
                 _PostCard(
+                  key: d.posts[i].pid == _focusPid ? _focusKey : null,
+                  highlight: d.posts[i].pid != null &&
+                      d.posts[i].pid == _focusPid,
                   post: _translated ? _zhPost(d.posts[i]) : d.posts[i],
                   onReply:
                       session.loggedIn ? () => _reply(d.posts[i]) : null,
@@ -323,6 +356,37 @@ class _AttachmentCard extends StatelessWidget {
   final int tid;
   final VoidCallback onBought;
 
+  /// 論壇只給售價、作者所得與購買後餘額，「目前有多少」要自己算回來。
+  /// 順便把簡體欄位名換成介面用的繁體。
+  List<({String label, String value})> _payRows(AttachPay pay) {
+    final out = <({String label, String value})>[];
+    var price = 0;
+    var after = 0;
+    var unit = '';
+
+    for (final r in pay.rows) {
+      final n = int.tryParse(r.value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final u = r.value.replaceAll(RegExp(r'[0-9\s]'), '');
+      if (r.label.contains('售价') || r.label.contains('售價')) {
+        price = n;
+        unit = u;
+        out.add((label: tr('售價'), value: r.value));
+      } else if (r.label.contains('所得')) {
+        out.add((label: tr('作者所得'), value: r.value));
+      } else if (r.label.contains('余额') || r.label.contains('餘額')) {
+        after = n;
+        out.add((label: tr('購買後餘額'), value: r.value));
+      } else {
+        out.add(r);
+      }
+    }
+
+    if (price > 0 || after > 0) {
+      out.insert(0, (label: tr('目前擁有'), value: '${after + price}$unit'));
+    }
+    return out;
+  }
+
   /// 付費附件先把售價與購買後餘額攤開來，確認了才真的扣金幣
   Future<void> _buy(BuildContext context, Attachment a) async {
     if (!await requireLogin(context, action: tr('購買附件'))) return;
@@ -364,7 +428,7 @@ class _AttachmentCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: faint(c))),
             ],
             const SizedBox(height: 12),
-            for (final r in pay.rows)
+            for (final r in _payRows(pay))
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
@@ -395,11 +459,28 @@ class _AttachmentCard extends StatelessWidget {
     try {
       final r = await api.submitAttachPay(pay);
       if (!context.mounted) return;
-      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      // 論壇會回「购买成功，开始下载」，但 App 這邊不會自動下載，
+      // 照著唸只會讓人以為檔案跑到哪去了
+      final msg = r.ok
+          ? tr('購買成功，點一下附件就能看內容')
+          : r.message;
+      toast(context, msg, kind: r.ok ? ToastKind.ok : ToastKind.warn);
       if (r.ok) onBought();
     } on DiscuzException catch (e) {
       if (context.mounted) toast(context, tr('購買失敗：${e.message}'));
     }
+  }
+
+  /// 誰買過這個附件。之前是丟給瀏覽器，其實解析起來很單純
+  Future<void> _showPayments(BuildContext context, Attachment a) async {
+    final aid = a.aid;
+    if (aid == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => _PaymentsSheet(aid: aid, name: a.name),
+    );
   }
 
   @override
@@ -455,8 +536,7 @@ class _AttachmentCard extends StatelessWidget {
                           tooltip: tr('購買紀錄'),
                           visualDensity: VisualDensity.compact,
                           icon: const Icon(LucideIcons.receipt, size: 17),
-                          onPressed: () => openInApp(context, items[i].recordUrl,
-                              title: tr('購買紀錄')),
+                          onPressed: () => _showPayments(context, items[i]),
                         ),
                       Icon(
                           items[i].needsPay
@@ -495,13 +575,18 @@ class _AttachmentCard extends StatelessWidget {
 
 class _PostCard extends StatelessWidget {
   const _PostCard({
+    super.key,
     required this.post,
     this.onReply,
     this.onRate,
     this.onShowRatings,
     this.onEdit,
+    this.highlight = false,
   });
   final PostItem post;
+
+  /// 從「我的回覆」跳過來的那一樓，框起來才找得到
+  final bool highlight;
   final VoidCallback? onReply;
   final VoidCallback? onRate;
   final VoidCallback? onShowRatings;
@@ -511,10 +596,18 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 7),
-      color: Theme.of(context).colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: highlight
+            ? Border(
+                left: BorderSide(color: scheme.primary, width: 3),
+              )
+            : null,
+      ),
+      padding: EdgeInsets.fromLTRB(highlight ? 11 : 14, 14, 14, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -704,6 +797,99 @@ class _PrizeBanner extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 附件的購買紀錄
+class _PaymentsSheet extends StatefulWidget {
+  const _PaymentsSheet({required this.aid, required this.name});
+  final int aid;
+  final String name;
+
+  @override
+  State<_PaymentsSheet> createState() => _PaymentsSheetState();
+}
+
+class _PaymentsSheetState extends State<_PaymentsSheet> {
+  List<({String user, String date, String price})>? _rows;
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _err = null);
+    try {
+      final r = await api.fetchAttachPayments(widget.aid);
+      if (mounted) setState(() => _rows = r);
+    } on DiscuzException catch (e) {
+      if (mounted) setState(() => _err = e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _rows;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * .6,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('購買紀錄'),
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 3),
+                Text(widget.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: faint(context))),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _err != null
+                ? Center(
+                    child: TextButton(
+                        onPressed: _load, child: Text(tr('重試'))))
+                : rows == null
+                    ? const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : rows.isEmpty
+                        ? Center(
+                            child: Text(tr('還沒有人買過'),
+                                style: TextStyle(
+                                    fontSize: 13, color: faint(context))))
+                        : ListView.separated(
+                            itemCount: rows.length,
+                            separatorBuilder: (_, _) => const Divider(
+                                height: 1, indent: 16, endIndent: 16),
+                            itemBuilder: (c, i) => ListTile(
+                              dense: true,
+                              title: Text(rows[i].user,
+                                  style: const TextStyle(fontSize: 14)),
+                              subtitle: rows[i].date.isEmpty
+                                  ? null
+                                  : Text(rows[i].date,
+                                      style: TextStyle(
+                                          fontSize: 11.5, color: faint(c))),
+                              trailing: Text(rows[i].price,
+                                  style: TextStyle(
+                                      fontSize: 12.5, color: subtle(c))),
+                            ),
+                          ),
           ),
         ],
       ),

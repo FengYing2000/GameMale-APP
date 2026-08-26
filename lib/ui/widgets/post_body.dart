@@ -51,7 +51,10 @@ class PostBody extends StatelessWidget {
       },
       customStylesBuilder: (element) {
         if (element.classes.contains('smiley')) {
-          return {'width': '22px', 'height': '22px'};
+          // 論壇給多大就多大；沒寫的話 22 是它自己的預設
+          final size = int.tryParse(element.attributes['data-size'] ?? '') ?? 22;
+          final px = '${size.clamp(14, 48)}px';
+          return {'width': px, 'height': px};
         }
 
         final styles = <String, String>{};

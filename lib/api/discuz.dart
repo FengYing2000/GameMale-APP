@@ -80,12 +80,12 @@ IndexData parseIndex(dom.Document doc) {
         final label = txt(link).replaceAll(RegExp(r'^\[|\]$'), '').trim();
         if (label.isEmpty) continue;
         if (subs.any((x) => x.fid == sid)) continue;
-        subs.add(SubForum(fid: sid, name: label));
+        subs.add(SubForum(fid: sid, name: sys(label)));
       }
 
       forums.add(ForumItem(
         fid: paramInt(attr(a, 'href'), 'fid') ?? 0,
-        name: name,
+        name: sys(name),
         icon: absolute(attr(li.querySelector('.f_icon img'), 'src')),
         threads: nums.isNotEmpty ? nums[0] : '',
         posts: attr(count?.querySelector('span[title]'), 'title').isNotEmpty
@@ -96,7 +96,8 @@ IndexData parseIndex(dom.Document doc) {
       ));
     }
     if (forums.isNotEmpty) {
-      groups.add(ForumGroup(name: txt(head.querySelector('h2')), forums: forums));
+      groups.add(
+          ForumGroup(name: sys(txt(head.querySelector('h2'))), forums: forums));
     }
   }
 
@@ -134,7 +135,7 @@ Map<int, List<SubForum>> parseIndexSubforums(dom.Document doc) {
       final name = txt(a).replaceAll(RegExp(r'^\[|\]$'), '').trim();
       if (name.isEmpty) continue;
       if (subs.any((x) => x.fid == sid)) continue;
-      subs.add(SubForum(fid: sid, name: name));
+      subs.add(SubForum(fid: sid, name: sys(name)));
     }
     if (subs.isNotEmpty) out[fid] = subs;
   }
@@ -201,9 +202,9 @@ Future<ForumData> fetchForum(
 ForumData parseForumFromDoc(dom.Document doc, int fid, {int page = 1}) {
   return ForumData(
     fid: fid,
-    name: txt(doc.querySelector('header h1')).isNotEmpty
+    name: sys(txt(doc.querySelector('header h1')).isNotEmpty
         ? txt(doc.querySelector('header h1'))
-        : txt(doc.querySelector('.forumListHeader h3')),
+        : txt(doc.querySelector('.forumListHeader h3'))),
     meta: doc.querySelectorAll('.forumListHeader p span').map(txt).toList(),
     subforums: _parseSubforums(doc),
     types: doc.querySelectorAll('#thread_types li a').map((a) {
@@ -531,8 +532,9 @@ SubmitResult _submitResult(String html, String what) {
           .firstMatch(html)
           ?.group(1);
   if (dialog != null && dialog.trim().isNotEmpty) {
-    final text = zh(dialog.trim());
-    return SubmitResult(ok: !_failurePatterns.hasMatch(text), message: text);
+    final raw = dialog.trim();
+    // 成敗要看原文 —— 轉成繁體之後「需要先登录」就對不上樣式了
+    return SubmitResult(ok: !_failurePatterns.hasMatch(raw), message: sys(raw));
   }
 
   final doc = toDoc(html);
@@ -685,7 +687,7 @@ Future<SignResult> fetchSignPage() async {
     final label = txt(rows[0]);
     final value = txt(rows[1]);
     if (label.isNotEmpty && value.isNotEmpty) {
-      stats.add((label: label, value: value));
+      stats.add((label: sys(label), value: sys(value)));
     }
   }
 
@@ -699,7 +701,7 @@ Future<SignResult> fetchSignPage() async {
         : '',
     signed: doc.querySelector('.btn_visited') != null ||
         RegExp('已签到|已簽到').hasMatch(header),
-    level: level,
+    level: sys(level),
     stats: stats,
   );
 }
@@ -728,18 +730,181 @@ Future<SignRules> fetchSignRules(String op) async {
       for (final td in tr.querySelectorAll('td')) {
         // 論壇每列開頭都塞一個空的圖示欄
         if (td.classes.contains('icn')) continue;
-        cells.add(txt(td));
+        cells.add(sys(txt(td)));
       }
       if (cells.any((c) => c.isNotEmpty)) rows.add(cells);
     }
-    if (rows.isNotEmpty) tables.add(SignRuleTable(title: title, rows: rows));
+    if (rows.isNotEmpty) {
+      tables.add(SignRuleTable(title: sys(title), rows: rows));
+    }
   }
 
   return SignRules(
-    intro: txt(main.querySelector('.bm_c p')),
+    intro: sys(txt(main.querySelector('.bm_c p'))),
     tables: tables,
-    text: tables.isEmpty ? txt(main) : '',
+    text: tables.isEmpty ? sys(txt(main)) : '',
   );
+}
+
+/// 我訂閱的專輯（淘帖）。只有桌面模板
+Future<List<CollectionItem>> fetchCollections() async {
+  final doc = toDoc(
+      await Api.instance.get('forum.php?mod=collection&op=my', desktop: true));
+  final out = <CollectionItem>[];
+
+  for (final dl in doc.querySelectorAll('.clct_list dl')) {
+    final a = dl.querySelector('dt a[href*="ctid="]');
+    final ctid = paramInt(attr(a, 'href'), 'ctid');
+    if (a == null || ctid == null) continue;
+
+    final ps = dl.querySelectorAll('dd p');
+    final latest = dl.querySelector('a[href*="thread-"]');
+
+    out.add(CollectionItem(
+      ctid: ctid,
+      name: txt(a),
+      threads: txt(dl.querySelector('dd.m strong')),
+      desc: ps.isNotEmpty ? txt(ps[0]) : '',
+      meta: ps.length > 1 ? txt(ps[1]) : '',
+      author: txt(dl.querySelector('a[href*="space-uid"]')),
+      latest: txt(latest),
+      latestTid: int.tryParse(
+          RegExp(r'thread-(\d+)').firstMatch(attr(latest, 'href'))?.group(1) ??
+              ''),
+    ));
+  }
+  return out;
+}
+
+/// 版塊的版規、版主與「收藏本版」。手機模板沒有這些，所以另外抓桌面頁
+Future<ForumExtras> fetchForumExtras(int fid) async {
+  final doc =
+      toDoc(await Api.instance.get('forum-$fid-1.html', desktop: true));
+
+  final rules = doc.getElementById('forum_rules_$fid');
+  final fav = doc.querySelector('#a_favorite');
+
+  // 版主只在版規那塊上面那一行，整頁掃會把主題列表的作者也撈進來
+  final mods = <ProfileLink>[];
+  for (final div in doc.querySelectorAll('.bm_c div')) {
+    if (!txt(div).startsWith('版主')) continue;
+    for (final a in div.querySelectorAll('a[href*="space-username"]')) {
+      final name = txt(a);
+      if (name.isEmpty || mods.any((m) => m.name == name)) continue;
+      mods.add(ProfileLink(name, url: absolute(attr(a, 'href'))));
+    }
+    break;
+  }
+
+  return ForumExtras(
+    rulesHtml: rules == null ? '' : sanitizeContent(rules),
+    moderators: mods,
+    favoriteUrl: absolute(attr(fav, 'href')),
+    favoriteCount: txt(doc.getElementById('number_favorite_num')),
+  );
+}
+
+/// 收藏清單。論壇左側那排分類（帖子／版塊／群組／日誌／相冊）共用這一支
+Future<({List<FavoriteItem> items, PageInfo pager})> fetchFavoriteList(
+  int uid, {
+  String type = 'all',
+  int page = 1,
+}) async {
+  final q = 'home.php?mod=space&uid=$uid&do=favorite&view=me&type=$type'
+      '${page > 1 ? '&page=$page' : ''}';
+  final doc = toDoc(await Api.instance.get(q, desktop: true));
+
+  final items = <FavoriteItem>[];
+  for (final li in doc.querySelectorAll('#favorite_ul li')) {
+    final favid = paramInt(
+        attr(li.querySelector('a[href*="op=delete"]'), 'href'), 'favid');
+    // 標題是那個 target=_blank 的連結，刪除連結不是
+    final a = li.querySelector('a[target="_blank"]');
+    if (favid == null || a == null) continue;
+
+    final href = attr(a, 'href');
+    final kind = _favKindOf(href, attr(li.querySelector('span img'), 'alt'));
+    items.add(FavoriteItem(
+      favid: favid,
+      title: txt(a),
+      type: kind,
+      url: absolute(href),
+      date: txt(li.querySelector('span.xg1')),
+      targetId: int.tryParse(
+              RegExp(r'(?:thread|forum|group|blog)-(\d+)')
+                      .firstMatch(href)
+                      ?.group(1) ??
+                  '') ??
+          paramInt(href, 'tid') ??
+          paramInt(href, 'fid') ??
+          paramInt(href, 'id'),
+    ));
+  }
+
+  return (items: items, pager: parsePager(doc, current: page));
+}
+
+String _favKindOf(String href, String alt) {
+  if (href.contains('thread-') || href.contains('mod=viewthread')) return 'thread';
+  if (href.contains('group-')) return 'group';
+  if (href.contains('forum-') || href.contains('forumdisplay')) return 'forum';
+  if (href.contains('blog-')) return 'blog';
+  if (href.contains('do=album')) return 'album';
+  return alt;
+}
+
+/// 簽到的道具擴展（補簽卡）。可以直接補簽或購買，不是單純一段說明
+Future<List<SignMagic>> fetchSignMagics() async {
+  final doc = toDoc(await Api.instance
+      .get('k_misign-misc.html?operation=magics', desktop: true));
+  final out = <SignMagic>[];
+
+  for (final dl in doc.querySelectorAll('.xld')) {
+    final name = txt(dl.querySelector('dt'));
+    if (name.isEmpty) continue;
+    final ps = dl.querySelectorAll('dd p');
+    out.add(SignMagic(
+      name: sys(name),
+      icon: absolute(attr(dl.querySelector('dd.m img'), 'src')),
+      desc: ps.isNotEmpty ? sys(txt(ps[0])) : '',
+      detail: ps.length > 1 ? sys(txt(ps[1])) : '',
+      useUrl: absolute(attr(dl.querySelector('a[id\$="_bq"]'), 'href')),
+      buyUrl: absolute(attr(dl.querySelector('a[id\$="_buy"]'), 'href')),
+    ));
+  }
+  return out;
+}
+
+/// 附件的購買紀錄
+Future<List<({String user, String date, String price})>> fetchAttachPayments(
+    int aid) async {
+  final doc = toDoc(await Api.instance.get(
+      'forum.php?mod=misc&action=viewattachpayments&aid=$aid',
+      desktop: true));
+
+  // 欄位順序是 用户名 / 时间 / 金币；表頭用的是 <th>，自然不會混進來
+  final out = <({String user, String date, String price})>[];
+  for (final tr in doc.querySelectorAll('tr')) {
+    final tds = tr.querySelectorAll('td');
+    if (tds.length < 2) continue;
+    final user = txt(tds[0]);
+    if (user.isEmpty) continue;
+    out.add((
+      user: user,
+      date: attr(tds[1].querySelector('span[title]'), 'title').isNotEmpty
+          ? attr(tds[1].querySelector('span[title]'), 'title')
+          : txt(tds[1]),
+      price: tds.length > 2 ? sys(txt(tds[2])) : '',
+    ));
+  }
+  return out;
+}
+
+/// 附件的原始位元組，存檔用
+Future<Uint8List> fetchAttachmentBytes(String url) {
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  return Api.instance.getBytes(path.replaceFirst(RegExp(r'^/'), ''));
 }
 
 /* ─────────────── 通知 / 私訊 ─────────────── */
@@ -1133,7 +1298,13 @@ List<Attachment> parseAttachments(dom.Document doc) {
     final href = attr(a, 'href');
     final tip = doc.getElementById('${attr(span, 'id')}_menu');
     final tipText = txt(tip);
+    final record =
+        attr(tip?.querySelector('a[href*="viewattachpayments"]'), 'href');
     add(Attachment(
+      aid: int.tryParse(
+              RegExp(r'attach_(\d+)').firstMatch(attr(span, 'id'))?.group(1) ??
+                  '') ??
+          paramInt(record, 'aid'),
       name: txt(a),
       url: absolute(href),
       icon: absolute(attr(span.previousElementSibling, 'src')),
@@ -1141,8 +1312,7 @@ List<Attachment> parseAttachments(dom.Document doc) {
       price: RegExp(r'售价[:：]\s*([^\s\[]+)').firstMatch(tipText)?.group(1) ?? '',
       permission:
           RegExp(r'阅读权限[:：]\s*(\S+)').firstMatch(tipText)?.group(1) ?? '',
-      recordUrl: absolute(
-          attr(tip?.querySelector('a[href*="viewattachpayments"]'), 'href')),
+      recordUrl: absolute(record),
       bought: href.contains('mod=attachment'),
     ));
   }
@@ -1179,15 +1349,22 @@ List<Attachment> parseAttachments(dom.Document doc) {
     }
 
     final href = attr(a, 'href');
+    final record =
+        attr(dl.querySelector('a[href*="viewattachpayments"]'), 'href');
     add(Attachment(
+      aid: paramInt(href, 'aid') ??
+          paramInt(record, 'aid') ??
+          int.tryParse(RegExp(r'aid(\d+)')
+                  .firstMatch(attr(dl.querySelector('[id^="aid"]'), 'id'))
+                  ?.group(1) ??
+              ''),
       name: name,
       url: absolute(href),
       icon: absolute(icon),
       info: info,
       price: price,
       permission: permission,
-      recordUrl: absolute(
-          attr(dl.querySelector('a[href*="viewattachpayments"]'), 'href')),
+      recordUrl: absolute(record),
       bought: href.contains('mod=attachment'),
     ));
   }
@@ -1525,7 +1702,7 @@ void _captureCreditNames(String html) {
     if (f.length < 3) continue;
     final id = int.tryParse(f[0]);
     if (id == null) continue;
-    out[id] = (name: f[1], unit: f[2]);
+    out[id] = (name: sys(f[1]), unit: sys(f[2]));
   }
   if (out.isNotEmpty) _creditNames = out;
 }
@@ -1718,6 +1895,9 @@ Future<SubmitResult> postDoing(String message, {String formhash = ''}) async {
 /* ─────────────── 評分 ─────────────── */
 
 /// Discuz 的浮層端點回的是 `<root><![CDATA[ …HTML… ]]></root>`
+/// ajax 回應包在 CDATA 裡，其他檔案也要用
+String unwrapAjax(String xml) => _unwrapAjax(xml);
+
 String _unwrapAjax(String xml) {
   final m = RegExp(r'<!\[CDATA\[([\s\S]*?)\]\]>').firstMatch(xml);
   return m?.group(1) ?? xml;

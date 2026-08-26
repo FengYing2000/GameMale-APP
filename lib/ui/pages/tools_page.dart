@@ -93,12 +93,7 @@ class _ToolsPageState extends State<ToolsPage> {
                   ),
                   title: Row(
                     children: [
-                      SizedBox(
-                        width: 26,
-                        child: Text(tool.icon,
-                            style: const TextStyle(fontSize: 17),
-                            textAlign: TextAlign.center),
-                      ),
+                      SizedBox(width: 26, child: Icon(tool.icon, size: 19)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(tr(tool.label),

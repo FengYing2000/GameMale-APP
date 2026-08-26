@@ -565,6 +565,52 @@ void main() {
     print('  ${rule.intro}｜${rule.tables.map((t) => '${t.title}(${t.rows.length})').join('、')}');
   }, timeout: const Timeout(Duration(seconds: 90)));
 
+  test('我訂閱的專輯、版塊版規、收藏分類、簽到道具', () async {
+    final c = await api.fetchCollections();
+    expect(c, isNotEmpty);
+    expect(c.every((x) => x.name.isNotEmpty && x.ctid > 0), isTrue);
+
+    final e = await api.fetchForumExtras(206);
+    expect(e.hasRules, isTrue);
+    expect(e.favoriteUrl, isNotEmpty);
+    // 版主只在版規那塊上面一行，整頁掃會把主題列表的作者也撈進來
+    expect(e.moderators.length, lessThan(8));
+
+    // 收藏之前只做了帖子與版塊
+    for (final t in favoriteTypes) {
+      final f = await api.fetchFavoriteList(677863, type: t.type);
+      expect(f.items.every((i) => i.favid > 0 && i.title.isNotEmpty), isTrue,
+          reason: '${t.name} 有缺欄位');
+    }
+    final threads = await api.fetchFavoriteList(677863, type: 'thread');
+    expect(threads.items, isNotEmpty);
+    expect(threads.items.every((i) => i.type == 'thread'), isTrue);
+
+    final m = await api.fetchSignMagics();
+    expect(m, isNotEmpty, reason: '補簽卡');
+    expect(m.first.useUrl, isNotEmpty, reason: '要能直接補簽');
+    expect(m.first.buyUrl, isNotEmpty, reason: '要能購買');
+    // ignore: avoid_print
+    print('  專輯 ${c.length}｜版主 ${e.moderators.map((x) => x.name).join('、')}'
+        '｜道具 ${m.first.name}');
+  }, timeout: const Timeout(Duration(seconds: 150)));
+
+  test('附件的購買紀錄與原始位元組', () async {
+    final ex = await api.fetchThreadExtras(194000);
+    final a = ex.attachments.first;
+    expect(a.aid, isNotNull);
+
+    final pays = await api.fetchAttachPayments(a.aid!);
+    expect(pays, isNotEmpty, reason: '這個附件有人買過');
+    expect(pays.every((p) => p.user.isNotEmpty), isTrue);
+
+    // 存檔要拿得到原始位元組
+    final bytes = await api.fetchAttachmentBytes(a.url);
+    expect(bytes.length, greaterThan(10));
+    // ignore: avoid_print
+    print('  ${pays.length} 筆紀錄，例如 ${pays.first.user}｜檔案 ${bytes.length} bytes');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

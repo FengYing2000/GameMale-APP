@@ -1,6 +1,6 @@
 import 'package:html/dom.dart' as dom;
 
-import 'discuz.dart' as discuz show confirmAndSubmit;
+import 'discuz.dart' as discuz show confirmAndSubmit, unwrapAjax;
 import 'discuz.dart' show submitResult;
 import 'http.dart';
 import 'models.dart';
@@ -441,6 +441,47 @@ List<({String label, String value})> _blogStats(dom.Document doc) {
 /// 收藏／取消收藏日誌、置頂、刪除都是同一種確認流程
 Future<SubmitResult> blogAction(String url, String what) =>
     discuz.confirmAndSubmit(url, what);
+
+/// 讀出評論原本的內容（編輯前要先填進輸入框）
+Future<({String text, String formhash, String action, String handlekey})>
+    fetchCommentEdit(String url) async {
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  path = path.replaceFirst(RegExp(r'^/'), '');
+
+  final xml = await Api.instance
+      .get('$path${path.contains('?') ? '&' : '?'}infloat=yes&inajax=1',
+          desktop: true);
+  final doc = toDoc(discuz.unwrapAjax(xml));
+  final form = doc.querySelector('form');
+  return (
+    text: txt(doc.querySelector('textarea')),
+    formhash: attr(doc.querySelector('input[name="formhash"]'), 'value'),
+    action: attr(form, 'action').replaceAll('&amp;', '&'),
+    handlekey: attr(doc.querySelector('input[name="handlekey"]'), 'value'),
+  );
+}
+
+Future<SubmitResult> submitCommentEdit(
+  ({String text, String formhash, String action, String handlekey}) form,
+  String message,
+) async {
+  if (form.action.isEmpty || form.formhash.isEmpty) {
+    return const SubmitResult(ok: false, message: '拿不到編輯表單');
+  }
+  final html = await Api.instance.post(
+    '${form.action}${form.action.contains('?') ? '&' : '?'}inajax=1',
+    {
+      'formhash': form.formhash,
+      'handlekey': form.handlekey,
+      'editsubmit': 'true',
+      'message': message,
+      'referer': '$kOrigin/',
+    },
+    desktop: true,
+  );
+  return submitResult(html, '編輯');
+}
 
 /// 日誌留言。跟留言板同一支端點，只是 idtype 換成 blogid
 Future<SubmitResult> postBlogComment(

@@ -11,6 +11,15 @@ bool convertToTraditional = false;
 
 String zh(String s) => convertToTraditional ? S2T.instance.convert(s) : s;
 
+/// 介面語言是不是繁體。由 SettingsStore 設定
+bool uiTraditional = true;
+
+/// 系統文字（簽到頁的欄位、積分名稱、版塊名、論壇給的提示…）跟著介面語言走。
+///
+/// 使用者自己發的東西 —— 帖子標題、內文、留言 —— 一律用 `txt()` 保留原文，
+/// 轉過的標題跟網頁版對不起來。想看繁體請用帖子頁上的翻譯鈕。
+String sys(String s) => uiTraditional ? S2T.instance.convert(s) : s;
+
 dom.Document toDoc(String html) => html_parser.parse(html);
 
 /// 取文字並把連續空白（含 &nbsp;）收成單一空格
@@ -110,11 +119,27 @@ String sanitizeContent(dom.Element? el) {
         img.attributes['src'];
     final src = absolute(real);
     img.attributes['src'] = src;
+    // 尺寸要先讀下來再刪 —— 表情圖是靠它認出來的
+    final w = int.tryParse(
+        (img.attributes['width'] ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
+    final h = int.tryParse(
+        (img.attributes['height'] ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
+
     for (final k in ['width', 'height', 'file', 'zoomfile', 'data-original', 'onclick']) {
       img.attributes.remove(k);
     }
-    final cls = src.contains('/static/image/smiley/') ? 'smiley' : 'post-img';
-    img.attributes['class'] = cls;
+
+    // 論壇自己的表情在 /static/image/smiley/，但使用者也會插 noto-emoji 的
+    // SVG（jsdelivr）。那些都寫著 width="15"，照內容圖畫會變成整排大圖。
+    final small = (w != null && w <= 48) || (h != null && h <= 48);
+    final isSmiley = src.contains('/static/image/smiley/') ||
+        src.contains('noto-emoji') ||
+        small;
+    img.attributes['class'] = isSmiley ? 'smiley' : 'post-img';
+    if (isSmiley && (w != null || h != null)) {
+      // 原本多大就畫多大，別統一撐成 22
+      img.attributes['data-size'] = '${w ?? h}';
+    }
   }
 
   for (final a in node.querySelectorAll('a').toList()) {

@@ -148,7 +148,7 @@ class _MyListPageState extends State<MyListPage> {
     try {
       final page = await api.resolvePostPage(t.tid, t.myPid!);
       if (!mounted) return;
-      context.push('/t/${t.tid}?page=$page');
+      context.push('/t/${t.tid}?page=$page&pid=${t.myPid}');
     } on DiscuzException {
       if (mounted) context.push('/t/${t.tid}');
     }

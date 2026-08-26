@@ -23,7 +23,7 @@ class _MePageState extends State<MePage> {
 
   // needsLogin=false 的訪客也能看，論壇本來就開放
   static const _entries = [
-    (LucideIcons.star, '我的收藏', '/my/favorite', true),
+    (LucideIcons.star, '我的收藏', '/favorites', true),
     (LucideIcons.squarePen, '我的主題', '/my/thread', true),
     (LucideIcons.reply, '我的回覆', '/my/reply', true),
   ];

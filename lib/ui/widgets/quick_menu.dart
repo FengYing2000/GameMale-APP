@@ -15,19 +15,21 @@ import 'external_link.dart';
 /// 用內建瀏覽器開（帶得到登入狀態）。
 /// 論壇左側那排功能。全都是外掛頁面，只有桌面模板，
 /// 用內建瀏覽器開（帶得到登入狀態，網址也會補上 mobile=no）。
-const forumTools = <({String id, String label, String icon, String path})>[
-  (id: 'medalshop', label: '勳章商城', icon: '🎖', path: 'wodexunzhang-showxunzhang.html'),
-  (id: 'mymedal', label: '我的勳章', icon: '▣', path: 'wodexunzhang-showxunzhang.html?action=my'),
-  (id: 'magic', label: '道具超市', icon: '㍰', path: 'home.php?mod=magic'),
-  (id: 'blood', label: '血液祭獻', icon: '⇄', path: 'home.php?mod=spacecp&ac=credit&op=exchange'),
-  (id: 'card', label: '日常卡片', icon: '¼', path: 'it618_award-award.html'),
-  (id: 'buyname', label: '頭銜稱號', icon: 'Ｔ', path: 'tshuz_buyname-tshuz_buyname.html'),
-  (id: 'usercard', label: '多彩名片', icon: '▤', path: 'k_usercard-style.html'),
-  (id: 'bgshop', label: '背景商店', icon: 'Ｂ', path: 'tshuz_bgshop-tshuz_bgshop.html'),
-  (id: 'draw', label: '你畫我猜', icon: '✎', path: 'plugin.php?id=viewui_draw'),
-  (id: 'task', label: '熱門任務', icon: '☑', path: 'home.php?mod=task'),
-  (id: 'posttask', label: '每週發帖獎勵', icon: '✎', path: 'home.php?mod=task&do=view&id=25'),
-  (id: 'replytask', label: '每月回帖獎勵', icon: '↩', path: 'reply_reward-reply_reward.html'),
+/// 論壇左側那排功能。全都是外掛頁面，只有桌面模板，
+/// 用內建瀏覽器開（帶得到登入狀態，網址也會補上 mobile=no）。
+const forumTools = <({String id, String label, IconData icon, String path})>[
+  (id: 'medalshop', label: '勳章商城', icon: LucideIcons.medal, path: 'wodexunzhang-showxunzhang.html'),
+  (id: 'mymedal', label: '我的勳章', icon: LucideIcons.award, path: 'wodexunzhang-showxunzhang.html?action=my'),
+  (id: 'magic', label: '道具超市', icon: LucideIcons.wand, path: 'home.php?mod=magic'),
+  (id: 'blood', label: '血液祭獻', icon: LucideIcons.droplet, path: 'home.php?mod=spacecp&ac=credit&op=exchange'),
+  (id: 'card', label: '日常卡片', icon: LucideIcons.creditCard, path: 'it618_award-award.html'),
+  (id: 'buyname', label: '頭銜稱號', icon: LucideIcons.tag, path: 'tshuz_buyname-tshuz_buyname.html'),
+  (id: 'usercard', label: '多彩名片', icon: LucideIcons.idCard, path: 'k_usercard-style.html'),
+  (id: 'bgshop', label: '背景商店', icon: LucideIcons.image, path: 'tshuz_bgshop-tshuz_bgshop.html'),
+  (id: 'draw', label: '你畫我猜', icon: LucideIcons.pencil, path: 'plugin.php?id=viewui_draw'),
+  (id: 'task', label: '熱門任務', icon: LucideIcons.listChecks, path: 'home.php?mod=task'),
+  (id: 'posttask', label: '每週發帖獎勵', icon: LucideIcons.squarePen, path: 'home.php?mod=task&do=view&id=25'),
+  (id: 'replytask', label: '每月回帖獎勵', icon: LucideIcons.reply, path: 'reply_reward-reply_reward.html'),
 ];
 
 /// 首頁的側邊欄
@@ -126,9 +128,7 @@ class QuickDrawer extends StatelessWidget {
             ),
             for (final t in settings.visibleTools)
               _tile(context,
-                  leading: Text(t.icon,
-                      style: const TextStyle(fontSize: 16),
-                      textAlign: TextAlign.center),
+                  icon: t.icon,
                   label: tr(t.label),
                   onTap: () => openInApp(
                       context, Api.desktopFullUrl(t.path),

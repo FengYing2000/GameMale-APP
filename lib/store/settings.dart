@@ -158,7 +158,7 @@ class SettingsStore extends ChangeNotifier {
   }
 
   /// 依使用者排好的順序給出要顯示的工具
-  List<({String id, String label, String icon, String path})> get visibleTools {
+  List<({String id, String label, IconData icon, String path})> get visibleTools {
     final order = _toolOrder;
     if (order == null) return forumTools;
     return [
@@ -169,7 +169,7 @@ class SettingsStore extends ChangeNotifier {
   }
 
   /// 有哪些被關掉了
-  List<({String id, String label, String icon, String path})> get hiddenTools {
+  List<({String id, String label, IconData icon, String path})> get hiddenTools {
     final order = _toolOrder;
     if (order == null) return const [];
     return [for (final t in forumTools) if (!order.contains(t.id)) t];

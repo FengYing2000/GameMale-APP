@@ -771,14 +771,15 @@ void main() {
 
     test('依積分 ID 定位，不是照順序數', () {
       final out = api.parseCreditNotice(cookie, uid: 677863);
+      // 積分名稱是系統文字，介面設繁體時會跟著轉
       expect(out.map((c) => c.toString()).toList(),
-          ['金币 +3枚', '血液 +4滴', '咒术 +1卷']);
+          ['金幣 +3枚', '血液 +4滴', '咒術 +1卷']);
     });
 
     test('不會把變化套到下一個名稱上', () {
       final names = api.parseCreditNotice(cookie, uid: 677863).map((c) => c.name);
-      expect(names, isNot(contains('追随')), reason: '追随這次沒有變動');
-      expect(names, isNot(contains('知识')));
+      expect(names, isNot(contains('追隨')), reason: '追隨這次沒有變動');
+      expect(names, isNot(contains('知識')));
       expect(names, isNot(contains('旅程')));
     });
 
@@ -798,7 +799,7 @@ void main() {
 
     test('負值也讀得出來', () {
       final out = api.parseCreditNotice('-5D0D-5D0D0D0D0D0D0D677863', uid: 677863);
-      expect(out.single.toString(), '金币 -5枚');
+      expect(out.single.toString(), '金幣 -5枚');
     });
   });
 
@@ -973,6 +974,31 @@ void main() {
       final r = parsePager(toDoc('<div></div>'), current: 3);
       expect(r.page, 3);
       expect(r.hasNext, isFalse);
+    });
+  });
+
+  group('系統文字 vs 使用者內容', () {
+    // 使用者發的東西一律原文（轉過的標題跟網頁版對不起來），
+    // 系統文字（版塊名、積分名、論壇提示）才跟著介面語言
+    test('txt 不轉，sys 才轉', () {
+      uiTraditional = true;
+      convertToTraditional = false;
+      final doc = toDoc('<p>汉化补丁</p>');
+      expect(txt(doc.querySelector('p')), '汉化补丁', reason: '使用者內容要保留原文');
+      expect(sys('汉化补丁'), '漢化補丁');
+    });
+    test('介面設簡體時系統文字也維持簡體', () {
+      uiTraditional = false;
+      expect(sys('金币'), '金币');
+      uiTraditional = true;
+    });
+    test('送出失敗要看原文判斷，別被轉換擋掉', () {
+      const body = "<root><![CDATA[<script>showDialog('您需要先登录才能继续本操作',"
+          "'alert');</script>]]></root>";
+      final r = api.submitResult(body, '收藏');
+      expect(r.ok, isFalse, reason: '轉成繁體後「需要先登录」就對不上樣式了');
+      // 顯示出來的還是繁體
+      expect(r.message, contains('登錄'));
     });
   });
 

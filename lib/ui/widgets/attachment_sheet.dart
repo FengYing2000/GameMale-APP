@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
@@ -31,6 +35,7 @@ class _Sheet extends StatefulWidget {
 class _SheetState extends State<_Sheet> {
   String? _text;
   String? _err;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -56,6 +61,30 @@ class _SheetState extends State<_Sheet> {
           .map((m) => m.group(0)!)
           .toSet()
           .toList();
+
+  /// iOS 沒有「下載資料夾」可以丟，所以寫進 App 的暫存目錄再交給
+  /// 系統分享單 —— 使用者要存到檔案 App、傳給別人都從那裡走
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final bytes = await api.fetchAttachmentBytes(widget.attachment.url);
+      final dir = await getTemporaryDirectory();
+      // 檔名可能有斜線之類的字元，掃乾淨免得寫不進去
+      final safe = widget.attachment.name
+          .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final file = File('${dir.path}/$safe');
+      await file.writeAsBytes(bytes);
+      if (!mounted) return;
+      await SharePlus.instance
+          .share(ShareParams(files: [XFile(file.path)], title: safe));
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '${tr('存檔失敗：')}${e.message}');
+    } catch (e) {
+      if (mounted) toast(context, '${tr('存檔失敗：')}$e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +164,19 @@ class _SheetState extends State<_Sheet> {
                       },
                       icon: const Icon(LucideIcons.copy, size: 17),
                       label: Text(tr('複製全部')),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(LucideIcons.save, size: 17),
+                      label: Text(_saving ? tr('存檔中…') : tr('存成檔案')),
                     ),
                   ),
                 ],

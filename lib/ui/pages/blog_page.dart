@@ -118,6 +118,54 @@ class _BlogPageState extends State<BlogPage> {
     }
   }
 
+  /// 評論編輯改成 App 內做 —— 只是一個輸入框，開瀏覽器太重
+  Future<void> _editComment(BlogComment c) async {
+    final form = await () async {
+      try {
+        return await api.fetchCommentEdit(c.editUrl);
+      } on DiscuzException catch (e) {
+        if (mounted) toast(context, '${tr('拿不到編輯表單：')}${e.message}');
+        return null;
+      }
+    }();
+    if (form == null || !mounted) return;
+    if (form.formhash.isEmpty) {
+      toast(context, tr('拿不到編輯表單'), kind: ToastKind.warn);
+      return;
+    }
+
+    final ctrl = TextEditingController(text: form.text);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('編輯評論')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 5,
+          decoration: InputDecoration(hintText: tr('說點什麼…')),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: Text(tr('儲存'))),
+        ],
+      ),
+    );
+    if (text == null || text.isEmpty || !mounted) return;
+
+    try {
+      final r = await api.submitCommentEdit(form, text);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, '${tr('編輯失敗：')}${e.message}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -389,8 +437,7 @@ class _BlogPageState extends State<BlogPage> {
                           if (c.editUrl.isNotEmpty)
                             TextButton(
                               style: _tight,
-                              onPressed: () => openInApp(context, c.editUrl,
-                                  title: tr('編輯評論')),
+                              onPressed: () => _editComment(c),
                               child: Text(tr('編輯'),
                                   style: const TextStyle(fontSize: 12)),
                             ),

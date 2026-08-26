@@ -28,6 +28,7 @@ import 'ui/pages/profile_page.dart';
 import 'ui/pages/album_page.dart';
 import 'ui/pages/blog_list_page.dart';
 import 'ui/pages/blog_page.dart';
+import 'ui/pages/favorites_page.dart';
 import 'ui/pages/group_page.dart';
 import 'ui/pages/groups_page.dart';
 import 'ui/pages/register_page.dart';
@@ -85,6 +86,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
     final want = _settings.toTraditional;
     final changed = UiLang.instance.simplified == want;
     parse.convertToTraditional = false;
+    parse.uiTraditional = want;   // 系統文字跟著介面語言
     S2T.instance.useTaiwanWords = true;
     UiLang.instance.simplified = !want;      // 介面文字
     if (changed && mounted) setState(() {});
@@ -158,6 +160,7 @@ GoRouter _buildRouter(SessionStore session) {
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/settings/tools', builder: (c, s) => const ToolsPage()),
       GoRoute(path: '/blogs', builder: (c, s) => const BlogListPageView()),
+      GoRoute(path: '/favorites', builder: (c, s) => const FavoritesPage()),
       GoRoute(path: '/groups', builder: (c, s) => const GroupsPage()),
       GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
@@ -202,6 +205,7 @@ GoRouter _buildRouter(SessionStore session) {
           tid: _int(s, 'tid'),
           initialPage:
               int.tryParse(s.uri.queryParameters['page'] ?? '') ?? 1,
+          focusPid: int.tryParse(s.uri.queryParameters['pid'] ?? ''),
         ),
       ),
       GoRoute(path: '/notice', builder: (c, s) => const NoticePage()),

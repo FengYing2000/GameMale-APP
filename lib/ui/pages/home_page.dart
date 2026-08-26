@@ -12,6 +12,7 @@ import '../../api/models.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/external_link.dart';
 import '../widgets/quick_menu.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -26,6 +27,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   IndexData? _data;
   List<SubForum> _favForums = const [];
+  List<CollectionItem> _collections = const [];
   bool _loading = true;
   bool _signing = false;
   String? _err;
@@ -87,6 +89,22 @@ class _HomePageState extends State<HomePage> {
     }
     _loadFavorites();
     _loadSubforums();
+    _loadCollections();
+  }
+
+  /// 我訂閱的專輯（淘帖）。只有桌面模板，登入了才有東西
+  Future<void> _loadCollections() async {
+    if (!mounted) return;
+    if (context.read<SessionStore>().uid == null) {
+      if (_collections.isNotEmpty) setState(() => _collections = const []);
+      return;
+    }
+    try {
+      final c = await api.fetchCollections();
+      if (mounted) setState(() => _collections = c);
+    } on DiscuzException {
+      // 抓不到就不顯示這一區
+    }
   }
 
   /// 手機模板的子版塊列不齊（勳章公會的「勳章博物館」就漏了），
@@ -179,6 +197,7 @@ class _HomePageState extends State<HomePage> {
             if (data != null) ...[
               if (data.sign case final sign?) _SignCard(
                   sign: sign, busy: _signing, onSign: _sign),
+              if (_collections.isNotEmpty) _Collections(items: _collections),
               if (_favForums.isNotEmpty) _FavoriteForums(items: _favForums),
               for (var i = 0; i < data.groups.length; i++) ...[
                 _GroupHeader(
@@ -297,6 +316,98 @@ class _GroupHeader extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 我訂閱的專輯
+class _Collections extends StatelessWidget {
+  const _Collections({required this.items});
+  final List<CollectionItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
+          child: Text(tr('我訂閱的專輯'),
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: faint(context))),
+        ),
+        SizedBox(
+          height: 92,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              for (final c in items)
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: SizedBox(
+                    width: 190,
+                    child: Card(
+                      margin: EdgeInsets.zero,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => openInApp(
+                          context,
+                          '$kOrigin/forum.php?mod=collection&action=view&ctid=${c.ctid}',
+                          title: c.name,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(LucideIcons.library,
+                                      size: 15,
+                                      color:
+                                          Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(c.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                '${c.threads} ${tr('主題')}'
+                                '${c.meta.isEmpty ? '' : '　${c.meta}'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 11, color: faint(context)),
+                              ),
+                              const Spacer(),
+                              if (c.latest.isNotEmpty)
+                                Text(c.latest,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: subtle(context))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
