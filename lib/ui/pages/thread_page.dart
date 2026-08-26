@@ -162,18 +162,29 @@ class _ThreadPageState extends State<ThreadPage> {
     context.push(uri.toString());
   }
 
-  /// 捲到指定的那一樓。畫面要先排好版才量得到位置，所以等一幀
+  /// 捲到指定的那一樓。難點是圖片與樓中樓是逐步載入的，第一次量到的位置
+  /// 之後會被上方長高的內容往下推，所以隔一小段時間就再校正一次。
   void _scrollToFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    var tries = 0;
+    void go() {
+      if (!mounted) return;
       final ctx = _focusKey.currentContext;
-      if (ctx == null) return;
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
-        alignment: 0.1,
-      );
-    });
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          alignment: 0.08,
+        );
+      }
+      // 校正幾次涵蓋圖片載入造成的位移；找不到（還沒建好）也重試。
+      // 次數別太多，否則會跟使用者自己的捲動打架
+      if (++tries < 4) {
+        Future.delayed(const Duration(milliseconds: 300), go);
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => go());
   }
 
   /// 開了翻譯才轉，沒開就原樣回去
