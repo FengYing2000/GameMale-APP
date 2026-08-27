@@ -32,6 +32,7 @@ import 'ui/pages/blog_page.dart';
 import 'ui/pages/collection_page.dart';
 import 'ui/pages/favorites_page.dart';
 import 'ui/pages/group_page.dart';
+import 'ui/pages/group_extra_page.dart';
 import 'ui/pages/groups_page.dart';
 import 'ui/pages/register_page.dart';
 import 'ui/pages/web_page.dart';
@@ -160,6 +161,7 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
         builder: (c, s) => SearchPage(
           fid: _int(s, 'fid'),
           forumName: s.uri.queryParameters['name'] ?? '',
+          initialQuery: s.uri.queryParameters['q'] ?? '',
         ),
       ),
       GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
@@ -172,6 +174,14 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
       ),
       GoRoute(path: '/favorites', builder: (c, s) => const FavoritesPage()),
       GoRoute(path: '/groups', builder: (c, s) => const GroupsPage()),
+      GoRoute(path: '/groups/my', builder: (c, s) => const MyGroupsPage()),
+      GoRoute(
+        path: '/g/:fid/members',
+        builder: (c, s) => GroupMembersPage(
+          fid: _int(s, 'fid'),
+          name: s.uri.queryParameters['name'] ?? '',
+        ),
+      ),
       GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
       GoRoute(

@@ -1,16 +1,19 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../api/discuz.dart' as discuz;
 import '../../api/group.dart' as api;
 import '../../api/http.dart';
 import '../../api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
-import '../widgets/external_link.dart';
 import '../widgets/pager_bar.dart';
+import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';
+import '../widgets/toast.dart';
 
 /// 群組。只有桌面模板，所以走 desktop 抓再自己排版
 class GroupPage extends StatefulWidget {
@@ -24,6 +27,7 @@ class GroupPage extends StatefulWidget {
 class _GroupPageState extends State<GroupPage> {
   GroupData? _data;
   bool _loading = true;
+  bool _busy = false;
   String? _err;
   int _page = 1;
 
@@ -49,6 +53,78 @@ class _GroupPageState extends State<GroupPage> {
     }
   }
 
+  /// 加入是一步就成立的（沒有確認頁），所以先問一次
+  Future<void> _join() async {
+    final d = _data;
+    if (d == null) return;
+    if (!await requireLogin(context, action: tr('加入群組'))) return;
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('加入群組')),
+        content: Text('${tr('確定要加入「')}${d.name}${tr('」嗎？')}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('加入'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await api.joinGroup(widget.fid);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) await _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _quit() async {
+    final d = _data;
+    if (d == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('退出群組')),
+        content: Text('${tr('確定要退出「')}${d.name}${tr('」嗎？')}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('退出'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await api.quitGroup(widget.fid, formhash: d.formhash);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) await _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _favorite() async {
+    final d = _data;
+    if (d == null || d.favoriteUrl.isEmpty) return;
+    if (!await requireLogin(context, action: tr('收藏群組'))) return;
+    if (!mounted) return;
+    try {
+      final r = await discuz.favoriteByUrl(d.favoriteUrl);
+      if (mounted) toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -61,7 +137,25 @@ class _GroupPageState extends State<GroupPage> {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 16),
         ),
+        actions: [
+          if (d != null)
+            IconButton(
+              tooltip: tr('成員列表'),
+              icon: const Icon(LucideIcons.usersRound),
+              onPressed: () => context.push(Uri(
+                path: '/g/${widget.fid}/members',
+                queryParameters: {'name': d.name},
+              ).toString()),
+            ),
+        ],
       ),
+      floatingActionButton: (d != null && d.joined)
+          ? FloatingActionButton(
+              onPressed: () => context.push('/f/${widget.fid}/post'),
+              tooltip: tr('發表主題'),
+              child: const Icon(LucideIcons.squarePen),
+            )
+          : null,
       bottomNavigationBar: d == null || d.threads.isEmpty
           ? null
           : StickyPager(pager: d.pager, onGo: (p) => _load(page: p)),
@@ -113,12 +207,32 @@ class _GroupPageState extends State<GroupPage> {
                         Text(d.name,
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.w700)),
-                        if (d.meta.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(d.meta,
-                              style: TextStyle(
-                                  fontSize: 12, color: faint(context))),
-                        ],
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 12,
+                          children: [
+                            if (d.level.isNotEmpty)
+                              Text(d.level,
+                                  style: TextStyle(
+                                      fontSize: 12, color: faint(context))),
+                            if (d.points.isNotEmpty)
+                              Text('${tr('積分')} ${d.points}',
+                                  style: TextStyle(
+                                      fontSize: 12, color: faint(context))),
+                          ],
+                        ),
+                        if (d.master.isNotEmpty)
+                          GestureDetector(
+                            onTap: d.masterUid == null
+                                ? null
+                                : () => context.push('/u/${d.masterUid}'),
+                            child: Text('${tr('群主')}：${d.master}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: d.masterUid == null
+                                        ? faint(context)
+                                        : Theme.of(context).colorScheme.primary)),
+                          ),
                       ],
                     ),
                   ),
@@ -130,6 +244,30 @@ class _GroupPageState extends State<GroupPage> {
                     style: TextStyle(
                         fontSize: 13.5, height: 1.7, color: subtle(context))),
               ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (d.joined)
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _quit,
+                      icon: const Icon(LucideIcons.logOut, size: 16),
+                      label: Text(tr('退出群組')),
+                    )
+                  else if (d.canJoin)
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _join,
+                      icon: const Icon(LucideIcons.userPlus, size: 16),
+                      label: Text(tr('加入群組')),
+                    ),
+                  const SizedBox(width: 10),
+                  if (d.favoriteUrl.isNotEmpty)
+                    OutlinedButton.icon(
+                      onPressed: _favorite,
+                      icon: const Icon(LucideIcons.star, size: 16),
+                      label: Text(tr('收藏')),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
@@ -147,17 +285,14 @@ class _GroupPageState extends State<GroupPage> {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14.5, height: 1.7),
             ),
-            const SizedBox(height: 18),
-            // 加入與申請都得在論壇頁面上完成
-            FilledButton.icon(
-              onPressed: () => openInApp(
-                context,
-                '$kOrigin/group-${widget.fid}-1.html',
-                title: d.name,
+            if (d.canJoin && !d.joined) ...[
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: _busy ? null : _join,
+                icon: const Icon(LucideIcons.userPlus, size: 18),
+                label: Text(tr('加入群組')),
               ),
-              icon: const Icon(LucideIcons.externalLink, size: 18),
-              label: Text(tr('在論壇頁面開啟')),
-            ),
+            ],
           ],
         ),
       );

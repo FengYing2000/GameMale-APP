@@ -50,6 +50,10 @@ class ForumItem {
   final String posts;
   final String desc;
 
+  /// 版塊簡介的原始 HTML（含 &lt;br&gt; 與快捷連結）。純文字 `desc` 會把
+  /// 換行全部收成一行、很難讀，資訊卡改用這個交給 PostBody 渲染。
+  final String descHtml;
+
   /// 版主名單（首頁桌面模板才有）
   final List<String> moderators;
 
@@ -63,6 +67,7 @@ class ForumItem {
     this.threads = '',
     this.posts = '',
     this.desc = '',
+    this.descHtml = '',
     this.moderators = const [],
     this.subforums = const [],
   });
@@ -1368,10 +1373,62 @@ const searchSpecialOptions = <({int value, String label})>[
 
 /// 群組列表的一項
 class GroupItem {
-  const GroupItem({required this.fid, required this.name, this.icon = ''});
+  const GroupItem(
+      {required this.fid, required this.name, this.icon = '', this.desc = ''});
   final int fid;
   final String name;
   final String icon;
+  final String desc;
+}
+
+/// 群組分類（電玩遊戲／休閒娛樂…）
+class GroupCategory {
+  const GroupCategory({
+    required this.name,
+    this.count = '',
+    this.subs = const [],
+    this.groups = const [],
+  });
+  final String name;
+  final String count;
+
+  /// 子分類（网游／单机…）
+  final List<({String name, int? sgid, int? gid})> subs;
+  final List<GroupItem> groups;
+}
+
+/// 群組積分排行的一列
+class GroupRankRow {
+  const GroupRankRow(
+      {required this.rank, required this.name, required this.fid, this.points = ''});
+  final int rank;
+  final String name;
+  final int fid;
+  final String points;
+}
+
+/// 群組首頁：推薦、分類、積分排行
+class GroupIndex {
+  const GroupIndex({
+    this.recommended = const [],
+    this.categories = const [],
+    this.ranking = const [],
+  });
+  final List<GroupItem> recommended;
+  final List<GroupCategory> categories;
+  final List<GroupRankRow> ranking;
+}
+
+/// 群組成員
+class GroupMember {
+  const GroupMember(
+      {required this.name, this.uid, this.avatar = '', this.title = ''});
+  final String name;
+  final int? uid;
+  final String avatar;
+
+  /// 群主／管理員之類的頭銜
+  final String title;
 }
 
 /// 群組內頁
@@ -1382,6 +1439,13 @@ class GroupData {
     this.icon = '',
     this.desc = '',
     this.meta = '',
+    this.master = '',
+    this.masterUid,
+    this.level = '',
+    this.points = '',
+    this.joined = false,
+    this.favoriteUrl = '',
+    this.formhash = '',
     this.threads = const [],
     this.pager = const PageInfo(),
     this.canJoin = false,
@@ -1396,6 +1460,15 @@ class GroupData {
 
   /// 群組等級、積分、群主
   final String meta;
+  final String master;
+  final int? masterUid;
+  final String level;
+  final String points;
+
+  /// 我已經加入這個群組（能發帖、能退出）
+  final bool joined;
+  final String favoriteUrl;
+  final String formhash;
 
   final List<ThreadItem> threads;
   final PageInfo pager;
@@ -1471,6 +1544,8 @@ class CollectionItem {
     this.threads = '',
     this.meta = '',
     this.author = '',
+    this.authorUid,
+    this.tags = const [],
     this.latest = '',
     this.latestTid,
   });
@@ -1485,8 +1560,35 @@ class CollectionItem {
   /// 「订阅 26, 评论 13」
   final String meta;
   final String author;
+  final int? authorUid;
+
+  /// 專輯標籤（可點去搜尋）
+  final List<CollectionTag> tags;
   final String latest;
   final int? latestTid;
+}
+
+/// 淘專輯標籤：名字 + 搜尋關鍵字
+class CollectionTag {
+  const CollectionTag(this.name, this.keyword);
+  final String name;
+  final String keyword;
+}
+
+/// 淘專輯的一則評論（含評分星數）
+class CollectionComment {
+  const CollectionComment({
+    required this.author,
+    this.uid,
+    this.date = '',
+    this.stars = 0,
+    this.text = '',
+  });
+  final String author;
+  final int? uid;
+  final String date;
+  final int stars;
+  final String text;
 }
 
 /// 版塊的額外資訊：版規、版主、收藏本版
@@ -1645,10 +1747,18 @@ class CollectionView {
     this.name = '',
     this.desc = '',
     this.author = '',
+    this.authorUid,
     this.rating = '',
     this.follows = '',
     this.followUrl = '',
     this.following = false,
+    this.mine = false,
+    this.editUrl = '',
+    this.removeUrl = '',
+    this.inviteUrl = '',
+    this.recommendUrl = '',
+    this.formhash = '',
+    this.comments = const [],
     this.list = const [],
     this.pager = const PageInfo(),
     this.message,
@@ -1658,8 +1768,9 @@ class CollectionView {
   final String name;
   final String desc;
   final String author;
+  final int? authorUid;
 
-  /// 「(共 3 次打分)」之類
+  /// 「(共 3 次打分)」或「暂时还没有人评分」
   final String rating;
   final String follows;
 
@@ -1667,6 +1778,19 @@ class CollectionView {
   final String followUrl;
   final bool following;
 
+  /// 這是不是我自己建的（才有編輯／刪除／邀請維護）
+  final bool mine;
+  final String editUrl;
+  final String removeUrl;
+  final String inviteUrl;
+
+  /// 向作者推薦主題
+  final String recommendUrl;
+
+  /// 發表評論／推薦主題要用的 formhash
+  final String formhash;
+
+  final List<CollectionComment> comments;
   final List<ThreadItem> list;
   final PageInfo pager;
   final String? message;

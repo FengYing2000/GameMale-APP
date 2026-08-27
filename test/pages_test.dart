@@ -15,6 +15,7 @@ import 'package:gamemale/ui/pages/favorites_page.dart';
 import 'package:gamemale/ui/pages/forum_page.dart';
 import 'package:gamemale/ui/pages/group_page.dart';
 import 'package:gamemale/ui/pages/groups_page.dart';
+import 'package:gamemale/ui/pages/group_extra_page.dart';
 import 'package:gamemale/ui/pages/guide_page.dart';
 import 'package:gamemale/ui/pages/album_page.dart';
 import 'package:gamemale/ui/pages/blog_list_page.dart';
@@ -91,6 +92,8 @@ void main() {
     '日誌廣場': const BlogListPageView(),
     '群組': const GroupPage(fid: 116),
     '群組列表': const GroupsPage(),
+    '我的群組': const MyGroupsPage(),
+    '群組成員': const GroupMembersPage(fid: 116),
     '我的收藏': const FavoritesPage(),
     '我的主題': const MyListPage(type: 'thread'),
     '記錄廣場': const DoingPageView(),

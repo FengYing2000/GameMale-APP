@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
+import '../widgets/external_link.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';
@@ -159,15 +161,62 @@ class _CollectionCard extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 12.5, height: 1.4, color: subtle(context))),
                     ],
+                    if (item.tags.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          for (final t in item.tags)
+                            GestureDetector(
+                              onTap: () => context.push(Uri(
+                                path: '/f/0/search',
+                                queryParameters: {'q': t.keyword},
+                              ).toString()),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: .1),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text('#${t.name}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color:
+                                            Theme.of(context).colorScheme.primary)),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 5),
-                    Text(
-                      [
-                        if (item.author.isNotEmpty) item.author,
-                        if (item.meta.isNotEmpty) item.meta,
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11.5, color: faint(context)),
+                    Row(
+                      children: [
+                        if (item.author.isNotEmpty)
+                          GestureDetector(
+                            onTap: item.authorUid == null
+                                ? null
+                                : () => context.push('/u/${item.authorUid}'),
+                            child: Text(item.author,
+                                style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: item.authorUid == null
+                                        ? faint(context)
+                                        : Theme.of(context).colorScheme.primary)),
+                          ),
+                        if (item.meta.isNotEmpty)
+                          Expanded(
+                            child: Text('　${item.meta}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 11.5, color: faint(context))),
+                          ),
+                      ],
                     ),
                     if (item.latest.isNotEmpty) ...[
                       const SizedBox(height: 2),
@@ -252,11 +301,231 @@ class _CollectionViewPageState extends State<CollectionViewPage> {
     }
   }
 
+  /// 向作者推薦主題（貼主題網址）
+  Future<void> _recommend() async {
+    final d = _data;
+    if (d == null) return;
+    final ctrl = TextEditingController();
+    final url = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('向作者推薦主題')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(hintText: tr('貼上主題網址')),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: Text(tr('推薦'))),
+        ],
+      ),
+    );
+    if (url == null || url.isEmpty || !mounted) return;
+    try {
+      final r = await api.recommendThreadToCollection(widget.ctid, url,
+          formhash: d.formhash);
+      if (mounted) toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  /// 發表評論（可附評分）
+  Future<void> _comment() async {
+    final d = _data;
+    if (d == null) return;
+    final ctrl = TextEditingController();
+    var score = 5;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            18, 0, 18, MediaQuery.of(c).viewInsets.bottom + 18),
+        child: StatefulBuilder(
+          builder: (c, setSheet) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('評價淘專輯'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  for (var s = 1; s <= 5; s++)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setSheet(() => score = s),
+                      icon: Icon(
+                          s <= score ? Icons.star : Icons.star_border,
+                          color: const Color(0xFFF6B93B)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: ctrl,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: tr('說說你的看法（可留空）'),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text(tr('發表評論')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await api.commentCollection(widget.ctid, ctrl.text.trim(),
+          score: score, formhash: d.formhash);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) await _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  /// 編輯淘專輯（名稱／簡介／標籤）
+  Future<void> _edit() async {
+    final d = _data;
+    if (d == null) return;
+    final title = TextEditingController(text: d.name);
+    final desc = TextEditingController(text: d.desc);
+    final keyword = TextEditingController(
+        text: d.list.isEmpty ? '' : ''); // 標籤原文不在檢視頁，留空讓使用者填
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            18, 0, 18, MediaQuery.of(c).viewInsets.bottom + 18),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('編輯淘專輯'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: title,
+                decoration: InputDecoration(
+                    labelText: tr('淘專輯名'), border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: desc,
+                maxLines: 4,
+                decoration: InputDecoration(
+                    labelText: tr('簡介'), border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: keyword,
+                decoration: InputDecoration(
+                    labelText: tr('標籤（空格分隔，最多 5 個）'),
+                    border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text(tr('儲存')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await api.editCollection(widget.ctid,
+          title: title.text.trim(),
+          desc: desc.text.trim(),
+          keyword: keyword.text.trim(),
+          formhash: d.formhash);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) await _load();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  Future<void> _delete() async {
+    final d = _data;
+    if (d == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('刪除淘專輯')),
+        content: Text(tr('確定要刪除「${d.name}」嗎？刪了就找不回來了。')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('刪除'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await api.removeCollection(widget.ctid, formhash: d.formhash);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) context.pop();
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
     return Scaffold(
-      appBar: AppBar(title: Text(d?.name ?? tr('淘專輯'))),
+      appBar: AppBar(
+        title: Text(d?.name ?? tr('淘專輯')),
+        actions: [
+          if (d != null && d.mine)
+            PopupMenuButton<String>(
+              icon: const Icon(LucideIcons.ellipsisVertical),
+              onSelected: (v) {
+                switch (v) {
+                  case 'edit':
+                    _edit();
+                  case 'delete':
+                    _delete();
+                  case 'invite':
+                    if (d.inviteUrl.isNotEmpty) {
+                      openInApp(context, d.inviteUrl, title: tr('邀請維護'));
+                    }
+                }
+              },
+              itemBuilder: (c) => [
+                PopupMenuItem(value: 'edit', child: Text(tr('編輯'))),
+                if (d.inviteUrl.isNotEmpty)
+                  PopupMenuItem(value: 'invite', child: Text(tr('邀請維護'))),
+                PopupMenuItem(value: 'delete', child: Text(tr('刪除'))),
+              ],
+            ),
+        ],
+      ),
       bottomNavigationBar: d == null || d.list.isEmpty
           ? null
           : StickyPager(pager: d.pager, onGo: (p) => _load(page: p)),
@@ -289,19 +558,60 @@ class _CollectionViewPageState extends State<CollectionViewPage> {
                       ),
                       if (d.author.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        Text('${tr('專輯創建人')}：${d.author}',
-                            style: TextStyle(fontSize: 12.5, color: faint(context))),
+                        GestureDetector(
+                          onTap: d.authorUid == null
+                              ? null
+                              : () => context.push('/u/${d.authorUid}'),
+                          child: Text.rich(TextSpan(children: [
+                            TextSpan(
+                                text: '${tr('專輯創建人')}：',
+                                style: TextStyle(
+                                    fontSize: 12.5, color: faint(context))),
+                            TextSpan(
+                                text: d.author,
+                                style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: d.authorUid == null
+                                        ? faint(context)
+                                        : Theme.of(context).colorScheme.primary)),
+                          ])),
+                        ),
                       ],
-                      if (d.follows.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text('${d.follows} ${tr('人訂閱')}',
-                            style: TextStyle(fontSize: 12.5, color: faint(context))),
-                      ],
+                      Row(
+                        children: [
+                          if (d.follows.isNotEmpty)
+                            Text('${d.follows} ${tr('人訂閱')}',
+                                style: TextStyle(fontSize: 12.5, color: faint(context))),
+                          if (d.rating.isNotEmpty) ...[
+                            if (d.follows.isNotEmpty)
+                              Text('　·　',
+                                  style: TextStyle(fontSize: 12.5, color: faint(context))),
+                            Text(d.rating,
+                                style: TextStyle(fontSize: 12.5, color: faint(context))),
+                          ],
+                        ],
+                      ),
                       if (d.desc.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Text(d.desc,
                             style: const TextStyle(fontSize: 13.5, height: 1.6)),
                       ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _recommend,
+                            icon: const Icon(LucideIcons.send, size: 15),
+                            label: Text(tr('推薦主題')),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _comment,
+                            icon: const Icon(LucideIcons.star, size: 15),
+                            label: Text(tr('評分評論')),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -316,9 +626,87 @@ class _CollectionViewPageState extends State<CollectionViewPage> {
                         style: TextStyle(fontSize: 13, color: faint(context))),
                   ),
                 ),
+              if (d.comments.isNotEmpty) _CommentsCard(comments: d.comments),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 淘專輯的最新評論
+class _CommentsCard extends StatelessWidget {
+  const _CommentsCard({required this.comments});
+  final List<CollectionComment> comments;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+            child: Text(tr('最新評論'),
+                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+          ),
+          for (var i = 0; i < comments.length; i++) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: comments[i].uid == null
+                                  ? null
+                                  : () => context.push('/u/${comments[i].uid}'),
+                              child: Text(comments[i].author,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          Theme.of(context).colorScheme.primary)),
+                            ),
+                            const SizedBox(width: 8),
+                            if (comments[i].stars > 0)
+                              Row(
+                                children: [
+                                  for (var s = 0; s < comments[i].stars; s++)
+                                    const Icon(Icons.star,
+                                        size: 12, color: Color(0xFFF6B93B)),
+                                ],
+                              ),
+                            const Spacer(),
+                            if (comments[i].date.isNotEmpty)
+                              Text(comments[i].date,
+                                  style: TextStyle(
+                                      fontSize: 11, color: faint(context))),
+                          ],
+                        ),
+                        if (comments[i].text.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(comments[i].text,
+                              style: const TextStyle(fontSize: 13, height: 1.5)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (i != comments.length - 1)
+              const Divider(height: 1, indent: 14, endIndent: 14),
+          ],
+          const SizedBox(height: 6),
+        ],
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/post_body.dart';
 import '../widgets/quick_menu.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -45,6 +46,9 @@ class _HomePageState extends State<HomePage> {
 
   int _rev = -1;
   int _langTick = -1;
+
+  /// 自動簽到一個 App 生命週期只嘗試一次，別每次回首頁都戳
+  bool _autoSignTried = false;
 
   @override
   void didChangeDependencies() {
@@ -98,6 +102,30 @@ class _HomePageState extends State<HomePage> {
     _loadFavorites();
     _loadSubforums();
     _loadCollections();
+    _maybeAutoSign();
+  }
+
+  /// 開啟設定裡的「每天自動簽到」後，登入且今天還沒簽就自動點一次
+  Future<void> _maybeAutoSign() async {
+    if (_autoSignTried || !mounted) return;
+    final settings = context.read<SettingsStore>();
+    final sign = _data?.sign;
+    if (!settings.autoSign ||
+        !context.read<SessionStore>().loggedIn ||
+        sign == null ||
+        sign.signed) {
+      return;
+    }
+    _autoSignTried = true;
+    try {
+      final r = await api.doSign();
+      if (r.ok && mounted) {
+        toast(context, r.message, kind: ToastKind.ok);
+        await _load();
+      }
+    } on DiscuzException {
+      // 自動簽到失敗就安靜略過，使用者還能手動簽
+    }
   }
 
   /// 我訂閱的專輯（淘帖）。只有桌面模板，登入了才有東西
@@ -164,14 +192,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// 兩邊都可能漏：手機首頁少了勳章公會那種，桌面首頁只展開部分分類。
-  /// 取聯集才齊全
+  /// 取聯集才齊全。圖示只有桌面版有，所以同一個子版塊優先用「有圖示」的那份。
   List<SubForum> _subsOf(ForumItem f) {
-    final extra = _subforums[f.fid];
-    if (extra == null || extra.isEmpty) return f.subforums;
-    final out = [...f.subforums];
-    for (final s in extra) {
-      if (out.any((x) => x.fid == s.fid)) continue;
-      out.add(s);
+    final extra = _subforums[f.fid] ?? const <SubForum>[];
+    final byId = <int, SubForum>{};
+    for (final s in [...f.subforums, ...extra]) {
+      final prev = byId[s.fid];
+      // 後來的若有圖示、或這格還沒填過，就用它
+      if (prev == null || (prev.icon.isEmpty && s.icon.isNotEmpty)) {
+        byId[s.fid] = s;
+      }
+    }
+    // 盡量維持手機版原本的順序，桌面多出來的接在後面
+    final out = <SubForum>[];
+    final seen = <int>{};
+    for (final s in [...f.subforums, ...extra]) {
+      if (seen.add(s.fid)) out.add(byId[s.fid]!);
     }
     return out;
   }
@@ -236,16 +272,9 @@ class _HomePageState extends State<HomePage> {
                               _openSubs[fid] = !(_openSubs[fid] ?? false);
                             }),
                           ),
-                          if (_openSubs[data.groups[i].forums[j].fid] ?? false) ...[
-                            _ForumExpanded(
-                              item: data.groups[i].forums[j],
-                              moderators:
-                                  _moderators[data.groups[i].forums[j].fid] ??
-                                      data.groups[i].forums[j].moderators,
-                            ),
+                          if (_openSubs[data.groups[i].forums[j].fid] ?? false)
                             for (final sub in _subsOf(data.groups[i].forums[j]))
                               _SubForumRow(item: sub),
-                          ],
                           if (j != data.groups[i].forums.length - 1)
                             const Divider(indent: 66, endIndent: 14),
                         ],
@@ -538,30 +567,104 @@ class _ForumRow extends StatelessWidget {
     return '$n';
   }
 
+  bool get _hasInfo => item.descHtml.isNotEmpty || moderators.isNotEmpty;
+
+  /// 點版塊圖示看資訊：版主與簡介（簡介保留換行與快捷連結，不再擠成一行）
+  void _showInfo(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .5,
+        maxChildSize: .9,
+        builder: (c, scroll) => ListView(
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          children: [
+            Text(item.name,
+                style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(
+              [
+                if (item.threads.isNotEmpty) '${item.threads} ${tr('主題')}',
+                if (item.posts.isNotEmpty) '${_short(item.posts)} ${tr('回覆')}',
+              ].join(' · '),
+              style: TextStyle(fontSize: 12.5, color: faint(c)),
+            ),
+            if (moderators.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text('${tr('版主')}：${moderators.join('、')}',
+                  style: TextStyle(fontSize: 13, color: subtle(c))),
+            ],
+            if (item.descHtml.isNotEmpty) ...[
+              const Divider(height: 24),
+              PostBody(item.descHtml,
+                  textStyle: const TextStyle(fontSize: 13.5, height: 1.7)),
+            ],
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: () {
+                Navigator.pop(c);
+                context.push('/f/${item.fid}');
+              },
+              icon: const Icon(LucideIcons.arrowRight, size: 17),
+              label: Text(tr('進入版塊')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 有子版塊、簡介或版主，就給一顆展開鈕把它們收起來，別擠在列表裡
-    final canExpand =
-        subforums.isNotEmpty || item.desc.isNotEmpty || moderators.isNotEmpty;
     return InkWell(
       onTap: () => context.push('/f/${item.fid}'),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: item.icon.isEmpty
-                  ? _placeholder(context, item.name)
-                  : CachedNetworkImage(
-                      imageUrl: item.icon,
-                      httpHeaders: Api.imageHeaders,
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.cover,
-                      placeholder: (c, _) => _placeholder(c, item.name),
-                      errorWidget: (c, _, _) => _placeholder(c, item.name),
+            // 點圖示看版主與簡介，不擠進列表
+            GestureDetector(
+              onTap: _hasInfo ? () => _showInfo(context) : null,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: item.icon.isEmpty
+                        ? _placeholder(context, item.name)
+                        : CachedNetworkImage(
+                            imageUrl: item.icon,
+                            httpHeaders: Api.imageHeaders,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            placeholder: (c, _) => _placeholder(c, item.name),
+                            errorWidget: (c, _, _) =>
+                                _placeholder(c, item.name),
+                          ),
+                  ),
+                  if (_hasInfo)
+                    Positioned(
+                      right: -3,
+                      bottom: -3,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(LucideIcons.info,
+                            size: 12,
+                            color: Theme.of(context).colorScheme.primary),
+                      ),
                     ),
+                ],
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -582,13 +685,13 @@ class _ForumRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // 有子版塊／簡介／版主就變成展開鈕，沒有就維持指向內頁的箭頭
-            if (!canExpand)
+            // 箭頭一律指向內頁；只有真的有子版塊才多一顆展開鈕
+            if (subforums.isEmpty)
               Icon(LucideIcons.chevronRight, size: 18, color: faint(context))
             else
               IconButton(
                 visualDensity: VisualDensity.compact,
-                tooltip: expanded ? tr('收合') : tr('展開簡介與子版塊'),
+                tooltip: expanded ? tr('收合子版塊') : tr('展開子版塊'),
                 icon: Icon(
                     expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                     size: 20),
@@ -608,42 +711,4 @@ class _ForumRow extends StatelessWidget {
         child: Text(name.isEmpty ? '?' : name.characters.first,
             style: TextStyle(fontWeight: FontWeight.w600, color: faint(c))),
       );
-}
-
-/// 展開後的版塊簡介與版主
-class _ForumExpanded extends StatelessWidget {
-  const _ForumExpanded({required this.item, this.moderators = const []});
-  final ForumItem item;
-  final List<String> moderators;
-
-  @override
-  Widget build(BuildContext context) {
-    if (item.desc.isEmpty && moderators.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: .5),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (moderators.isNotEmpty)
-            Text('${tr('版主')}：${moderators.join('、')}',
-                style: TextStyle(fontSize: 12, color: subtle(context))),
-          if (item.desc.isNotEmpty) ...[
-            if (moderators.isNotEmpty) const SizedBox(height: 6),
-            Text(item.desc,
-                style: TextStyle(
-                    fontSize: 12.5, height: 1.6, color: subtle(context))),
-          ],
-        ],
-      ),
-    );
-  }
 }

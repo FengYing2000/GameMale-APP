@@ -369,10 +369,12 @@ void main() {
     expect(closed.threads, isEmpty);
     expect(closed.message, isNotNull);
 
-    final list = await group.fetchGroups();
-    expect(list.length, greaterThan(10));
+    // 群組首頁的分類底下有一整片群組（推薦只有幾個，分類才多）
+    final idx = await group.fetchGroupIndex();
+    final total = idx.categories.expand((c) => c.groups).length;
+    expect(total, greaterThan(10));
     // ignore: avoid_print
-    print('  ${open.name} ${open.threads.length} 篇｜清單 ${list.length} 個群組');
+    print('  ${open.name} ${open.threads.length} 篇｜分類群組 $total 個');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
   test('簽到頁解得出等級與統計', () async {
@@ -651,6 +653,55 @@ void main() {
     print('  專輯 ${idx.items.length}｜《${view.name}》${view.list.length} 帖'
         '｜記錄 ${doing.items.length}｜排行 ${rank.length}｜道具 ${op.name}');
   }, timeout: const Timeout(Duration(seconds: 150)));
+
+  test('群組首頁、成員列表、我的群組', () async {
+    final idx = await group.fetchGroupIndex();
+    expect(idx.recommended, isNotEmpty, reason: '推薦群組');
+    expect(idx.recommended.every((g) => g.fid > 0 && g.name.isNotEmpty), isTrue);
+    expect(idx.categories, isNotEmpty, reason: '群組分類');
+    expect(idx.categories.any((c) => c.groups.isNotEmpty), isTrue);
+    expect(idx.ranking, isNotEmpty, reason: '積分排行');
+
+    final members = await group.fetchGroupMembers(116);
+    expect(members.members, isNotEmpty);
+    expect(members.members.any((m) => m.title.contains('群主')), isTrue);
+
+    // 我的群組（可能為空，只驗不丟例外）
+    final mine = await group.fetchMyGroups(view: 'join');
+    expect(mine, isA<List<GroupItem>>());
+
+    // 群組詳情帶得出群主／是否已加入
+    final g116 = await group.fetchGroup(116);
+    expect(g116.name, isNotEmpty);
+    expect(g116.master, isNotEmpty);
+
+    // ignore: avoid_print
+    print('  推薦 ${idx.recommended.length}｜分類 ${idx.categories.length}'
+        '｜排行 ${idx.ranking.length}｜${g116.name} 群主 ${g116.master}'
+        '｜成員 ${members.members.length}');
+  }, timeout: const Timeout(Duration(seconds: 150)));
+
+  test('道具售完時要回真正的訊息（不是「已送出」）', () async {
+    // 補簽卡目前缺貨，送出購買不會扣錢，正好驗錯誤訊息有沒有抓到
+    final op = await api.fetchMagicOp(
+        'home.php?mod=magic&action=shop&operation=buy&mid=k_misign:k_misign_bq');
+    expect(op.ready, isTrue);
+    final r = await api.submitMagicOp(op);
+    expect(r.ok, isFalse, reason: '缺貨應該是失敗');
+    expect(r.message, contains('售完'));
+    // ignore: avoid_print
+    print('  ${r.message}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('我的回覆能數出真正的總頁數', () async {
+    final first = await api.fetchGuideMine(type: 'reply', page: 1);
+    if (first.pager.hasNext) {
+      final total = await api.resolveGuideTotal(type: 'reply', fromPage: 2);
+      expect(total, greaterThanOrEqualTo(2));
+      // ignore: avoid_print
+      print('  我的回覆共 $total 頁');
+    }
+  }, timeout: const Timeout(Duration(seconds: 120)));
 
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容

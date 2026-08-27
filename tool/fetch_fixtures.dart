@@ -47,6 +47,10 @@ Future<void> main() async {
     'sign_rank.xml': 'plugin.php?id=k_misign:sign&operation=list&mobile=no',
     'magic_buy.xml': 'home.php?mod=magic&action=shop&operation=buy&mid=k_misign:k_misign_bq&inajax=1&mobile=no',
     'addthread.xml': 'forum.php?mod=collection&action=edit&op=addthread&tid=194232&inajax=1&mobile=no',
+    // 群組首頁／成員列表、自己建的淘專輯（有編輯／刪除）
+    'group_index.html': 'group.php?mod=index&mobile=no',
+    'group_members.html': 'forum.php?mod=group&action=memberlist&fid=116&mobile=no',
+    'collection_mine.html': 'forum.php?mod=collection&action=view&ctid=656&fromop=my&mobile=no',
   };
 
   final dir = Directory('test/fixtures')..createSync(recursive: true);

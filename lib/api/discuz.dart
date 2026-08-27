@@ -92,6 +92,7 @@ IndexData parseIndex(dom.Document doc) {
             ? attr(count?.querySelector('span[title]'), 'title')
             : (nums.length > 1 ? nums[1] : ''),
         desc: desc,
+        descHtml: p == null ? '' : sanitizeContent(p),
         subforums: subs,
       ));
     }
@@ -565,6 +566,13 @@ final _failurePatterns = RegExp(
 SubmitResult submitResult(String html, String what) => _submitResult(html, what);
 
 SubmitResult _submitResult(String html, String what) {
+  // 明確的錯誤呼叫 errorhandle_x('訊息', {}) —— 例如道具「本道具已售完」。
+  // 這種一定是失敗，且訊息就在第一個參數，優先辨識，別被後面當成功處理。
+  final err = RegExp(r"errorhandle_\w*\('([^']*)'").firstMatch(html)?.group(1);
+  if (err != null && err.trim().isNotEmpty) {
+    return SubmitResult(ok: false, message: sys(err.trim()));
+  }
+
   // ajax 回應常常整包只是一段 <script>，直接把 body 當訊息會連 JavaScript
   // 一起唸出來。訊息可能在 showDialog('…') 或 succeedhandle_x(url, '…', {…})
   final dialog = RegExp(r"showDialog\('([^']*)'").firstMatch(html)?.group(1) ??
@@ -839,13 +847,25 @@ Future<({List<CollectionItem> items, PageInfo pager})> fetchCollectionIndex({
     if (a == null || ctid == null) continue;
     final ps = dl.querySelectorAll('dd p');
     final latest = dl.querySelector('a[href*="thread-"]');
+    final creator = dl.querySelector('a[href*="space-uid"]');
+    // 標籤：ctag_keyword 裡的搜尋連結
+    final tags = <CollectionTag>[];
+    for (final t in dl.querySelectorAll('.ctag_keyword a')) {
+      final name = txt(t);
+      final kw = param(attr(t, 'href'), 'srchtxt') ?? name;
+      if (name.isNotEmpty) tags.add(CollectionTag(name, kw));
+    }
     out.add(CollectionItem(
       ctid: ctid,
       name: txt(a),
       threads: txt(dl.querySelector('dd.m strong')),
       desc: ps.isNotEmpty ? txt(ps[0]) : '',
       meta: ps.length > 1 ? txt(ps[1]) : '',
-      author: txt(dl.querySelector('a[href*="space-uid"]')),
+      author: txt(creator),
+      authorUid: paramInt(attr(creator, 'href'), 'uid') ??
+          int.tryParse(
+              RegExp(r'space-uid-(\d+)').firstMatch(attr(creator, 'href'))?.group(1) ?? ''),
+      tags: tags,
       latest: txt(latest),
       latestTid: int.tryParse(
           RegExp(r'thread-(\d+)').firstMatch(attr(latest, 'href'))?.group(1) ??
@@ -853,6 +873,11 @@ Future<({List<CollectionItem> items, PageInfo pager})> fetchCollectionIndex({
     ));
   }
   return (items: out, pager: parsePager(doc, current: page));
+}
+
+int _starCount(dom.Element? el) {
+  final cls = el?.querySelector('.star')?.className ?? '';
+  return int.tryParse(RegExp(r'star(\d)').firstMatch(cls)?.group(1) ?? '0') ?? 0;
 }
 
 /// 淘專輯內頁：專輯資訊 + 收錄的主題清單
@@ -886,19 +911,118 @@ CollectionView parseCollectionView(dom.Document doc, int ctid, {int page = 1}) {
     ));
   }
 
+  // 我自己建的才有編輯／刪除／邀請維護
+  final edit = doc.querySelector('a[href*="op=edit"]');
+  final remove = doc.querySelector('a[href*="op=remove"]');
+  final invite = doc.querySelector('#k_invite');
+  final creator = doc.querySelector('.mbn a[href*="space-uid"]') ??
+      doc.querySelector('.bm_c a[href*="space-uid"]');
+
+  // 最新评论：一組是 .pbn（作者＋日期）＋ .pbm（星數＋文字）
+  final comments = <CollectionComment>[];
+  final commentBlock = doc.querySelectorAll('.bm').where((b) =>
+      txt(b.querySelector('h2')).contains('评论') ||
+      txt(b.querySelector('h2')).contains('評論'));
+  for (final b in commentBlock) {
+    final heads = b.querySelectorAll('.bm_c .pbn');
+    final bodies = b.querySelectorAll('.bm_c .pbm');
+    for (var i = 0; i < heads.length; i++) {
+      final who = heads[i].querySelector('a[href*="space-uid"]');
+      if (who == null) continue;
+      final body = i < bodies.length ? bodies[i] : null;
+      comments.add(CollectionComment(
+        author: txt(who),
+        uid: paramInt(attr(who, 'href'), 'uid') ??
+            int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(attr(who, 'href'))?.group(1) ?? ''),
+        date: txt(heads[i].querySelector('.xg1')).replaceAll(RegExp(r'[:：]\s*$'), ''),
+        stars: _starCount(body),
+        text: body == null
+            ? ''
+            : txt(body).replaceAll(RegExp(r'^\d+\s*'), ''),
+      ));
+    }
+    break;
+  }
+
+  final ratingEl = doc.querySelector('.ptn.pbn.xg1');
+
   return CollectionView(
     ctid: ctid,
     name: txt(head),
-    desc: txt(doc.querySelector('.bm_c .mbn') ?? doc.querySelector('.bm_c > div:last-child')),
-    author: txt(doc.querySelector('.bm_c a[href*="space-uid"]')),
-    rating: txt(doc.querySelector('.clct_ratestar')?.parent),
+    desc: txt(doc.querySelector('.bm_c .mbn')?.nextElementSibling ??
+        doc.querySelector('.bm_c > div:last-child')),
+    author: txt(creator),
+    authorUid: paramInt(attr(creator, 'href'), 'uid') ??
+        int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(attr(creator, 'href'))?.group(1) ?? ''),
+    rating: txt(ratingEl),
     follows: txt(doc.getElementById('follownum_display')),
     followUrl: '',
     following: txt(follow).contains('取消'),
+    mine: edit != null && remove != null,
+    editUrl: absolute(attr(edit, 'href')),
+    removeUrl: absolute(attr(remove, 'href')),
+    inviteUrl: absolute(attr(invite, 'href')),
+    recommendUrl: absolute(attr(doc.querySelector('#k_recommened'), 'href')),
+    formhash: formhashOf(doc) ?? _formhash ?? '',
+    comments: comments,
     list: list,
     pager: parsePager(doc, current: page),
     message: list.isEmpty ? (noticeMessage(doc) ?? '這個專輯還沒有主題') : null,
   );
+}
+
+/// 向作者推薦主題
+Future<SubmitResult> recommendThreadToCollection(int ctid, String threadUrl,
+    {String formhash = ''}) async {
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final html = await Api.instance.post(
+    'forum.php?mod=collection&action=comment&op=recommend&ctid=$ctid&inajax=1',
+    {'threadurl': threadUrl, 'formhash': hash},
+    desktop: true,
+  );
+  return _submitResult(html, '推薦主題');
+}
+
+/// 發表評論（可附評分 1~5）
+Future<SubmitResult> commentCollection(int ctid, String message,
+    {int score = 0, String formhash = ''}) async {
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final html = await Api.instance.post(
+    'forum.php?mod=collection&action=comment&ctid=$ctid&inajax=1',
+    {
+      'message': message,
+      if (score > 0) 'ratescore': '$score',
+      'formhash': hash,
+      'handlekey': 'k_addComment',
+    },
+    desktop: true,
+  );
+  return _submitResult(html, '評論');
+}
+
+/// 編輯淘專輯（名稱／簡介／標籤）
+Future<SubmitResult> editCollection(int ctid,
+    {required String title, String desc = '', String keyword = '', String formhash = ''}) async {
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final html = await Api.instance.post('forum.php?mod=collection&action=edit&inajax=1', {
+    'title': title,
+    'desc': desc,
+    'keyword': keyword,
+    'submitcollection': '1',
+    'op': 'edit',
+    'ctid': '$ctid',
+    'formhash': hash,
+  }, desktop: true);
+  return _submitResult(html, '編輯');
+}
+
+/// 刪除淘專輯。論壇是一步 GET（確認後 window.location = 這個網址）
+Future<SubmitResult> removeCollection(int ctid, {String formhash = ''}) async {
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
+  final html = await Api.instance.get(
+      'forum.php?mod=collection&action=edit&op=remove&ctid=$ctid&formhash=$hash&inajax=1',
+      desktop: true);
+  return _submitResult(html, '刪除');
 }
 
 /// 訂閱／取消訂閱某個淘專輯
@@ -982,6 +1106,16 @@ Future<SubmitResult> reportPost({
     'reportsubmit': 'true',
   });
   return _submitResult(html, '舉報');
+}
+
+/// 用論壇給的完整收藏連結收藏（群組那種 `#a_favorite` 的 href）。一步 GET。
+Future<SubmitResult> favoriteByUrl(String url) async {
+  var path = url.replaceAll('&amp;', '&');
+  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  path = path.replaceFirst(RegExp(r'^/'), '');
+  final sep = path.contains('?') ? '&' : '?';
+  final html = await Api.instance.get('$path${sep}inajax=1', desktop: true);
+  return _submitResult(html, '收藏');
 }
 
 /// 收藏版塊。跟收藏主題一樣是一步 GET，不是刪除那種兩步驟。
@@ -1956,6 +2090,25 @@ Future<ListPage> fetchGuideMine({
     pager: parsePager(doc, current: page),
     message: list.isEmpty ? (noticeMessage(doc) ?? '這裡沒有東西') : null,
   );
+}
+
+/// 我的主題／回覆這幾頁只給「上一頁／下一頁」，沒有總頁數。想顯示成
+/// 「1 / N」就得自己往後翻，沿著 a.nxt 一路數到最後一頁。
+///
+/// [fromPage] 傳目前這頁的下一頁（呼叫端已知目前這頁還有下一頁）。
+/// 最多翻 30 頁，避免資料異常時無限翻。
+Future<int> resolveGuideTotal({
+  String type = 'thread',
+  int fid = 0,
+  required int fromPage,
+}) async {
+  var page = fromPage;
+  for (var i = 0; i < 30; i++) {
+    final r = await fetchGuideMine(type: type, page: page, fid: fid);
+    if (!r.pager.hasNext) return page;
+    page++;
+  }
+  return page;
 }
 
 /// 那一樓在第幾頁。論壇的 findpost 會轉到正確的頁，從轉址結果反推

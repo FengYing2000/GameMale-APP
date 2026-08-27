@@ -117,6 +117,17 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   onChanged: settings.setMarkReplied,
                 ),
+                const Divider(indent: 56, endIndent: 14),
+                SwitchListTile(
+                  value: settings.autoSign,
+                  secondary: const Icon(LucideIcons.calendarCheck),
+                  title: Text(tr('每天自動簽到')),
+                  subtitle: Text(
+                    tr('登入狀態下，每天第一次開 App 會自動幫你點簽到'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onChanged: settings.setAutoSign,
+                ),
               ],
             ),
           ),

@@ -17,11 +17,15 @@ import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key, this.fid = 0, this.forumName = ''});
+  const SearchPage(
+      {super.key, this.fid = 0, this.forumName = '', this.initialQuery = ''});
 
   /// 帶了就多一個「本版」分類，預設搜尋這個板塊
   final int fid;
   final String forumName;
+
+  /// 帶了就自動填入並搜尋（例如從專輯標籤點進來）
+  final String initialQuery;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -49,6 +53,12 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _thisForumOnly = widget.fid > 0;
+    if (widget.initialQuery.isNotEmpty) {
+      _ctrl.text = widget.initialQuery;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _run(1);
+      });
+    }
   }
 
   @override

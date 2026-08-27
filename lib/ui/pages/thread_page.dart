@@ -2,6 +2,7 @@ import '../../i18n/s2t.dart';
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -61,6 +62,12 @@ class _ThreadPageState extends State<ThreadPage> {
   final _focusKey = GlobalKey();
   late final int? _focusPid = widget.focusPid;
 
+  /// 每頁幾樓（看到一個「還有下一頁」的完整頁就記下來），指定樓層要用
+  int? _perPage;
+
+  /// 「跳到樓層」要停的那一樓在本頁的索引；捲到後清掉
+  int? _focusIndex;
+
   @override
   void initState() {
     super.initState();
@@ -81,13 +88,17 @@ class _ThreadPageState extends State<ThreadPage> {
     });
     try {
       final d = await api.fetchThread(widget.tid, page: _page);
-      if (mounted) setState(() => _data = d);
+      if (mounted) {
+        // 完整的一頁（還有下一頁）拿來當每頁樓層數的基準
+        if (d.pager.hasNext && d.posts.isNotEmpty) _perPage = d.posts.length;
+        setState(() => _data = d);
+      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
-        if (_focusPid != null) {
+        if (_focusPid != null || _focusIndex != null) {
           _scrollToFocus();
         } else if (_scroll.hasClients) {
           _scroll.jumpTo(0);
@@ -162,25 +173,36 @@ class _ThreadPageState extends State<ThreadPage> {
     context.push(uri.toString());
   }
 
-  /// 捲到指定的那一樓。難點是圖片與樓中樓是逐步載入的，第一次量到的位置
-  /// 之後會被上方長高的內容往下推，所以隔一小段時間就再校正一次。
+  /// 捲到指定的那一樓。難點是上方的圖片與樓中樓是逐步載入的，樓層會一路
+  /// 被往下推。用 getOffsetToReveal 每次都算出「現在」該停的絕對位置，一直
+  /// 校正到不再位移為止（穩了就收手，避免一直跟使用者的捲動打架）。
   void _scrollToFocus() {
     var tries = 0;
+    var settled = 0;
     void go() {
-      if (!mounted) return;
+      if (!mounted || !_scroll.hasClients) return;
       final ctx = _focusKey.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          alignment: 0.08,
-        );
+      final ro = ctx?.findRenderObject();
+      if (ro is RenderBox) {
+        final target = RenderAbstractViewport.of(ro)
+            .getOffsetToReveal(ro, 0.08)
+            .offset
+            .clamp(_scroll.position.minScrollExtent,
+                _scroll.position.maxScrollExtent);
+        final diff = (target - _scroll.offset).abs();
+        if (diff > 4) {
+          _scroll.animateTo(target,
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic);
+          settled = 0;
+        } else {
+          settled++;
+        }
+        // 連續兩次都對準了就算穩定，收手
+        if (settled >= 2) return;
       }
-      // 校正幾次涵蓋圖片載入造成的位移；找不到（還沒建好）也重試。
-      // 次數別太多，否則會跟使用者自己的捲動打架
-      if (++tries < 4) {
-        Future.delayed(const Duration(milliseconds: 300), go);
+      if (++tries < 10) {
+        Future.delayed(const Duration(milliseconds: 320), go);
       }
     }
 
@@ -352,6 +374,113 @@ class _ThreadPageState extends State<ThreadPage> {
     }
   }
 
+  /// 快速選項：返回頂部／返回首樓／跳到指定樓層
+  Future<void> _quickJump() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.arrowUpToLine),
+              title: Text(tr('返回頂部')),
+              onTap: () => Navigator.pop(c, 'top'),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.crown),
+              title: Text(tr('返回首樓')),
+              onTap: () => Navigator.pop(c, 'first'),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.hash),
+              title: Text(tr('跳到指定樓層')),
+              onTap: () => Navigator.pop(c, 'floor'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case 'top':
+        if (_scroll.hasClients) {
+          _scroll.animateTo(0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut);
+        }
+      case 'first':
+        if (_page == 1) {
+          if (_scroll.hasClients) {
+            _scroll.animateTo(0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut);
+          }
+        } else {
+          setState(() => _page = 1);
+          _load();
+        }
+      case 'floor':
+        await _gotoFloor();
+    }
+  }
+
+  Future<void> _gotoFloor() async {
+    final perPage = _perPage ?? _data?.posts.length ?? 0;
+    final ctrl = TextEditingController();
+    final input = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('跳到指定樓層')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: tr('輸入樓層號，例如 1 是樓主'),
+          ),
+          onSubmitted: (_) => Navigator.pop(c, ctrl.text.trim()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: Text(tr('取消'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: Text(tr('前往'))),
+        ],
+      ),
+    );
+    final floor = int.tryParse(input ?? '');
+    if (floor == null || floor < 1 || perPage < 1 || !mounted) return;
+
+    final targetPage = ((floor - 1) ~/ perPage) + 1;
+    final indexOnPage = (floor - 1) % perPage;
+    if (targetPage == _page) {
+      // 已經在這頁，直接捲過去
+      setState(() => _focusIndex =
+          indexOnPage < (_data?.posts.length ?? 0) ? indexOnPage : null);
+      if (_focusIndex != null) {
+        _scrollToFocus();
+        _clearFocusLater();
+      }
+    } else {
+      setState(() {
+        _focusIndex = indexOnPage;
+        _page = targetPage;
+      });
+      await _load();
+      _clearFocusLater();
+    }
+  }
+
+  /// 高亮閃一下就收掉，別一直亮著
+  void _clearFocusLater() {
+    Future.delayed(const Duration(milliseconds: 2200), () {
+      if (mounted && _focusIndex != null) setState(() => _focusIndex = null);
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -369,6 +498,11 @@ class _ThreadPageState extends State<ThreadPage> {
           style: const TextStyle(fontSize: 16),
         ),
         actions: [
+          IconButton(
+            tooltip: tr('快速選項'),
+            icon: const Icon(LucideIcons.listChevronsUpDown),
+            onPressed: _quickJump,
+          ),
           // 論壇本來就是簡體，介面設成簡體時這顆按鈕沒有意義
           if (context.watch<SettingsStore>().toTraditional)
             IconButton(
@@ -463,9 +597,13 @@ class _ThreadPageState extends State<ThreadPage> {
               // 投票與附件都是樓主帖的一部分，排在第一樓底下才合理
               for (var i = 0; i < d.posts.length; i++) ...[
                 _PostCard(
-                  key: d.posts[i].pid == _focusPid ? _focusKey : null,
-                  highlight: d.posts[i].pid != null &&
-                      d.posts[i].pid == _focusPid,
+                  key: (d.posts[i].pid == _focusPid && _focusPid != null) ||
+                          i == _focusIndex
+                      ? _focusKey
+                      : null,
+                  highlight: (d.posts[i].pid != null &&
+                          d.posts[i].pid == _focusPid) ||
+                      i == _focusIndex,
                   post: _translated ? _zhPost(d.posts[i]) : d.posts[i],
                   onReply:
                       session.loggedIn ? () => _reply(d.posts[i]) : null,

@@ -27,14 +27,15 @@ enum AppLang {
   final String desc;
 }
 
-/// 主題強調色。深淺兩種模式都用同一顆種子色去產配色
+/// 主題強調色。取自 LGBTQ+ 六色彩虹旗，照旗子由上而下排：紅橙黃綠藍紫。
+/// 深淺兩種模式都用同一顆種子色去產配色；預設仍是藍。
 enum Accent {
-  blue('海藍', Color(0xFF2F6FB5)),
-  forum('論壇綠', Color(0xFF70A128)),
-  violet('紫羅蘭', Color(0xFF7A5AF8)),
-  teal('青碧', Color(0xFF00897B)),
-  rose('玫瑰', Color(0xFFD5427C)),
-  amber('琥珀', Color(0xFFE08A00));
+  red('紅', Color(0xFFE40303)),
+  orange('橙', Color(0xFFF08C00)),
+  yellow('黃', Color(0xFFE0A800)),
+  green('綠', Color(0xFF008026)),
+  blue('藍', Color(0xFF2F6FB5)),
+  violet('紫', Color(0xFF750787));
 
   const Accent(this.label, this.seed);
   final String label;
@@ -49,6 +50,7 @@ class SettingsStore extends ChangeNotifier {
   static const _kReplied = 'gm.replied';
   static const _kTwWords = 'gm.twWords';
   static const _kTools = 'gm.tools';
+  static const _kAutoSign = 'gm.autoSign';
 
   ImagePolicy imagePolicy = ImagePolicy.always;
   AppLang lang = AppLang.auto;
@@ -61,6 +63,9 @@ class SettingsStore extends ChangeNotifier {
 
   /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇
   bool markReplied = true;
+
+  /// 登入狀態下每天開 App 自動簽到
+  bool autoSign = false;
 
   /// 側邊欄「論壇功能」的顯示順序；沒設定過就用內建順序。
   /// 值是工具的 id，不在清單裡的代表被關掉了
@@ -117,6 +122,7 @@ class SettingsStore extends ChangeNotifier {
     );
     markReplied = prefs.getBool(_kReplied) ?? true;
     taiwanWords = prefs.getBool(_kTwWords) ?? false;
+    autoSign = prefs.getBool(_kAutoSign) ?? false;
     _toolOrder = prefs.getStringList(_kTools);
 
     await _refreshNetwork();
@@ -208,6 +214,13 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kReplied, v);
+  }
+
+  Future<void> setAutoSign(bool v) async {
+    autoSign = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAutoSign, v);
   }
 
   Future<void> setThemeMode(ThemeMode v) async {

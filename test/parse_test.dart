@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:gamemale/api/discuz.dart' as api;
+import 'package:gamemale/api/group.dart' as group_api;
 import 'package:gamemale/api/http.dart';
 import 'package:gamemale/api/models.dart';
 import 'package:gamemale/api/parse.dart';
@@ -1106,5 +1107,47 @@ void main() {
       expect(opts.isNotEmpty, isTrue);
       expect(int.tryParse(opts.first.attributes['value'] ?? ''), isNotNull);
     });
+  });
+
+  group('我自己建的淘專輯', () {
+    final doc = _load('collection_mine.html');
+    if (doc == null) return;
+    final v = api.parseCollectionView(doc, 656);
+
+    test('認得出是自己建的（有編輯／刪除）', () => expect(v.mine, isTrue));
+    test('編輯／刪除連結解得出',
+        () => expect(v.editUrl.isNotEmpty && v.removeUrl.isNotEmpty, isTrue));
+    test('有創建人與 uid',
+        () => expect(v.author.isNotEmpty && (v.authorUid ?? 0) > 0, isTrue));
+    test('有 formhash（發評論／刪除要用）',
+        () => expect(v.formhash.isNotEmpty, isTrue));
+  });
+
+  group('群組首頁', () {
+    final doc = _load('group_index.html');
+    if (doc == null) return;
+    final g = group_api.parseGroupIndexDoc(doc);
+
+    test('有推薦群組', () => expect(g.recommended.isNotEmpty, isTrue));
+    test('推薦群組每個有 fid 與名稱',
+        () => expect(g.recommended.every((x) => x.fid > 0 && x.name.isNotEmpty), isTrue));
+    test('有群組分類', () => expect(g.categories.isNotEmpty, isTrue));
+    test('分類底下有群組',
+        () => expect(g.categories.any((c) => c.groups.isNotEmpty), isTrue));
+    test('有積分排行', () => expect(g.ranking.isNotEmpty, isTrue));
+    test('排行每列有 fid',
+        () => expect(g.ranking.every((r) => r.fid > 0 && r.name.isNotEmpty), isTrue));
+  });
+
+  group('群組成員列表', () {
+    final doc = _load('group_members.html');
+    if (doc == null) return;
+    final r = group_api.parseGroupMembersDoc(doc);
+
+    test('解析出成員', () => expect(r.members.isNotEmpty, isTrue));
+    test('每個成員有名字',
+        () => expect(r.members.every((m) => m.name.isNotEmpty), isTrue));
+    test('認得出群主',
+        () => expect(r.members.any((m) => m.title.contains('群主')), isTrue));
   });
 }

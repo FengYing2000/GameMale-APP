@@ -41,6 +41,9 @@ class _MyListPageState extends State<MyListPage> {
   List<ForumGroup> _forumTree = const [];
   final _scroll = ScrollController();
 
+  /// 導讀類列表只給上一頁／下一頁，總頁數要自己翻出來，翻過就記著
+  final _totalCache = <String, int>{};
+
   @override
   void dispose() {
     _scroll.dispose();
@@ -88,6 +91,37 @@ class _MyListPageState extends State<MyListPage> {
         if (_scroll.hasClients) _scroll.jumpTo(0);
       }
     }
+    _resolveTotal();
+  }
+
+  /// 導讀列表沒有總頁數，往後翻一次數出來（每個分頁只算一次），
+  /// 之後 StickyPager 就能顯示成「1 / N」跟其他列表一致
+  Future<void> _resolveTotal() async {
+    if (widget.type == 'favorite') return;
+    final d = _data;
+    if (d == null || d.pager.numbered || !d.pager.hasNext) return;
+    final key = '$_postType:$_filterFid';
+    if (_totalCache.containsKey(key)) return; // 已經數過
+    try {
+      final total = await api.resolveGuideTotal(
+          type: _postType, fid: _filterFid, fromPage: d.pager.page + 1);
+      if (mounted) setState(() => _totalCache[key] = total);
+    } on DiscuzException {
+      // 數不出來就維持原樣
+    }
+  }
+
+  /// 若已數出總頁數，把它套進 pager，讓分頁列顯示成 1 / N
+  PageInfo _effPager(PageInfo p) {
+    final total = _totalCache['$_postType:$_filterFid'];
+    if (total == null || total < p.page) return p;
+    return PageInfo(
+      page: p.page,
+      total: total,
+      hasNext: p.page < total,
+      hasPrev: p.page > 1,
+      numbered: true,
+    );
   }
 
   Future<void> _loadForumTree() async {
@@ -223,7 +257,7 @@ class _MyListPageState extends State<MyListPage> {
       bottomNavigationBar: (_favForums || d == null || d.list.isEmpty)
           ? null
           : StickyPager(
-              pager: d.pager,
+              pager: _effPager(d.pager),
               onGo: (p) {
                 setState(() => _page = p);
                 _load();
