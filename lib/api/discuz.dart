@@ -1424,27 +1424,55 @@ const noticeTypes = <String, List<NoticeTab>>{
 
 /// 通知頁沒有手機版，Discuz 會回桌面模板，結構是 .nts > dl 而不是 li。
 /// 內文連結指向 mod=redirect，主題 id 放在 ptid。
-/// 首頁紅點：最新一則提醒的 id（比看過的新就是未讀）＋私訊有沒有未讀。
-/// 兩支都失敗就回 (0, false)，不影響首頁其他內容。
-Future<({int newestNoticeId, bool pmUnread})> fetchBadges() async {
-  var newest = 0;
+/// 首頁紅點：直接讀桌面版頁首的提醒選單，那裡有各類的未讀數，
+/// 是論壇自己的權威來源（讀過就會歸零），比自己追 id 準得多。
+///
+/// - 私訊（消息）：`prompt_news_N` 的數字後綴
+/// - 系統提醒／壇友互動／應用提醒：各自 `<span class="rq">N</span>`
+/// - 新聽眾：`prompt_follower_N`
+///
+/// `#myprompt` 帶 class `yes` 代表「有新的東西」，當作保底。
+Future<({int notice, int pm, Map<String, int> views})> fetchBadges() async {
   try {
-    final n = await fetchNotice();
-    for (final it in n.items) {
-      final id = int.tryParse(it.id) ?? 0;
-      if (id > newest) newest = id;
-    }
+    final doc = toDoc(await Api.instance.get('forum.php', desktop: true));
+    return parsePromptCounts(doc);
   } on DiscuzException {
-    // 抓不到就當作沒有新提醒
+    return (notice: 0, pm: 0, views: const <String, int>{});
   }
-  var pm = false;
-  try {
-    final p = await fetchPmList();
-    pm = p.items.any((i) => i.unread > 0);
-  } on DiscuzException {
-    // 抓不到就當作沒有未讀私訊
+}
+
+int _classSuffix(dom.Element? el, String prefix) {
+  final m = RegExp('${RegExp.escape(prefix)}(\\d+)').firstMatch(el?.className ?? '');
+  return int.tryParse(m?.group(1) ?? '0') ?? 0;
+}
+
+/// 從頁首提醒選單解析未讀數。找不到選單就回全 0。
+///
+/// `views` 是各類提醒（system／interactive／app／mypost）各自的未讀數，
+/// 給提醒頁高亮「是哪一類有新的」用。
+({int notice, int pm, Map<String, int> views}) parsePromptCounts(
+    dom.Document doc) {
+  final menu = doc.getElementById('myprompt_menu');
+  if (menu == null) return (notice: 0, pm: 0, views: const <String, int>{});
+
+  final pm = _classSuffix(menu.querySelector('[class*="prompt_news_"]'), 'prompt_news_');
+  final follower =
+      _classSuffix(menu.querySelector('[class*="prompt_follower_"]'), 'prompt_follower_');
+
+  // 每個提醒分類的連結帶著 view=，未讀數在旁邊的 .rq 裡
+  final views = <String, int>{};
+  for (final a in menu.querySelectorAll('a[href*="do=notice"]')) {
+    final view = param(attr(a, 'href'), 'view') ?? 'mypost';
+    final rq = int.tryParse(txt(a.querySelector('.rq'))) ?? 0;
+    if (rq > 0) views[view] = (views[view] ?? 0) + rq;
   }
-  return (newestNoticeId: newest, pmUnread: pm);
+
+  var notice = views.values.fold(0, (a, b) => a + b) + follower;
+  // 保底：頁首說有新的（class yes）但上面都沒抓到，就當作有一則提醒
+  final yes = doc.getElementById('myprompt')?.classes.contains('yes') ?? false;
+  if (yes && notice == 0 && pm == 0) notice = 1;
+
+  return (notice: notice, pm: pm, views: views);
 }
 
 Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) async {

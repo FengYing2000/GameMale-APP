@@ -703,12 +703,12 @@ void main() {
     }
   }, timeout: const Timeout(Duration(seconds: 120)));
 
-  test('紅點：最新提醒 id 與私訊未讀', () async {
+  test('紅點：頁首提醒選單解得出未讀數', () async {
     final b = await api.fetchBadges();
-    expect(b.newestNoticeId, greaterThan(0), reason: '提醒頁至少有一則、拿得到 id');
-    expect(b.pmUnread, isA<bool>());
+    expect(b.notice, greaterThanOrEqualTo(0));
+    expect(b.pm, greaterThanOrEqualTo(0));
     // ignore: avoid_print
-    print('  最新提醒 id=${b.newestNoticeId}｜私訊未讀=${b.pmUnread}');
+    print('  提醒未讀=${b.notice}｜私訊未讀=${b.pm}');
   }, timeout: const Timeout(Duration(seconds: 60)));
 
   test('淘帖搜尋與單字搜尋', () async {

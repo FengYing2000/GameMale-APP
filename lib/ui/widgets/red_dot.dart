@@ -14,16 +14,23 @@ class RedDot extends StatelessWidget {
       children: [
         child,
         Positioned(
-          right: -1,
-          top: -1,
+          right: -2,
+          top: -2,
           child: Container(
-            width: 9,
-            height: 9,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
-              color: const Color(0xFFE53935),
+              color: const Color(0xFFFF1744),
               shape: BoxShape.circle,
               border: Border.all(
                   color: Theme.of(context).colorScheme.surface, width: 1.5),
+              // 霓虹光：紅色外暈，深色模式下特別明顯
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0xFFFF1744), blurRadius: 6, spreadRadius: 1),
+                BoxShadow(
+                    color: Color(0x88FF5252), blurRadius: 12, spreadRadius: 2),
+              ],
             ),
           ),
         ),

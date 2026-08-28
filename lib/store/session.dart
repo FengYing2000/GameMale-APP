@@ -21,37 +21,28 @@ class SessionStore extends ChangeNotifier {
   /// 各頁比對這個值就知道要不要重抓。
   int revision = 0;
 
-  /// 有沒有新提醒／新私訊，給首頁鈴鐺與訊息分頁的紅點用
+  /// 有沒有新提醒／新私訊，給首頁鈴鐺與訊息分頁的紅點用。
+  /// 論壇讀過就會把未讀數歸零，所以直接用「數量 > 0」判斷即可。
   bool hasNewNotice = false;
   bool hasNewPm = false;
 
-  /// 上次看過的最新一則提醒 id —— 比它新的就算「未讀」，看過後存起來
-  int _seenNoticeId = 0;
-  static const _kSeenNotice = 'gm.seenNoticeId';
-
-  /// 首頁背景抓到的紅點狀態。newestNoticeId 比看過的新就亮鈴鐺
-  Future<void> setBadges({required int newestNoticeId, required bool pmUnread}) async {
-    if (_seenNoticeId == 0) {
-      final prefs = await SharedPreferences.getInstance();
-      _seenNoticeId = prefs.getInt(_kSeenNotice) ?? 0;
-    }
-    final notice = newestNoticeId > 0 && newestNoticeId > _seenNoticeId;
-    if (notice != hasNewNotice || pmUnread != hasNewPm) {
-      hasNewNotice = notice;
-      hasNewPm = pmUnread;
+  /// 首頁背景抓到的頁首未讀數
+  void setBadges({required int notice, required int pm}) {
+    final n = notice > 0;
+    final p = pm > 0;
+    if (n != hasNewNotice || p != hasNewPm) {
+      hasNewNotice = n;
+      hasNewPm = p;
       notifyListeners();
     }
   }
 
-  /// 開了提醒頁＝當作都看過了，記下最新 id 並熄鈴鐺
-  Future<void> markNoticesSeen(int newestNoticeId) async {
-    if (newestNoticeId > _seenNoticeId) _seenNoticeId = newestNoticeId;
+  /// 開了提醒頁＝當作看過了，先把鈴鐺熄掉（下次首頁重抓會再依伺服器校正）
+  void markNoticesSeen() {
     if (hasNewNotice) {
       hasNewNotice = false;
       notifyListeners();
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kSeenNotice, _seenNoticeId);
   }
 
   /// 訊息分頁自己算出還有沒有未讀，同步紅點

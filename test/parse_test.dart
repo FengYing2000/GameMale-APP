@@ -1150,4 +1150,24 @@ void main() {
     test('認得出群主',
         () => expect(r.members.any((m) => m.title.contains('群主')), isTrue));
   });
+
+  group('頁首提醒選單（紅點）', () {
+    final doc = _load('prompt_menu.html');
+    if (doc == null) return;
+    final c = api.parsePromptCounts(doc);
+
+    // 樣本是「系统提醒(1)、消息0、新听众0」，鈴鐺該亮、訊息不亮
+    test('系統提醒 1 則要算進提醒未讀', () => expect(c.notice, 1));
+    test('沒有未讀私訊', () => expect(c.pm, 0));
+    test('認得出是 system 這一類有新的', () => expect(c.views['system'], 1));
+
+    test('有未讀私訊時 prompt_news_N 的 N 就是數量', () {
+      // prompt_news 的未讀數藏在 class 後綴裡（消息=私訊）
+      final d = toDoc(
+          '<ul id="myprompt_menu"><li>'
+          '<a href="home.php?mod=space&do=pm"><em class="prompt_news_3"></em>消息</a>'
+          '</li></ul>');
+      expect(api.parsePromptCounts(d).pm, 3);
+    });
+  });
 }

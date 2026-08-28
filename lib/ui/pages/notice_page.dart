@@ -26,10 +26,32 @@ class _NoticePageState extends State<NoticePage> {
   bool _loading = true;
   String? _err;
 
+  /// 各類提醒的未讀數，用來高亮「是哪一類有新的」
+  Map<String, int> _unread = const {};
+
   @override
   void initState() {
     super.initState();
-    _load();
+    _boot();
+  }
+
+  /// 先問頁首各類未讀數，有新的就直接跳到那一類，並在分頁上標出來
+  Future<void> _boot() async {
+    try {
+      final b = await api.fetchBadges();
+      if (!mounted) return;
+      setState(() => _unread = b.views);
+      // 依 noticeViews 的順序挑第一個有未讀的分類（例如系統提醒）
+      for (final v in api.noticeViews) {
+        if ((b.views[v.view] ?? 0) > 0) {
+          _view = v.view;
+          break;
+        }
+      }
+    } on DiscuzException {
+      // 抓不到就用預設分類
+    }
+    if (mounted) _load();
   }
 
   Future<void> _load() async {
@@ -40,14 +62,15 @@ class _NoticePageState extends State<NoticePage> {
     try {
       final d = await api.fetchNotice(view: _view, type: _type);
       if (mounted) {
-        setState(() => _data = d);
-        // 看過提醒＝當作都讀了，記最新 id 熄鈴鐺
-        var newest = 0;
-        for (final it in d.items) {
-          final id = int.tryParse(it.id) ?? 0;
-          if (id > newest) newest = id;
-        }
-        if (newest > 0) context.read<SessionStore>().markNoticesSeen(newest);
+        setState(() {
+          _data = d;
+          // 這一類看過了，取消它的高亮
+          if (_unread.containsKey(_view)) {
+            _unread = {..._unread}..remove(_view);
+          }
+        });
+        // 看過提醒＝當作都讀了，先熄鈴鐺（下次首頁重抓會依伺服器校正）
+        context.read<SessionStore>().markNoticesSeen();
       }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
@@ -85,6 +108,7 @@ class _NoticePageState extends State<NoticePage> {
               items: [for (final v in api.noticeViews) (v.view, v.name)],
               selected: _view,
               onPick: _pickView,
+              badges: _unread,
             ),
             if (subTabs != null)
               _ChipRow(
@@ -126,6 +150,7 @@ class _ChipRow extends StatelessWidget {
     required this.selected,
     required this.onPick,
     this.small = false,
+    this.badges = const {},
   });
 
   final List<(String, String)> items;
@@ -133,8 +158,12 @@ class _ChipRow extends StatelessWidget {
   final ValueChanged<String> onPick;
   final bool small;
 
+  /// 分類 → 未讀數，有數字的分類會加上紅色數量標記並描邊
+  final Map<String, int> badges;
+
   @override
   Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
     return SizedBox(
       height: small ? 42 : 50,
       child: ListView(
@@ -144,12 +173,32 @@ class _ChipRow extends StatelessWidget {
           for (final it in items)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(it.$2, style: TextStyle(fontSize: small ? 12.5 : 14)),
-                selected: selected == it.$1,
-                visualDensity: small ? VisualDensity.compact : null,
-                onSelected: (_) => onPick(it.$1),
-              ),
+              child: Builder(builder: (context) {
+                final n = badges[it.$1] ?? 0;
+                return ChoiceChip(
+                  avatar: n > 0
+                      ? Container(
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFF1744),
+                            borderRadius: BorderRadius.all(Radius.circular(9)),
+                          ),
+                          child: Text(n > 99 ? '99+' : '$n',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700)),
+                        )
+                      : null,
+                  label: Text(it.$2,
+                      style: TextStyle(fontSize: small ? 12.5 : 14)),
+                  selected: selected == it.$1,
+                  visualDensity: small ? VisualDensity.compact : null,
+                  side: n > 0 ? BorderSide(color: accent, width: 1.4) : null,
+                  onSelected: (_) => onPick(it.$1),
+                );
+              }),
             ),
         ],
       ),

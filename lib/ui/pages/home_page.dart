@@ -113,8 +113,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final b = await api.fetchBadges();
       if (!mounted) return;
-      await context.read<SessionStore>().setBadges(
-          newestNoticeId: b.newestNoticeId, pmUnread: b.pmUnread);
+      context.read<SessionStore>().setBadges(notice: b.notice, pm: b.pm);
     } on DiscuzException {
       // 紅點抓不到就算了
     }
