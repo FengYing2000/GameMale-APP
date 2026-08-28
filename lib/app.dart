@@ -43,6 +43,7 @@ import 'ui/pages/tools_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
+import 'ui/widgets/red_dot.dart';
 
 class GameMaleApp extends StatefulWidget {
   const GameMaleApp({super.key});
@@ -276,6 +277,7 @@ class _Scaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final newPm = context.watch<SessionStore>().hasNewPm;
     return Scaffold(
       body: shell,
       bottomNavigationBar: NavigationBar(
@@ -283,8 +285,9 @@ class _Scaffold extends StatelessWidget {
         destinations: [
           for (final t in _tabs)
             NavigationDestination(
-              icon: Icon(t.$1),
-              selectedIcon: Icon(t.$2),
+              // 訊息分頁有未讀私訊時掛個紅點
+              icon: RedDot(show: t.$3 == '訊息' && newPm, child: Icon(t.$1)),
+              selectedIcon: RedDot(show: t.$3 == '訊息' && newPm, child: Icon(t.$2)),
               label: tr(t.$3),
             ),
         ],

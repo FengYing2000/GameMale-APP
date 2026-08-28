@@ -57,6 +57,7 @@ Future<SearchResult> search(
     SearchScope.blog => _parseBlogHits(doc),
     SearchScope.album => _parseAlbumHits(doc),
     SearchScope.group => _parseGroupHits(doc),
+    SearchScope.collection => _parseCollectionHits(doc),
     SearchScope.user => _parseUserHits(doc),
   };
 
@@ -163,6 +164,22 @@ List<SearchHit> _parseGroupHits(dom.Document doc) {
       image: absolute(attr(dl.querySelector('img'), 'src')),
       fid: fid,
       url: absolute(href),
+    ));
+  }
+  return out;
+}
+
+/// 淘帖搜尋：桌面 `.slst dl`，`<dt><a ...ctid=N>標題</a></dt>`＋一行主題/評論/訂閱
+List<SearchHit> _parseCollectionHits(dom.Document doc) {
+  final out = <SearchHit>[];
+  for (final dl in doc.querySelectorAll('.slst dl')) {
+    final a = dl.querySelector('dt a[href*="ctid="]');
+    if (a == null) continue;
+    out.add(SearchHit(
+      title: txt(a),
+      subtitle:
+          dl.querySelectorAll('dd').map(txt).where((s) => s.isNotEmpty).join(' · '),
+      url: absolute(attr(a, 'href')),
     ));
   }
   return out;

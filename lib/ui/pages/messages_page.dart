@@ -57,7 +57,12 @@ class _MessagesPageState extends State<MessagesPage> {
     });
     try {
       final d = await api.fetchPmList();
-      if (mounted) setState(() => _data = d);
+      if (mounted) {
+        setState(() => _data = d);
+        // 這份清單就是權威：還有沒有未讀，直接同步紅點
+        context.read<SessionStore>()
+            .setPmUnread(d.items.any((i) => i.unread > 0));
+      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {

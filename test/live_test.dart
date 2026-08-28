@@ -703,6 +703,27 @@ void main() {
     }
   }, timeout: const Timeout(Duration(seconds: 120)));
 
+  test('紅點：最新提醒 id 與私訊未讀', () async {
+    final b = await api.fetchBadges();
+    expect(b.newestNoticeId, greaterThan(0), reason: '提醒頁至少有一則、拿得到 id');
+    expect(b.pmUnread, isA<bool>());
+    // ignore: avoid_print
+    print('  最新提醒 id=${b.newestNoticeId}｜私訊未讀=${b.pmUnread}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('淘帖搜尋與單字搜尋', () async {
+    // 淘帖搜尋（桌面）
+    final c = await search.search('脚本', scope: SearchScope.collection);
+    expect(c.hits, isNotEmpty, reason: '搜得到淘專輯');
+    expect(c.hits.every((h) => h.url.contains('ctid=')), isTrue);
+
+    // 論壇本身沒有 2 個字限制，一個字也搜得到
+    final one = await search.search('猫', scope: SearchScope.forum);
+    expect(one.hits, isNotEmpty, reason: '單字也搜得到帖子');
+    // ignore: avoid_print
+    print('  淘帖 ${c.hits.length} 個｜單字「猫」${one.hits.length} 筆');
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

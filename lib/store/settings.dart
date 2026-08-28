@@ -64,8 +64,8 @@ class SettingsStore extends ChangeNotifier {
   /// 在主題列表標出自己回過的帖。要對每個主題各問一次論壇
   bool markReplied = true;
 
-  /// 登入狀態下每天開 App 自動簽到
-  bool autoSign = false;
+  /// 登入狀態下每天開 App 自動簽到。預設開（含覆蓋安裝時使用者沒手動關過的情況）
+  bool autoSign = true;
 
   /// 側邊欄「論壇功能」的顯示順序；沒設定過就用內建順序。
   /// 值是工具的 id，不在清單裡的代表被關掉了
@@ -122,7 +122,9 @@ class SettingsStore extends ChangeNotifier {
     );
     markReplied = prefs.getBool(_kReplied) ?? true;
     taiwanWords = prefs.getBool(_kTwWords) ?? false;
-    autoSign = prefs.getBool(_kAutoSign) ?? false;
+    // 未設定過就預設開 —— 覆蓋安裝時沒手動關過的人也會是開的。
+    // 之後新增的增強功能開關，一律沿用「?? true」讓覆蓋安裝預設開。
+    autoSign = prefs.getBool(_kAutoSign) ?? true;
     _toolOrder = prefs.getStringList(_kTools);
 
     await _refreshNetwork();

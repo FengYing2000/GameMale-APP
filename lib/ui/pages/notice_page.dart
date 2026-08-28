@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../api/discuz.dart' as api;
 import '../../api/models.dart';
+import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/state_box.dart';
@@ -36,7 +39,16 @@ class _NoticePageState extends State<NoticePage> {
     });
     try {
       final d = await api.fetchNotice(view: _view, type: _type);
-      if (mounted) setState(() => _data = d);
+      if (mounted) {
+        setState(() => _data = d);
+        // 看過提醒＝當作都讀了，記最新 id 熄鈴鐺
+        var newest = 0;
+        for (final it in d.items) {
+          final id = int.tryParse(it.id) ?? 0;
+          if (id > newest) newest = id;
+        }
+        if (newest > 0) context.read<SessionStore>().markNoticesSeen(newest);
+      }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
     } finally {

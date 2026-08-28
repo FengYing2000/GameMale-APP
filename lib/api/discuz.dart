@@ -1424,6 +1424,29 @@ const noticeTypes = <String, List<NoticeTab>>{
 
 /// 通知頁沒有手機版，Discuz 會回桌面模板，結構是 .nts > dl 而不是 li。
 /// 內文連結指向 mod=redirect，主題 id 放在 ptid。
+/// 首頁紅點：最新一則提醒的 id（比看過的新就是未讀）＋私訊有沒有未讀。
+/// 兩支都失敗就回 (0, false)，不影響首頁其他內容。
+Future<({int newestNoticeId, bool pmUnread})> fetchBadges() async {
+  var newest = 0;
+  try {
+    final n = await fetchNotice();
+    for (final it in n.items) {
+      final id = int.tryParse(it.id) ?? 0;
+      if (id > newest) newest = id;
+    }
+  } on DiscuzException {
+    // 抓不到就當作沒有新提醒
+  }
+  var pm = false;
+  try {
+    final p = await fetchPmList();
+    pm = p.items.any((i) => i.unread > 0);
+  } on DiscuzException {
+    // 抓不到就當作沒有未讀私訊
+  }
+  return (newestNoticeId: newest, pmUnread: pm);
+}
+
 Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) async {
   final q = 'home.php?mod=space&do=notice&view=$view'
       '${type.isEmpty ? '' : '&type=$type'}&forcemobile=1';

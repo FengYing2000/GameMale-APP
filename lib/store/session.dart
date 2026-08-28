@@ -21,6 +21,47 @@ class SessionStore extends ChangeNotifier {
   /// 各頁比對這個值就知道要不要重抓。
   int revision = 0;
 
+  /// 有沒有新提醒／新私訊，給首頁鈴鐺與訊息分頁的紅點用
+  bool hasNewNotice = false;
+  bool hasNewPm = false;
+
+  /// 上次看過的最新一則提醒 id —— 比它新的就算「未讀」，看過後存起來
+  int _seenNoticeId = 0;
+  static const _kSeenNotice = 'gm.seenNoticeId';
+
+  /// 首頁背景抓到的紅點狀態。newestNoticeId 比看過的新就亮鈴鐺
+  Future<void> setBadges({required int newestNoticeId, required bool pmUnread}) async {
+    if (_seenNoticeId == 0) {
+      final prefs = await SharedPreferences.getInstance();
+      _seenNoticeId = prefs.getInt(_kSeenNotice) ?? 0;
+    }
+    final notice = newestNoticeId > 0 && newestNoticeId > _seenNoticeId;
+    if (notice != hasNewNotice || pmUnread != hasNewPm) {
+      hasNewNotice = notice;
+      hasNewPm = pmUnread;
+      notifyListeners();
+    }
+  }
+
+  /// 開了提醒頁＝當作都看過了，記下最新 id 並熄鈴鐺
+  Future<void> markNoticesSeen(int newestNoticeId) async {
+    if (newestNoticeId > _seenNoticeId) _seenNoticeId = newestNoticeId;
+    if (hasNewNotice) {
+      hasNewNotice = false;
+      notifyListeners();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kSeenNotice, _seenNoticeId);
+  }
+
+  /// 訊息分頁自己算出還有沒有未讀，同步紅點
+  void setPmUnread(bool unread) {
+    if (unread != hasNewPm) {
+      hasNewPm = unread;
+      notifyListeners();
+    }
+  }
+
   /// 冷啟動：先讀本機快取讓畫面有東西，再問伺服器 cookie 還有沒有效。
   Future<void> restore() async {
     try {

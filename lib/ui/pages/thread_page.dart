@@ -173,36 +173,40 @@ class _ThreadPageState extends State<ThreadPage> {
     context.push(uri.toString());
   }
 
-  /// 捲到指定的那一樓。難點是上方的圖片與樓中樓是逐步載入的，樓層會一路
-  /// 被往下推。用 getOffsetToReveal 每次都算出「現在」該停的絕對位置，一直
-  /// 校正到不再位移為止（穩了就收手，避免一直跟使用者的捲動打架）。
+  /// 捲到指定的那一樓。兩個難點：
+  /// 1. ListView 是惰性的 —— 目標樓層在下面很遠時根本還沒被建出來，
+  ///    `currentContext` 是 null，`ensureVisible` 也無從量起。要先一路
+  ///    往下推把它逼出來（就是使用者手動往下滑會做的事）。之前正是因為
+  ///    沒推，所以要手動滑一下才會定位。
+  /// 2. 上方圖片與樓中樓逐步載入，位置會一直往下位移，建出來後還要用
+  ///    getOffsetToReveal 算出「現在」該停的絕對位置，校正到穩定。
   void _scrollToFocus() {
     var tries = 0;
     var settled = 0;
     void go() {
       if (!mounted || !_scroll.hasClients) return;
-      final ctx = _focusKey.currentContext;
-      final ro = ctx?.findRenderObject();
-      if (ro is RenderBox) {
+      final pos = _scroll.position;
+      final ro = _focusKey.currentContext?.findRenderObject();
+      if (ro is RenderBox && ro.hasSize) {
         final target = RenderAbstractViewport.of(ro)
             .getOffsetToReveal(ro, 0.08)
             .offset
-            .clamp(_scroll.position.minScrollExtent,
-                _scroll.position.maxScrollExtent);
-        final diff = (target - _scroll.offset).abs();
+            .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+        final diff = (target - pos.pixels).abs();
         if (diff > 4) {
-          _scroll.animateTo(target,
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic);
+          _scroll.jumpTo(target);
           settled = 0;
         } else {
           settled++;
         }
-        // 連續兩次都對準了就算穩定，收手
-        if (settled >= 2) return;
+        if (settled >= 3) return; // 連三次都對準＝穩了，收手
+      } else if (pos.pixels < pos.maxScrollExtent - 2) {
+        // 還沒建出來，往下推一個視窗把惰性列表逼著往下建
+        _scroll.jumpTo((pos.pixels + pos.viewportDimension * 0.9)
+            .clamp(pos.minScrollExtent, pos.maxScrollExtent));
       }
-      if (++tries < 10) {
-        Future.delayed(const Duration(milliseconds: 320), go);
+      if (++tries < 80) {
+        Future.delayed(const Duration(milliseconds: 80), go);
       }
     }
 

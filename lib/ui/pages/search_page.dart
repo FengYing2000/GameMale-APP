@@ -71,7 +71,8 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _run(int page) async {
     final kw = _ctrl.text.trim();
-    if (kw.characters.length < 2) return toast(context, tr('關鍵字至少 2 個字'));
+    // 論壇本身沒有 2 個字的限制，一個字也搜得到，所以只擋空白
+    if (kw.isEmpty) return toast(context, tr('請先輸入關鍵字'));
 
     FocusScope.of(context).unfocus();
     setState(() {
@@ -191,6 +192,12 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _open(SearchHit hit) {
+    // 淘帖搜尋結果的網址帶著 ctid
+    final ctid = RegExp(r'ctid=(\d+)').firstMatch(hit.url);
+    if (ctid != null) {
+      context.push('/collection/${ctid.group(1)}');
+      return;
+    }
     if (hit.tid != null) {
       context.push('/t/${hit.tid}');
       return;

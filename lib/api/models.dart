@@ -762,6 +762,7 @@ enum SearchScope {
   blog('日誌', 'blog'),
   album('相簿', 'album'),
   group('群組', 'group'),
+  collection('淘帖', 'collection'),
   user('使用者', 'user');
 
   const SearchScope(this.label, this.mod);

@@ -15,6 +15,7 @@ import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_body.dart';
 import '../widgets/quick_menu.dart';
+import '../widgets/red_dot.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -103,6 +104,20 @@ class _HomePageState extends State<HomePage> {
     _loadSubforums();
     _loadCollections();
     _maybeAutoSign();
+    _refreshBadges();
+  }
+
+  /// 首頁的鈴鐺與訊息分頁紅點：背景抓，不擋首頁內容
+  Future<void> _refreshBadges() async {
+    if (!mounted || !context.read<SessionStore>().loggedIn) return;
+    try {
+      final b = await api.fetchBadges();
+      if (!mounted) return;
+      await context.read<SessionStore>().setBadges(
+          newestNoticeId: b.newestNoticeId, pmUnread: b.pmUnread);
+    } on DiscuzException {
+      // 紅點抓不到就算了
+    }
   }
 
   /// 開啟設定裡的「每天自動簽到」後，登入且今天還沒簽就自動點一次
@@ -230,7 +245,10 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.bell),
+            icon: RedDot(
+              show: context.watch<SessionStore>().hasNewNotice,
+              child: const Icon(LucideIcons.bell),
+            ),
             tooltip: tr('通知'),
             onPressed: () => context.push('/notice'),
           ),
