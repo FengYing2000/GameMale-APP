@@ -52,7 +52,7 @@ class GameMaleApp extends StatefulWidget {
   State<GameMaleApp> createState() => _GameMaleAppState();
 }
 
-class _GameMaleAppState extends State<GameMaleApp> {
+class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   late final SessionStore _session;
   late final SettingsStore _settings;
   late final RepliedStore _replied;
@@ -67,7 +67,25 @@ class _GameMaleAppState extends State<GameMaleApp> {
     _replied = RepliedStore();
     _favorites = FavoriteStore();
     _router = _buildRouter(_session, _settings);
+    WidgetsBinding.instance.addObserver(this);
     _boot();
+  }
+
+  /// 從背景切回前景就重新對一次紅點 —— 提醒常常是在 App 沒開的時候來的
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshBadges();
+  }
+
+  /// 紅點只讀頁首的提醒選單，不會把提醒標成已讀
+  Future<void> _refreshBadges() async {
+    if (!_session.loggedIn) return;
+    try {
+      final b = await api.fetchBadges();
+      _session.setBadges(notice: b.notice, pm: b.pm);
+    } on Exception {
+      // 抓不到就維持原狀
+    }
   }
 
   Future<void> _boot() async {
@@ -81,6 +99,8 @@ class _GameMaleAppState extends State<GameMaleApp> {
     _applyReplied();
     await _favorites.load();
     await _session.restore();
+    // 登入狀態確定之後才問得到紅點
+    _refreshBadges();
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
@@ -108,6 +128,7 @@ class _GameMaleAppState extends State<GameMaleApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _settings.removeListener(_applyLang);
     _settings.removeListener(_applyReplied);
     _session.removeListener(_applyReplied);

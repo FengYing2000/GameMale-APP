@@ -10,7 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
-[![Tests](https://img.shields.io/badge/测试-287%20项-4CAF50)](#测试策略)
+[![Tests](https://img.shields.io/badge/测试-289%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -141,14 +141,14 @@ tool/
 
 | 文件 | 内容 | 数量 |
 |---|---|---|
-| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 221 |
+| `parse_test.dart` | 用真实抓下来的页面验证每个选择器 | 223 |
 | `pages_test.dart` | 每页 pump 起来 + 离线行为 | 33 |
 | `s2t_test.dart` | 繁简转换的每一类判断 | 18 |
 | `render_test.dart` | 真实帖子 HTML 丢进 PostBody 确认画得出来 | 12 |
 | `live_test.dart` | 对真实论坛的端到端（需 cookie，CI 自动跳过） | 51 |
 
 ```bash
-flutter test                        # 287 项离线测试
+flutter test                        # 289 项离线测试
 flutter analyze                     # 零问题
 ```
 

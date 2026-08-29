@@ -70,6 +70,39 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
+  /// 開對話：進去就等於讀過了，回來立刻把那一列的未讀數清掉並重抓清單，
+  /// 不必等下次重開 App 紅點才消失。
+  Future<void> _openChat(PmItem item) async {
+    if (item.touid == null) return;
+    await context.push(Uri(
+      path: '/pm/${item.touid}',
+      queryParameters: {'name': item.name},
+    ).toString());
+    if (!mounted) return;
+
+    // 先本地清掉這一列的圈圈與紅點（伺服器已在檢視時標成已讀）
+    final d = _data;
+    if (d != null) {
+      final items = [
+        for (final x in d.items)
+          x.touid == item.touid
+              ? PmItem(
+                  touid: x.touid,
+                  name: x.name,
+                  last: x.last,
+                  time: x.time,
+                  avatar: x.avatar,
+                  unread: 0)
+              : x,
+      ];
+      setState(() => _data = PmListResult(items: items, message: d.message));
+      context.read<SessionStore>()
+          .setPmUnread(items.any((i) => i.unread > 0));
+    }
+    // 再跟伺服器對一次（對方可能又回了新訊息）
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -116,7 +149,10 @@ class _MessagesPageState extends State<MessagesPage> {
                 child: Column(
                   children: [
                     for (var i = 0; i < d.items.length; i++) ...[
-                      _PmRow(item: d.items[i]),
+                      _PmRow(
+                        item: d.items[i],
+                        onOpen: () => _openChat(d.items[i]),
+                      ),
                       if (i != d.items.length - 1) const Divider(indent: 68, endIndent: 14),
                     ],
                   ],
@@ -130,8 +166,9 @@ class _MessagesPageState extends State<MessagesPage> {
 }
 
 class _PmRow extends StatelessWidget {
-  const _PmRow({required this.item});
+  const _PmRow({required this.item, required this.onOpen});
   final PmItem item;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -164,12 +201,7 @@ class _PmRow extends StatelessWidget {
           ],
         ],
       ),
-      onTap: item.touid == null
-          ? null
-          : () => context.push(Uri(
-                path: '/pm/${item.touid}',
-                queryParameters: {'name': item.name},
-              ).toString()),
+      onTap: item.touid == null ? null : onOpen,
     );
   }
 }

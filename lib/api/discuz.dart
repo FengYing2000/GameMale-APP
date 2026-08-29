@@ -1452,29 +1452,42 @@ int _classSuffix(dom.Element? el, String prefix) {
 /// 給提醒頁高亮「是哪一類有新的」用。
 ({int notice, int pm, Map<String, int> views}) parsePromptCounts(
     dom.Document doc) {
-  final menu = doc.getElementById('myprompt_menu');
-  if (menu == null) return (notice: 0, pm: 0, views: const <String, int>{});
+  // 提醒選單在每個桌面頁的頁首都有；找不到就整份文件掃，別直接放棄
+  final scope = doc.getElementById('myprompt_menu') ?? doc.documentElement;
+  if (scope == null) return (notice: 0, pm: 0, views: const <String, int>{});
 
-  final pm = _classSuffix(menu.querySelector('[class*="prompt_news_"]'), 'prompt_news_');
+  // 私訊未讀：數字在 class 後綴（prompt_news_3），有些模板另外寫成 (N)
+  final pmLink = scope.querySelector('a[href*="do=pm"]');
+  var pm = _classSuffix(
+      scope.querySelector('[class*="prompt_news_"]'), 'prompt_news_');
+  final pmRq = int.tryParse(txt(pmLink?.querySelector('.rq'))) ?? 0;
+  if (pmRq > pm) pm = pmRq;
+
   final follower =
-      _classSuffix(menu.querySelector('[class*="prompt_follower_"]'), 'prompt_follower_');
+      _classSuffix(scope.querySelector('[class*="prompt_follower_"]'), 'prompt_follower_');
 
-  // 每個提醒分類的連結帶著 view=，未讀數在旁邊的 .rq 裡
+  // 每個提醒分類的連結帶著 view=，未讀數在裡面的 .rq
   final views = <String, int>{};
-  for (final a in menu.querySelectorAll('a[href*="do=notice"]')) {
+  for (final a in scope.querySelectorAll('a[href*="do=notice"]')) {
     final view = param(attr(a, 'href'), 'view') ?? 'mypost';
     final rq = int.tryParse(txt(a.querySelector('.rq'))) ?? 0;
     if (rq > 0) views[view] = (views[view] ?? 0) + rq;
   }
 
   var notice = views.values.fold(0, (a, b) => a + b) + follower;
-  // 保底：頁首說有新的（class yes）但上面都沒抓到，就當作有一則提醒
+  // 保底：頁首說有新的（#myprompt 帶 class yes）但數字沒解出來，
+  // 至少要讓鈴鐺亮起來 —— 這一段不能被「找不到選單」擋掉
   final yes = doc.getElementById('myprompt')?.classes.contains('yes') ?? false;
   if (yes && notice == 0 && pm == 0) notice = 1;
 
   return (notice: notice, pm: pm, views: views);
 }
 
+/// 提醒清單。
+///
+/// **注意：開這一頁論壇就會把該分類的提醒標成已讀**（未讀數歸零）。
+/// 所以紅點絕對不能靠這支去「查有沒有新的」—— 那等於一邊查一邊清掉，
+/// 使用者永遠看不到紅點。紅點請用 [fetchBadges]（只讀頁首，不會標已讀）。
 Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) async {
   final q = 'home.php?mod=space&do=notice&view=$view'
       '${type.isEmpty ? '' : '&type=$type'}&forcemobile=1';

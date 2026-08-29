@@ -1169,5 +1169,18 @@ void main() {
           '</li></ul>');
       expect(api.parsePromptCounts(d).pm, 3);
     });
+
+    test('沒有提醒選單但頁首標了 yes，鈴鐺照樣要亮', () {
+      // 這個保底不能被「找不到選單」擋掉
+      final d = toDoc('<a id="myprompt" class="showmenu yes">提醒</a>');
+      expect(api.parsePromptCounts(d).notice, 1);
+    });
+
+    test('什麼都沒有就不要亮', () {
+      final d = toDoc('<a id="myprompt" class="showmenu">提醒</a>');
+      final c = api.parsePromptCounts(d);
+      expect(c.notice, 0);
+      expect(c.pm, 0);
+    });
   });
 }

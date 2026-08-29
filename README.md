@@ -10,7 +10,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Tests](https://img.shields.io/badge/測試-287%20項-4CAF50)](#測試策略)
+[![Tests](https://img.shields.io/badge/測試-289%20項-4CAF50)](#測試策略)
 [![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
 
 [繁體中文](README.md) · [简体中文](README.zh-CN.md)
@@ -141,14 +141,14 @@ tool/
 
 | 檔案 | 內容 | 數量 |
 |---|---|---|
-| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 221 |
+| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 223 |
 | `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 33 |
 | `s2t_test.dart` | 簡繁轉換的每一類判斷 | 18 |
 | `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
 | `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 51 |
 
 ```bash
-flutter test                        # 287 項離線測試
+flutter test                        # 289 項離線測試
 flutter analyze                     # 零問題
 ```
 
