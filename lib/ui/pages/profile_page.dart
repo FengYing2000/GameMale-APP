@@ -11,6 +11,7 @@ import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/poke_sheet.dart';
 import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -262,7 +263,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   OutlinedButton.icon(
                     onPressed: _busy
                         ? null
-                        : () => _act(() => api.poke(widget.uid), tr('打招呼')),
+                        : () => showPokeSheet(context, widget.uid,
+                            name: _data?.name ?? ''),
                     icon: const Icon(LucideIcons.handHelping, size: 18),
                     label: Text(tr('打招呼')),
                   ),

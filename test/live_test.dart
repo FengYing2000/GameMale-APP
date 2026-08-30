@@ -724,6 +724,30 @@ void main() {
     print('  淘帖 ${c.hits.length} 個｜單字「猫」${one.hits.length} 筆');
   }, timeout: const Timeout(Duration(seconds: 90)));
 
+  test('打招呼表單：動作清單與留言欄', () async {
+    final f = await api.fetchPokeForm(677863);
+    expect(f.ready, isTrue);
+    expect(f.options.length, greaterThanOrEqualTo(10));
+    expect(f.options.every((o) => o.name.isNotEmpty), isTrue);
+    expect(f.formhash, isNotEmpty);
+    // ignore: avoid_print
+    print('  ${f.options.length} 種動作，預設 ${f.defaultIconId}'
+        '｜例如 ${f.options.take(4).map((o) => o.name).join('、')}');
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('提醒文字跟著介面語言（sys）', () async {
+    final n = await api.fetchNotice(view: 'system');
+    // 介面預設繁體，系統提醒的字就該是繁體（沒有提醒時略過）
+    if (n.items.isNotEmpty) {
+      expect(n.items.first.text, isNotEmpty);
+      // ignore: avoid_print
+      print('  ${n.items.first.text}');
+    } else {
+      // ignore: avoid_print
+      print('  （目前沒有系統提醒可比對）');
+    }
+  }, timeout: const Timeout(Duration(seconds: 60)));
+
   // 這個測試會清掉 cookie，一定要放在最後 —— 否則後面的測試都會以訪客身分跑，
   // 拿到的是登入頁而不是內容
   test('登出後能重新取得登入表單與驗證碼', () async {

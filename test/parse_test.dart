@@ -1183,4 +1183,26 @@ void main() {
       expect(c.pm, 0);
     });
   });
+
+  group('打招呼表單', () {
+    final xml = _f('poke_form.xml');
+    if (!xml.existsSync()) return;
+    final doc = toDoc(api.unwrapAjax(xml.readAsStringSync()));
+    // 解析邏輯與 fetchPokeForm 同一份（這裡直接驗選擇器）
+    final inputs = doc.querySelectorAll('input[name="iconid"]');
+
+    test('解析出 14 種動作', () => expect(inputs.length, 14));
+    test('每個動作都有 id 與名稱', () {
+      for (final i in inputs) {
+        expect(int.tryParse(i.attributes['value'] ?? ''), isNotNull);
+        expect(txt(i.parent).trim(), isNotEmpty);
+      }
+    });
+    test('有預設選中的動作',
+        () => expect(inputs.any((i) => i.attributes.containsKey('checked')), isTrue));
+    test('有留言欄與 formhash', () {
+      expect(doc.querySelector('input[name="note"]'), isNotNull);
+      expect(formhashOf(doc), isNotNull);
+    });
+  });
 }

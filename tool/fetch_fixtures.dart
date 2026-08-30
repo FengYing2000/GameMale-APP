@@ -51,6 +51,8 @@ Future<void> main() async {
     'group_index.html': 'group.php?mod=index&mobile=no',
     'group_members.html': 'forum.php?mod=group&action=memberlist&fid=116&mobile=no',
     'collection_mine.html': 'forum.php?mod=collection&action=view&ctid=656&fromop=my&mobile=no',
+    // 打招呼的動作清單（14 種＋可選留言）
+    'poke_form.xml': 'home.php?mod=spacecp&ac=poke&op=send&uid=610657&inajax=1&mobile=no',
   };
 
   final dir = Directory('test/fixtures')..createSync(recursive: true);

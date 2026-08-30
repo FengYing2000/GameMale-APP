@@ -566,11 +566,12 @@ final _failurePatterns = RegExp(
 SubmitResult submitResult(String html, String what) => _submitResult(html, what);
 
 SubmitResult _submitResult(String html, String what) {
-  // 明確的錯誤呼叫 errorhandle_x('訊息', {}) —— 例如道具「本道具已售完」。
-  // 這種一定是失敗，且訊息就在第一個參數，優先辨識，別被後面當成功處理。
+  // 明確的錯誤呼叫 errorhandle_x('訊息', {})。注意論壇連「操作成功」也走
+  // errorhandle_（例如刪提醒），所以成敗還是要看訊息本身，不能一律當失敗。
   final err = RegExp(r"errorhandle_\w*\('([^']*)'").firstMatch(html)?.group(1);
   if (err != null && err.trim().isNotEmpty) {
-    return SubmitResult(ok: false, message: sys(err.trim()));
+    final raw = err.trim();
+    return SubmitResult(ok: !_failurePatterns.hasMatch(raw), message: sys(raw));
   }
 
   // ajax 回應常常整包只是一段 <script>，直接把 body 當訊息會連 JavaScript
@@ -1396,18 +1397,18 @@ class NoticeTab {
 
 const noticeViews = <NoticeTab>[
   NoticeTab('mypost', '', '我的帖子'),
-  NoticeTab('interactive', '', '坛友互动'),
-  NoticeTab('system', '', '系统提醒'),
-  NoticeTab('app', '', '应用提醒'),
+  NoticeTab('interactive', '', '壇友互動'),
+  NoticeTab('system', '', '系統提醒'),
+  NoticeTab('app', '', '應用提醒'),
 ];
 
 const noticeTypes = <String, List<NoticeTab>>{
   'mypost': [
     NoticeTab('mypost', '', '全部'),
     NoticeTab('mypost', 'post', '帖子'),
-    NoticeTab('mypost', 'pcomment', '点评'),
-    NoticeTab('mypost', 'activity', '活动'),
-    NoticeTab('mypost', 'reward', '悬赏'),
+    NoticeTab('mypost', 'pcomment', '點評'),
+    NoticeTab('mypost', 'activity', '活動'),
+    NoticeTab('mypost', 'reward', '懸賞'),
     NoticeTab('mypost', 'goods', '商品'),
     NoticeTab('mypost', 'at', '提到我的'),
   ],
@@ -1416,7 +1417,7 @@ const noticeTypes = <String, List<NoticeTab>>{
     NoticeTab('interactive', 'poke', '打招呼'),
     NoticeTab('interactive', 'friend', '好友'),
     NoticeTab('interactive', 'wall', '留言'),
-    NoticeTab('interactive', 'comment', '评论'),
+    NoticeTab('interactive', 'comment', '評論'),
     NoticeTab('interactive', 'click', '挺你'),
     NoticeTab('interactive', 'sharenotice', '分享'),
   ],
@@ -1508,12 +1509,17 @@ Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) asy
       }
     }
     final av = attr(dl.querySelector('.avt img'), 'src');
+    // 提醒是論壇產生的系統文字（「XX 回覆了你的主題」），跟著介面語言走
     items.add(NoticeItem(
       id: attr(dl, 'notice'),
       avatar: av,
-      uid: paramInt(av, 'uid'),
-      time: txt(dl.querySelector('dt span')),
-      text: text,
+      uid: paramInt(av, 'uid') ??
+          int.tryParse(RegExp(r'space-uid-(\d+)')
+                  .firstMatch(attr(body.querySelector('a[href*="space-uid"]'), 'href'))
+                  ?.group(1) ??
+              ''),
+      time: sys(txt(dl.querySelector('dt span'))),
+      text: sys(text),
       tid: paramInt(link, 'ptid') ?? paramInt(link, 'tid'),
     ));
   }
@@ -1998,14 +2004,76 @@ Future<SubmitResult> addFriend(int uid) async {
   return _submitResult(html, '加好友');
 }
 
-/// 打招呼
-Future<SubmitResult> poke(int uid) async {
-  await _ensureFormhash();
+/// 打招呼的表單：14 種動作＋一句可選的話（最多 10 字）。
+/// 動作清單直接讀論壇的表單，論壇加減動作我們就跟著變。
+Future<PokeForm> fetchPokeForm(int uid) async {
+  final xml = await Api.instance
+      .get('home.php?mod=spacecp&ac=poke&op=send&uid=$uid&inajax=1', desktop: true);
+  final doc = toDoc(_unwrapAjax(xml));
+
+  final options = <PokeOption>[];
+  var defaultId = 0;
+  for (final input in doc.querySelectorAll('input[name="iconid"]')) {
+    final id = int.tryParse(attr(input, 'value'));
+    if (id == null) continue;
+    // 名稱是 <label> 裡除了圖片以外的文字
+    final label = input.parent;
+    final name = sys(txt(label).trim());
+    final icon = absolute(attr(label?.querySelector('img'), 'src'));
+    if (attr(input, 'checked').isNotEmpty || input.attributes.containsKey('checked')) {
+      defaultId = id;
+    }
+    options.add(PokeOption(id: id, name: name, icon: icon));
+  }
+
+  return PokeForm(
+    uid: uid,
+    options: options,
+    defaultIconId: defaultId,
+    formhash: formhashOf(doc) ?? _formhash ?? '',
+    noteHint: sys(txt(doc.querySelector('.xg1'))),
+  );
+}
+
+/// 送出打招呼。[fromNotice] 代表是從提醒頁回招呼（論壇會順手清掉那則提醒）
+Future<SubmitResult> sendPoke(
+  int uid, {
+  int iconId = 0,
+  String note = '',
+  String formhash = '',
+  bool fromNotice = false,
+}) async {
+  final hash = formhash.isNotEmpty ? formhash : (_formhash ?? '');
   final html = await Api.instance.post(
-    'home.php?mod=spacecp&ac=poke&op=send&uid=$uid&pokesubmit=true&infloat=yes',
-    {'formhash': _formhash ?? '', 'note': '', 'pokesubmit': 'true'},
+    'home.php?mod=spacecp&ac=poke&op=send&uid=$uid&inajax=1',
+    {
+      'formhash': hash,
+      'iconid': '$iconId',
+      'note': note,
+      'pokesubmit': 'true',
+      'pokesubmit_btn': 'true',
+      if (fromNotice) 'from': 'notice',
+    },
+    desktop: true,
   );
   return _submitResult(html, '打招呼');
+}
+
+/// 忽略某人的招呼（提醒頁的「忽略」）。論壇是兩步：先拿確認表單再 POST
+Future<SubmitResult> ignorePoke(int uid) => confirmAndSubmit(
+      'home.php?mod=spacecp&ac=poke&op=ignore&uid=$uid&handlekey=noticeignore',
+      '忽略招呼',
+    );
+
+/// 刪掉一則提醒。任何分類都適用，論壇回「操作成功」
+Future<SubmitResult> deleteNotice(String noticeId) async {
+  if (noticeId.isEmpty) {
+    return const SubmitResult(ok: false, message: '這則提醒沒有編號，無法忽略');
+  }
+  final html = await Api.instance.get(
+      'home.php?mod=misc&ac=ajax&op=delnotice&inajax=1&id=$noticeId',
+      desktop: true);
+  return _submitResult(html, '忽略提醒');
 }
 
 /// 收藏頁用的是 .fav_list，和主題列表不同版型

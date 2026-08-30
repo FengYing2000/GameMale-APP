@@ -1808,3 +1808,32 @@ const reportReasons = <String>[
   '資源撞車',
   '其他',
 ];
+
+/// 打招呼的一種動作（微笑、握個手…）
+class PokeOption {
+  const PokeOption({required this.id, required this.name, this.icon = ''});
+  final int id;
+  final String name;
+  final String icon;
+}
+
+/// 打招呼的表單內容
+class PokeForm {
+  const PokeForm({
+    required this.uid,
+    this.options = const [],
+    this.defaultIconId = 0,
+    this.formhash = '',
+    this.noteHint = '',
+  });
+
+  final int uid;
+  final List<PokeOption> options;
+  final int defaultIconId;
+  final String formhash;
+
+  /// 「內容為可選，並且會覆蓋之前的招呼，最多 10 個字」
+  final String noteHint;
+
+  bool get ready => options.isNotEmpty && formhash.isNotEmpty;
+}

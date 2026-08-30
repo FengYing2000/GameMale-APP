@@ -10,7 +10,9 @@ import '../../api/models.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/poke_sheet.dart';
 import '../widgets/state_box.dart';
+import '../widgets/toast.dart';
 
 class NoticePage extends StatefulWidget {
   const NoticePage({super.key});
@@ -92,6 +94,38 @@ class _NoticePageState extends State<NoticePage> {
     _load();
   }
 
+  /// 忽略這則提醒。打招呼那一類論壇另有「忽略招呼」（會連對方的請求一起清），
+  /// 其他分類就是把提醒本身刪掉。
+  Future<void> _ignore(NoticeItem item) async {
+    try {
+      final r = (_type == 'poke' && item.uid != null)
+          ? await api.ignorePoke(item.uid!)
+          : await api.deleteNotice(item.id);
+      if (!mounted) return;
+      toast(context, r.message, kind: r.ok ? ToastKind.ok : ToastKind.warn);
+      if (r.ok) {
+        // 從畫面上移掉，不必整頁重抓
+        final d = _data;
+        if (d != null) {
+          setState(() => _data = NoticeResult(
+                items: d.items.where((x) => x != item).toList(),
+                message: d.message,
+              ));
+        }
+      }
+    } on DiscuzException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  /// 回個招呼（從提醒回的話論壇會順手清掉那則提醒）
+  Future<void> _poke(NoticeItem item) async {
+    final uid = item.uid;
+    if (uid == null) return;
+    final ok = await showPokeSheet(context, uid, fromNotice: true);
+    if (ok && mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = _data;
@@ -130,7 +164,11 @@ class _NoticePageState extends State<NoticePage> {
                 child: Column(
                   children: [
                     for (var i = 0; i < d.items.length; i++) ...[
-                      _NoticeRow(item: d.items[i]),
+                      _NoticeRow(
+                        item: d.items[i],
+                        onIgnore: () => _ignore(d.items[i]),
+                        onPoke: () => _poke(d.items[i]),
+                      ),
                       if (i != d.items.length - 1)
                         const Divider(indent: 60, endIndent: 14),
                     ],
@@ -191,7 +229,7 @@ class _ChipRow extends StatelessWidget {
                                   fontWeight: FontWeight.w700)),
                         )
                       : null,
-                  label: Text(it.$2,
+                  label: Text(tr(it.$2),
                       style: TextStyle(fontSize: small ? 12.5 : 14)),
                   selected: selected == it.$1,
                   visualDensity: small ? VisualDensity.compact : null,
@@ -207,8 +245,14 @@ class _ChipRow extends StatelessWidget {
 }
 
 class _NoticeRow extends StatelessWidget {
-  const _NoticeRow({required this.item});
+  const _NoticeRow({
+    required this.item,
+    required this.onIgnore,
+    required this.onPoke,
+  });
   final NoticeItem item;
+  final VoidCallback onIgnore;
+  final VoidCallback onPoke;
 
   @override
   Widget build(BuildContext context) {
@@ -229,8 +273,20 @@ class _NoticeRow extends StatelessWidget {
                 children: [
                   Text(item.text, style: const TextStyle(fontSize: 14, height: 1.55)),
                   const SizedBox(height: 4),
-                  Text(item.time,
-                      style: TextStyle(fontSize: 11.5, color: faint(context))),
+                  Row(
+                    children: [
+                      Text(item.time,
+                          style: TextStyle(fontSize: 11.5, color: faint(context))),
+                      const Spacer(),
+                      // 對方是誰知道的話就能回招呼
+                      if (item.uid != null)
+                        _action(context, tr('打招呼'), onPoke),
+                      if (item.id.isNotEmpty) ...[
+                        const SizedBox(width: 14),
+                        _action(context, tr('忽略'), onIgnore, muted: true),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -241,4 +297,15 @@ class _NoticeRow extends StatelessWidget {
       ),
     );
   }
+
+  Widget _action(BuildContext c, String label, VoidCallback onTap,
+          {bool muted = false}) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: muted ? faint(c) : Theme.of(c).colorScheme.primary)),
+      );
 }
