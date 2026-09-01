@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
@@ -70,6 +71,12 @@ Future<void> showImageActions(BuildContext context, String url) async {
 }
 
 Future<void> _save(BuildContext context, String url) async {
+  // 網頁版沒辦法用程式把圖片寫進相簿（瀏覽器不給），
+  // 只能請使用者長按圖片自己存。這是 PWA 相對原生 App 唯一少掉的功能。
+  if (kIsWeb) {
+    toast(context, tr('網頁版請長按圖片，選「儲存影像」'));
+    return;
+  }
   try {
     if (!await Gal.hasAccess(toAlbum: true)) {
       if (!await Gal.requestAccess(toAlbum: true)) {

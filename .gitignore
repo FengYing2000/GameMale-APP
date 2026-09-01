@@ -60,3 +60,6 @@ test/fixtures/
 # PWA 後端的機密與執行期資料
 .env
 pwa/data/
+
+# Flutter 網頁版的產出：部署時才 build，不進版控（39MB）
+/build/

@@ -76,6 +76,25 @@ List<Cookie> decodeCookies(String raw) {
 Future<String> dumpCookies(Api target) async =>
     encodeCookies(await target.cookiesFor(Uri.parse(kOrigin)));
 
+/// 用瀏覽器送上來的 Cookie 標頭開一條連線。
+///
+/// 網頁版的使用者是直接登入論壇的（走 /gm 轉發），那些 cookie 就在
+/// 請求標頭上，拿來當 session 用即可，不必再登入一次。
+Future<Api> apiForRawCookies(String header) async {
+  final jar = CookieJar();
+  final cookies = <Cookie>[];
+  for (final part in header.split(';')) {
+    final i = part.indexOf('=');
+    if (i <= 0) continue;
+    final name = part.substring(0, i).trim();
+    // 我們自己的 session cookie 不要送去論壇
+    if (name == 'gm_session') continue;
+    cookies.add(Cookie(name, part.substring(i + 1).trim()));
+  }
+  await jar.saveFromResponse(Uri.parse(kForumOrigin), cookies);
+  return Api.forAccount(jar);
+}
+
 /// 用某個帳號存下來的 cookie 開一條連線
 Future<Api> apiForCookie(String cookiePlain) async {
   final jar = CookieJar();

@@ -28,9 +28,12 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/gm_server /usr/local/bin/gm_server
 COPY pwa/web/ /srv/web/
+# Flutter 網頁版（先在本機 flutter build web 產好再一起送上來）。
+# 不在映像裡編：那要整包 Flutter SDK，映像會肥好幾 GB。
+COPY build/web/ /srv/app/
 # 簡繁轉換表，通知文字要用；讀不到的話會原樣輸出簡體，不會掛
 COPY assets/s2t.json /srv/assets/s2t.json
-ENV WEB_ROOT=/srv/web \
+ENV WEB_ROOT=/srv/web     APP_ROOT=/srv/app \
     DATA_FILE=/data/accounts.json \
     ASSET_DIR=/srv/assets \
     TZ=Asia/Taipei \

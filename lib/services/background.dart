@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
@@ -81,6 +82,8 @@ Future<void> syncBadgeBaseline({required int notice, required int pm}) async {
 /// 打開背景檢查。iOS 由系統決定何時喚醒（強制關閉 App 就完全不會跑），
 /// Android 會照 WorkManager 的週期跑，最短 15 分鐘。
 Future<void> enableBackgroundBadges() async {
+  // 網頁版的背景檢查是伺服器在做，不需要（也沒有）workmanager
+  if (kIsWeb) return;
   await Workmanager().initialize(backgroundDispatcher);
   await Workmanager().registerPeriodicTask(
     backgroundTaskName,
@@ -92,5 +95,7 @@ Future<void> enableBackgroundBadges() async {
 }
 
 Future<void> disableBackgroundBadges() async {
+  // 網頁版的背景檢查是伺服器在做，不需要（也沒有）workmanager
+  if (kIsWeb) return;
   await Workmanager().cancelByUniqueName(backgroundTaskName);
 }

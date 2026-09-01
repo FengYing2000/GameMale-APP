@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// 本地通知。只有這支會發通知，前景背景共用。
@@ -18,6 +19,9 @@ class Notifications {
 
   static Future<void> init() async {
     if (_ready) return;
+    // 網頁版的通知走瀏覽器的 Web Push（見 web/index.html 的 JS），
+    // 這個外掛沒有網頁實作，呼叫下去會丟 MissingPluginException
+    if (kIsWeb) return;
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     // 權限等使用者真的打開開關時再要，不要一啟動就跳
     const darwin = DarwinInitializationSettings(
@@ -33,6 +37,7 @@ class Notifications {
 
   /// 要通知權限（Android 13+ 與 iOS 都要問過才發得出來）
   static Future<bool> requestPermission() async {
+    if (kIsWeb) return false;
     await init();
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -53,6 +58,7 @@ class Notifications {
     required String title,
     required String body,
   }) async {
+    if (kIsWeb) return;
     await init();
     await _plugin.show(
       id: id,

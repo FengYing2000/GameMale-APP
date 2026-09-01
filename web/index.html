@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="GameMale 論壇">
+
+  <!-- 加到主畫面之後才會以獨立 App 的樣子開啟；iOS 也只讓主畫面 App 收推播 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GameMale">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#0F1115">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>GameMale</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Flutter 載入前的底色。不設的話首屏會閃一下白，
+       深色主題下特別刺眼。 */
+    html, body { margin:0; padding:0; height:100%; background:#0F1115; }
+    #boot { position:fixed; inset:0; display:flex; align-items:center;
+      justify-content:center; flex-direction:column; gap:14px;
+      color:#9099ab; background:#0F1115;
+      font:14px/1.6 -apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif; }
+    #boot .r { width:26px; height:26px; border-radius:50%;
+      border:2px solid #282d38; border-top-color:#8DB943;
+      animation:sp .7s linear infinite; }
+    @keyframes sp { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="boot"><div class="r"></div><div>載入中…</div></div>
+
+  <script>
+  // ── Web Push 橋接 ──────────────────────────────────────────
+  // Flutter 網頁版沒辦法用 flutter_local_notifications（那是原生外掛），
+  // 推播得走瀏覽器自己的 Push API。Dart 端透過 window.gmPush.* 呼叫這裡。
+  (function () {
+    let registration = null;
+
+    async function ready() {
+      if (registration) return registration;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+      registration = await navigator.serviceWorker.register('push-sw.js');
+      await navigator.serviceWorker.ready;
+      return registration;
+    }
+
+    function toBytes(base64) {
+      const padded = (base64 + '='.repeat((4 - base64.length % 4) % 4))
+        .replace(/-/g, '+').replace(/_/g, '/');
+      return Uint8Array.from([...atob(padded)].map((c) => c.charCodeAt(0)));
+    }
+
+    window.gmPush = {
+      // 這台裝置有沒有本事收推播（iOS 一定要加到主畫面）
+      supported: function () {
+        const standalone = window.navigator.standalone === true ||
+          window.matchMedia('(display-mode: standalone)').matches;
+        const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+        if (iOS && !standalone) return 'need-install';
+        return 'ok';
+      },
+
+      status: function () {
+        return ('Notification' in window) ? Notification.permission : 'unsupported';
+      },
+
+      // 回傳訂閱的 JSON 字串；失敗回傳 'error:訊息'。
+      // 權限一定要在使用者手勢裡要，所以這支只能由按鈕觸發。
+      enable: async function () {
+        try {
+          const reg = await ready();
+          if (!reg) return 'error:這個瀏覽器不支援推播';
+          const perm = await Notification.requestPermission();
+          if (perm !== 'granted') return 'error:沒有授權通知';
+
+          const cfg = await (await fetch('api/config', { credentials: 'same-origin' })).json();
+          let sub = await reg.pushManager.getSubscription();
+          if (!sub) {
+            sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: toBytes(cfg.vapidPublicKey),
+            });
+          }
+          return JSON.stringify(sub.toJSON());
+        } catch (e) {
+          return 'error:' + (e && e.message ? e.message : e);
+        }
+      },
+
+      disable: async function () {
+        try {
+          const reg = await ready();
+          const sub = reg && await reg.pushManager.getSubscription();
+          if (sub) { await sub.unsubscribe(); return sub.endpoint; }
+          return '';
+        } catch (e) { return ''; }
+      },
+    };
+  })();
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      const b = document.getElementById('boot');
+      if (b) b.remove();
+    });
+  </script>
+</body>
+</html>

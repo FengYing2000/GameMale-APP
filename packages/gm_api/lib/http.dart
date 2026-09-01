@@ -7,7 +7,18 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 
 import 'models.dart';
 
-const String kOrigin = 'https://www.gamemale.com';
+/// 論壇的正式網址。用來判斷「這是不是站內連結」。
+const String kForumOrigin = 'https://www.gamemale.com';
+
+/// 實際要打的位址。
+///
+/// 原生版直連論壇。**網頁版不能直連**——瀏覽器不准跨網域打論壇
+/// （論壇沒送任何 CORS 標頭），所以要指到自己網站上的轉發路徑，由伺服器代打。
+/// 圖片、連結、請求全都經過 [absolute]／[avatarUrl]／[Api]，
+/// 所以只要在啟動時改這一個變數，整批就會轉向。
+///
+/// 一定要在 [Api.init] 之前設定。
+String kOrigin = kForumOrigin;
 
 const String _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -260,7 +271,7 @@ class Api {
   }
 
   /// 圖片走 Image.network / CachedNetworkImage 時要帶的標頭
-  static Map<String, String> get imageHeaders => const {
+  static Map<String, String> get imageHeaders => {
         'User-Agent': _ua,
         'Referer': '$kOrigin/forum.php?mobile=2',
       };

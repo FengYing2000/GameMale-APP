@@ -145,7 +145,11 @@ String sanitizeContent(dom.Element? el) {
   for (final a in node.querySelectorAll('a').toList()) {
     final href = absolute(a.attributes['href']);
     a.attributes['href'] = href;
-    if (href.startsWith(kOrigin)) a.attributes['data-inapp'] = '1';
+    // 站內連結。網頁版走代理時 kOrigin 是自己的網域，
+    // 但頁面裡仍可能出現論壇原網址，兩種都要認得。
+    if (href.startsWith(kOrigin) || href.startsWith(kForumOrigin)) {
+      a.attributes['data-inapp'] = '1';
+    }
   }
 
   for (final v in node.querySelectorAll('video, audio').toList()) {

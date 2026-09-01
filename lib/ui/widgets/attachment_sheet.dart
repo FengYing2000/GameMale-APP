@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -68,6 +69,17 @@ class _SheetState extends State<_Sheet> {
     setState(() => _saving = true);
     try {
       final bytes = await api.fetchAttachmentBytes(widget.attachment.url);
+      if (kIsWeb) {
+        // 網頁版沒有暫存目錄可以寫，直接交給瀏覽器下載
+        await SharePlus.instance.share(ShareParams(
+          files: [
+            XFile.fromData(bytes,
+                name: widget.attachment.name, mimeType: 'application/octet-stream')
+          ],
+          title: widget.attachment.name,
+        ));
+        return;
+      }
       final dir = await getTemporaryDirectory();
       // 檔名可能有斜線之類的字元，掃乾淨免得寫不進去
       final safe = widget.attachment.name

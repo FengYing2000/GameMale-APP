@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +35,13 @@ class _WebPageState extends State<WebPage> {
   }
 
   Future<void> _boot() async {
+    // 網頁版沒有內嵌 WebView（本身就在瀏覽器裡），直接開新分頁。
+    // 反正 cookie 在瀏覽器上本來就有，開起來一樣是已登入狀態。
+    if (kIsWeb) {
+      await launchUrl(Uri.parse(widget.url), webOnlyWindowName: '_blank');
+      if (mounted) Navigator.of(context).maybePop();
+      return;
+    }
     final jar = WebViewCookieManager();
     for (final c in await Api.instance.allCookies()) {
       await jar.setCookie(WebViewCookie(

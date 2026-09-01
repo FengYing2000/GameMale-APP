@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:gm_server/accounts.dart';
 import 'package:gm_server/forum.dart';
+import 'package:gm_server/forum_proxy.dart';
 import 'package:gm_server/json_api.dart';
 import 'package:gm_server/poller.dart';
 import 'package:gm_server/push_client.dart';
@@ -39,6 +40,8 @@ Future<void> main(List<String> args) async {
   final subject = env['VAPID_SUBJECT'] ?? 'mailto:admin@example.com';
   final port = int.tryParse(env['PORT'] ?? '') ?? 8080;
   final webRoot = env['WEB_ROOT'] ?? '../web';
+  // Flutter 網頁版的產出（flutter build web）。放著就會被掛上去。
+  final appRoot = env['APP_ROOT'] ?? '../../build/web';
   final assetDir = env['ASSET_DIR'] ?? '../../assets';
   final pollMinutes = int.tryParse(env['POLL_MINUTES'] ?? '') ?? 5;
 
@@ -256,6 +259,34 @@ Future<void> main(List<String> args) async {
       return ok({'ok': removed});
     })
 
+    // ── 網頁版（Flutter build web）的訂閱 ─────────────────────
+    // 網頁版是直接用論壇帳號登入的（透過 /gm 轉發），瀏覽器手上已經有
+    // 論壇的 cookie。**不要再要求它登入我們一次**——那等於同一個人登入兩遍。
+    // 這裡拿請求上的 cookie 去問論壇「你是誰」，認得出來就建帳號、綁訂閱。
+    ..post('/api/web-subscribe', (Request r) async {
+      final cookie = r.headers['cookie'] ?? '';
+      if (cookie.isEmpty) return bad('沒有論壇登入狀態，請先登入論壇', 401);
+      try {
+        final target = await apiForRawCookies(cookie);
+        final index = await asAccount(target, api.fetchIndex);
+        if (!index.user.loggedIn || index.user.name.isEmpty) {
+          return bad('論壇顯示未登入，請先在 App 裡登入', 401);
+        }
+        final account = await store.upsert(
+          username: index.user.name,
+          cookiePlain: await dumpCookies(target),
+        );
+        await store.addSubscription(
+            account, PushSubscription.fromJson(await bodyOf(r)));
+        stdout.writeln('網頁版綁定裝置：${index.user.name}');
+        return ok(stateOf(account));
+      } on FormatException catch (e) {
+        return bad(e.message);
+      } catch (e) {
+        return bad('$e', 502);
+      }
+    })
+
     // ── 論壇內容 ─────────────────────────────────────────────
     // 全部都要登入：論壇本身大部分內容對訪客就是關的，
     // 而且我們手上只有登入後的 cookie 可用。
@@ -391,11 +422,24 @@ Future<void> main(List<String> args) async {
       return ok(stateOf(a));
     });
 
-  final handler = Cascade()
-      .add(router.call)
-      .add(createStaticHandler(webRoot,
-          defaultDocument: 'index.html', useHeaderBytesForContentType: true))
-      .handler;
+  // 論壇轉發：讓瀏覽器裡的 Flutter 網頁版能打到論壇（它自己不准跨網域）
+  final proxy = ForumProxy();
+  Handler withProxy(Handler inner) => (Request r) {
+        if (r.url.path == 'gm' || r.url.path.startsWith('gm/')) {
+          return proxy.handle(r.change(path: 'gm'));
+        }
+        return inner(r);
+      };
+
+  // Flutter 網頁版在的話就由它當門面（它跟手寫版都要 index.html 與
+  // manifest.json，不能同時掛在根路徑）。手寫版是第一階段的原型，
+  // 只有在還沒 build web 時才頂上。
+  final hasApp = Directory(appRoot).existsSync();
+  final site = createStaticHandler(hasApp ? appRoot : webRoot,
+      defaultDocument: 'index.html', useHeaderBytesForContentType: true);
+
+  final handler =
+      withProxy(Cascade().add(router.call).add(site).handler);
 
   final server = await shelf_io.serve(
     const Pipeline().addMiddleware(logRequests()).addHandler(handler),
@@ -409,6 +453,9 @@ Future<void> main(List<String> args) async {
       'http://${server.address.host}:${server.port}');
   stdout.writeln('VAPID 公鑰：${keys.publicKeyBase64}');
   stdout.writeln('已有 ${store.length} 個帳號，每 $pollMinutes 分鐘輪詢一次');
+  stdout.writeln(hasApp
+      ? 'Flutter 網頁版：已掛載（$appRoot）'
+      : 'Flutter 網頁版：找不到 $appRoot，改用手寫的通知頁');
 }
 
 

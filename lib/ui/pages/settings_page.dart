@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import '../../i18n/ui.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -9,6 +10,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:gm_api/http.dart';
 import '../../services/background.dart';
+import '../../services/web_push_stub.dart'
+    if (dart.library.js_interop) '../../services/web_push.dart';
 import '../../services/notifications.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';
@@ -37,9 +40,39 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _setNotify(SettingsStore settings, bool on) async {
     if (!on) {
       await settings.setNotifyBackground(false);
-      await disableBackgroundBadges();
+      if (kIsWeb) {
+        await WebPush.disable();
+      } else {
+        await disableBackgroundBadges();
+      }
       return;
     }
+
+    // 網頁版走瀏覽器的 Web Push，跟原生的本地通知是兩套完全不同的東西
+    if (kIsWeb) {
+      if (WebPush.support == WebPushSupport.needInstall) {
+        if (mounted) {
+          toast(context, tr('iOS 要先把網頁「加入主畫面」，再從那個圖示打開才收得到推播'),
+              kind: ToastKind.warn);
+        }
+        return;
+      }
+      if (WebPush.support == WebPushSupport.unsupported) {
+        if (mounted) {
+          toast(context, tr('這個瀏覽器不支援推播'), kind: ToastKind.warn);
+        }
+        return;
+      }
+      final err = await WebPush.enable();
+      if (!mounted) return;
+      if (err != null) {
+        toast(context, tr(err), kind: ToastKind.warn);
+        return;
+      }
+      await settings.setNotifyBackground(true);
+      return;
+    }
+
     final granted = await Notifications.requestPermission();
     if (!mounted) return;
     if (!granted) {
@@ -156,12 +189,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   secondary: const Icon(LucideIcons.bellRing),
                   title: Text(tr('新提醒通知')),
                   subtitle: Text(
-                    Platform.isIOS
-                        ? tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
-                            'iOS 由系統決定何時喚醒，通常隔十幾分鐘到幾小時；'
-                            '把 App 從切換器上滑掉強制關閉就完全不會查。')
-                        : tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
-                            '最短 15 分鐘一次；被系統「強制停止」或省電機制清掉才會停。'),
+                    // Platform.isIOS 在網頁版會直接丟例外，一定要先擋掉
+                    kIsWeb
+                        ? tr('由伺服器定期查有沒有新提醒／私訊，有就推播過來。'
+                            '網頁版關掉也收得到，但 iOS 要先把網頁加入主畫面。')
+                        : Platform.isIOS
+                            ? tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
+                                'iOS 由系統決定何時喚醒，通常隔十幾分鐘到幾小時；'
+                                '把 App 從切換器上滑掉強制關閉就完全不會查。')
+                            : tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
+                                '最短 15 分鐘一次；被系統「強制停止」或省電機制清掉才會停。'),
                     style: const TextStyle(fontSize: 12),
                   ),
                   onChanged: (v) => _setNotify(settings, v),

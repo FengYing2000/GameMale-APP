@@ -1,7 +1,9 @@
 # build context 是專案根目錄（pwa/Dockerfile 需要 packages/gm_api），
 # 這裡把用不到又肥大的東西擋掉，不然每次 build 都要傳一整包
 .git
-build/
+# build/web 是 Flutter 網頁版的產出，要進映像
+build/*
+!build/web
 .dart_tool/
 **/.dart_tool/
 ios/
