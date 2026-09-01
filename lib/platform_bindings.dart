@@ -17,6 +17,8 @@ Future<void> installFlutterBindings() async {
     // 轉發路徑，由伺服器代打。同源請求瀏覽器會自動帶 cookie，
     // 登入狀態就交給它管，不需要 PersistCookieJar。
     kOrigin = '${Uri.base.origin}/gm';
+    // 論壇有些圖放在 img.gamemale.com，那是另一個網域抓不到，走這條代理
+    kAssetProxyPrefix = '${Uri.base.origin}/gmimg?u=';
     S2T.assetLoader = rootBundle.loadString;
     await Api.instance.init();
     return;

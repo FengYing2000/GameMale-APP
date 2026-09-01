@@ -13,6 +13,7 @@ import 'package:gm_server/webpush.dart';
 import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
+import 'package:http/http.dart' as http;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
@@ -54,6 +55,8 @@ Future<void> main(List<String> args) async {
   await store.load();
 
   final push = PushClient(keys: keys, subject: subject);
+  // 抓論壇圖片用的 client（公開資源，不帶登入）
+  final assetClient = http.Client();
   final logins = LoginSessions();
   final poller = Poller(
     store: store,
@@ -366,6 +369,33 @@ Future<void> main(List<String> args) async {
           final res = await asAccount(t, api.doSign);
           return {'ok': res.ok, 'message': res.message};
         }))
+
+    // ── 網頁版的跨子網域資源代理 ──────────────────────────────
+    // 論壇的圖片有不少放在 img.gamemale.com。那是另一個網域，
+    // 瀏覽器抓不到（沒有 CORS），所以由這裡代抓。
+    // 不需要登入——這些是公開的圖片資源，而且網頁版的人本來就在瀏覽論壇。
+    ..get('/gmimg', (Request r) async {
+      final raw = r.url.queryParameters['u'] ?? '';
+      final uri = Uri.tryParse(raw);
+      // 只准代理論壇自己的網域，否則就變成別人的開放代理
+      if (uri == null ||
+          !(uri.host == 'gamemale.com' || uri.host.endsWith('.gamemale.com'))) {
+        return bad('只能代理論壇的資源');
+      }
+      try {
+        final res = await assetClient.get(uri, headers: {
+          'User-Agent': Api.userAgent,
+          'Referer': '$kForumOrigin/',
+        });
+        if (res.statusCode >= 400) return Response.notFound('');
+        return Response.ok(res.bodyBytes, headers: {
+          'content-type': res.headers['content-type'] ?? 'application/octet-stream',
+          'cache-control': 'public, max-age=604800',
+        });
+      } catch (_) {
+        return Response.notFound('');
+      }
+    })
 
     // ── 圖片代理 ─────────────────────────────────────────────
     // 論壇的圖片（頭像、附件）要帶登入 cookie 才拿得到，瀏覽器沒有

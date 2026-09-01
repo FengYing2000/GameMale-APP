@@ -7,6 +7,12 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 
 import 'models.dart';
 
+/// 現在是不是跑在瀏覽器上。
+///
+/// gm_api 刻意不依賴 Flutter，所以用不了 `kIsWeb`——這是它背後同一招：
+/// 編譯器會依可用的函式庫定義 `dart.library.*`。
+const bool kIsWebPlatform = bool.fromEnvironment('dart.library.js_util');
+
 /// 論壇的正式網址。用來判斷「這是不是站內連結」。
 const String kForumOrigin = 'https://www.gamemale.com';
 
@@ -19,6 +25,22 @@ const String kForumOrigin = 'https://www.gamemale.com';
 ///
 /// 一定要在 [Api.init] 之前設定。
 String kOrigin = kForumOrigin;
+
+/// 網頁版專用：指向論壇的**絕對**網址要改走這個前綴的代理。
+///
+/// 論壇的圖片有不少放在 `img.gamemale.com`，那是另一個子網域，
+/// [absolute] 不會動它。瀏覽器抓跨網域圖片時，CanvasKit 是用 fetch 讀進來
+/// 再畫到 canvas 上，所以**一樣受 CORS 限制**——那些站台同樣沒送 CORS 標頭，
+/// 圖就整片載不出來。
+///
+/// 設成類似 `/gmimg?u=` 之後，這類網址會被包成自家的代理路徑。
+/// 空字串＝不改寫（原生版直連，不需要）。
+String kAssetProxyPrefix = '';
+
+bool _isForumHost(String url) {
+  final host = Uri.tryParse(url)?.host ?? '';
+  return host == 'gamemale.com' || host.endsWith('.gamemale.com');
+}
 
 const String _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -271,10 +293,15 @@ class Api {
   }
 
   /// 圖片走 Image.network / CachedNetworkImage 時要帶的標頭
-  static Map<String, String> get imageHeaders => {
-        'User-Agent': _ua,
-        'Referer': '$kOrigin/forum.php?mobile=2',
-      };
+  static Map<String, String> get imageHeaders => kIsWebPlatform
+      // 瀏覽器**禁止**自訂 User-Agent 與 Referer（forbidden header names），
+      // 帶了整個請求會直接失敗——圖片會全部載不出來，而且不會有錯誤訊息。
+      // 網頁版的圖片本來就走 /gm 轉發，這兩個標頭由伺服器補。
+      ? const <String, String>{}
+      : {
+          'User-Agent': _ua,
+          'Referer': '$kOrigin/forum.php?mobile=2',
+        };
 
   /// 讀出名稱以某段字尾結束的 cookie（Discuz 的 cookie 都有站台專屬前綴）
   /// 內建瀏覽器要用同一組 UA，不然論壇會給不一樣的模板
@@ -370,9 +397,18 @@ String absolute(String? u) {
   if (u == null) return '';
   var s = u.trim().replaceAll('&amp;', '&');
   if (s.isEmpty) return '';
-  if (s.startsWith('//')) return 'https:$s';
-  if (s.startsWith('http://') || s.startsWith('https://')) return s;
   if (s.startsWith('data:')) return s;
+  if (s.startsWith('//')) s = 'https:$s';
+
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    // 已經是絕對網址。網頁版遇到論壇自己的網域（含 img.gamemale.com
+    // 這種子網域）要改走代理，否則瀏覽器會因為 CORS 抓不到。
+    if (kAssetProxyPrefix.isNotEmpty && _isForumHost(s)) {
+      return '$kAssetProxyPrefix${Uri.encodeComponent(s)}';
+    }
+    return s;
+  }
+
   s = s.replaceFirst(RegExp(r'^\./'), '').replaceFirst(RegExp(r'^/'), '');
   return '$kOrigin/$s';
 }
