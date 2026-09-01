@@ -3,16 +3,21 @@ import 'dart:io';
 
 import 'package:gm_server/accounts.dart';
 import 'package:gm_server/forum.dart';
+import 'package:gm_server/json_api.dart';
 import 'package:gm_server/poller.dart';
 import 'package:gm_server/push_client.dart';
 import 'package:gm_server/secret_box.dart';
 import 'package:gm_server/vapid.dart';
 import 'package:gm_server/webpush.dart';
 import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/http.dart';
+import 'package:gm_api/models.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
+
+const _sessionCookie = 'gm_session';
 
 Future<void> main(List<String> args) async {
   final env = Platform.environment;
@@ -63,11 +68,30 @@ Future<void> main(List<String> args) async {
         headers: {'content-type': 'application/json; charset=utf-8'},
       );
 
+  /// 認 cookie 為主、Bearer 為輔。
+  ///
+  /// **一定要有 cookie 這條路**：論壇圖片是用 <img> 載的，而 <img>
+  /// 沒辦法帶 Authorization 標頭。把 token 塞進網址又會被寫進瀏覽器歷史
+  /// 與伺服器日誌，所以走 HttpOnly cookie 讓瀏覽器自己帶。
+  /// Bearer 留著給 curl 測試用。
   Account? whoIs(Request r) {
     final auth = r.headers['authorization'] ?? '';
-    if (!auth.startsWith('Bearer ')) return null;
-    return store.byToken(auth.substring(7));
+    if (auth.startsWith('Bearer ')) return store.byToken(auth.substring(7));
+    for (final part in (r.headers['cookie'] ?? '').split(';')) {
+      final kv = part.trim().split('=');
+      if (kv.length == 2 && kv[0] == _sessionCookie) {
+        return store.byToken(Uri.decodeComponent(kv[1]));
+      }
+    }
+    return null;
   }
+
+  /// SameSite=Lax 就夠了——這個站沒有跨站表單，Strict 會讓從通知點進來的
+  /// 第一個請求帶不到 cookie。
+  String sessionCookie(String token, {bool clear = false}) =>
+      '$_sessionCookie=${clear ? '' : Uri.encodeComponent(token)}; '
+      'HttpOnly; Secure; SameSite=Lax; Path=/; '
+      'Max-Age=${clear ? 0 : 60 * 60 * 24 * 30}';
 
   Future<Map<String, dynamic>> bodyOf(Request r) async {
     final raw = await r.readAsString();
@@ -88,6 +112,27 @@ Future<void> main(List<String> args) async {
         'lastCheckedAt': a.lastCheckedAt,
         'devices': a.subscriptions.length,
       };
+
+  /// 論壇相關的路徑共用：檢查登入、用這個帳號的 cookie 開連線、
+  /// 把論壇那邊的錯誤翻成前端看得懂的回應。
+  Future<Response> forum(
+      Request r, Future<Object> Function(Api target) body) async {
+    final a = whoIs(r);
+    if (a == null) return bad('尚未登入', 401);
+    if (a.cookieStatus == 'expired') {
+      return bad('論壇的登入已過期，請重新登入', 401);
+    }
+    try {
+      return ok(await body(await a.connect(store)));
+    } on DiscuzException catch (e) {
+      return bad('論壇回了錯誤：${e.message}', 502);
+    } catch (e) {
+      return bad('$e', 500);
+    }
+  }
+
+  int intParam(Request r, String name, int fallback) =>
+      int.tryParse(r.url.queryParameters[name] ?? '') ?? fallback;
 
   final router = Router()
     ..get('/api/config', (Request r) => ok({
@@ -143,7 +188,13 @@ Future<void> main(List<String> args) async {
       );
       final token = await store.issueToken(account);
       stdout.writeln('登入成功：$username');
-      return ok({'token': token, 'account': stateOf(account)});
+      return Response.ok(
+        json.encode({'account': stateOf(account)}),
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'set-cookie': sessionCookie(token),
+        },
+      );
     })
 
     ..get('/api/me', (Request r) async {
@@ -153,9 +204,21 @@ Future<void> main(List<String> args) async {
     })
 
     ..post('/api/logout', (Request r) async {
+      for (final part in (r.headers['cookie'] ?? '').split(';')) {
+        final kv = part.trim().split('=');
+        if (kv.length == 2 && kv[0] == _sessionCookie) {
+          await store.revokeToken(Uri.decodeComponent(kv[1]));
+        }
+      }
       final auth = r.headers['authorization'] ?? '';
       if (auth.startsWith('Bearer ')) await store.revokeToken(auth.substring(7));
-      return ok({'ok': true});
+      return Response.ok(
+        json.encode({'ok': true}),
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'set-cookie': sessionCookie('', clear: true),
+        },
+      );
     })
 
     ..post('/api/settings', (Request r) async {
@@ -191,6 +254,112 @@ Future<void> main(List<String> args) async {
       final b = await bodyOf(r);
       final removed = await store.removeSubscription(b['endpoint'] as String? ?? '');
       return ok({'ok': removed});
+    })
+
+    // ── 論壇內容 ─────────────────────────────────────────────
+    // 全部都要登入：論壇本身大部分內容對訪客就是關的，
+    // 而且我們手上只有登入後的 cookie 可用。
+    ..get('/api/index', (Request r) => forum(r, (t) async =>
+        indexJson(await asAccount(t, api.fetchIndex))))
+    ..get('/api/forum/<fid|[0-9]+>', (Request r, String fid) => forum(r, (t) async =>
+        forumJson(await asAccount(t, () => api.fetchForum(
+              int.parse(fid),
+              page: intParam(r, 'page', 1),
+              query: ForumQuery(
+                typeid: intParam(r, 'typeid', 0),
+                tab: r.url.queryParameters['tab'] ?? '',
+                orderby: r.url.queryParameters['orderby'] ?? '',
+                special: r.url.queryParameters['special'] ?? '',
+                dateline: intParam(r, 'dateline', 0),
+              ),
+            )))))
+    ..get('/api/thread/<tid|[0-9]+>', (Request r, String tid) => forum(r, (t) async =>
+        threadJson(await asAccount(t, () => api.fetchThread(
+              int.parse(tid),
+              page: intParam(r, 'page', 1),
+            )))))
+    ..get('/api/pm', (Request r) => forum(r, (t) async {
+          final res = await asAccount(t, api.fetchPmList);
+          return {
+            'items': [for (final p in res.items) pmItemJson(p)],
+            'message': res.message,
+          };
+        }))
+    ..get('/api/pm/<touid|[0-9]+>', (Request r, String touid) => forum(r, (t) async =>
+        pmChatJson(await asAccount(t, () => api.fetchPmChat(int.parse(touid))))))
+    // 注意：開提醒頁**會把那一類標成已讀**，所以只有使用者真的點進來時
+    // 才呼叫。背景輪詢一律走頁首的紅點，絕對不能用這支。
+    ..get('/api/notice', (Request r) => forum(r, (t) async {
+          final res = await asAccount(t, () => api.fetchNotice(
+                view: r.url.queryParameters['view'] ?? 'mypost',
+                type: r.url.queryParameters['type'] ?? '',
+              ));
+          return {
+            'items': [for (final n in res.items) noticeItemJson(n)],
+            'message': res.message,
+          };
+        }))
+    ..get('/api/sign', (Request r) => forum(r, (t) async {
+          final res = await asAccount(t, api.fetchSignPage);
+          return {
+            'signed': res.signed,
+            'level': res.level,
+            'stats': [
+              for (final st in res.stats)
+                {'label': st.label, 'value': st.value}
+            ],
+          };
+        }))
+
+    // ── 論壇動作 ─────────────────────────────────────────────
+    ..post('/api/reply', (Request r) => forum(r, (t) async {
+          final b = await bodyOf(r);
+          final res = await asAccount(t, () => api.replyThread(
+                fid: b['fid'] as int? ?? 0,
+                tid: b['tid'] as int? ?? 0,
+                message: b['message'] as String? ?? '',
+                repquote: b['repquote'] as String? ?? '',
+              ));
+          return {'ok': res.ok, 'message': res.message};
+        }))
+    ..post('/api/pm/<touid|[0-9]+>', (Request r, String touid) => forum(r, (t) async {
+          final b = await bodyOf(r);
+          final res = await asAccount(t, () => api.sendPm(
+                int.parse(touid),
+                b['message'] as String? ?? '',
+                pmid: b['pmid'] as String? ?? '',
+              ));
+          return {'ok': res.ok, 'message': res.message};
+        }))
+    ..post('/api/sign/do', (Request r) => forum(r, (t) async {
+          final res = await asAccount(t, api.doSign);
+          return {'ok': res.ok, 'message': res.message};
+        }))
+
+    // ── 圖片代理 ─────────────────────────────────────────────
+    // 論壇的圖片（頭像、附件）要帶登入 cookie 才拿得到，瀏覽器沒有
+    // 那份 cookie 也不該有，所以由這裡代抓。
+    ..get('/api/img', (Request r) async {
+      final a = whoIs(r);
+      if (a == null) return bad('尚未登入', 401);
+      final raw = r.url.queryParameters['u'] ?? '';
+      final uri = Uri.tryParse(raw);
+      // 只准代理論壇自己的圖，不要變成別人的開放代理
+      if (uri == null || !uri.host.endsWith('gamemale.com')) {
+        return bad('只能代理論壇的圖片');
+      }
+      try {
+        final target = await a.connect(store);
+        final bytes =
+            await asAccount(target, () => Api.instance.getAbsoluteBytes(raw));
+        return Response.ok(bytes, headers: {
+          'content-type': _guessImageType(bytes, raw),
+          // 圖片內容不會變，讓瀏覽器自己快取，不要每次捲動都回來要一遍
+          'cache-control': 'private, max-age=86400',
+        });
+      } catch (e) {
+        return Response.notFound('');
+      }
     })
 
     // ── 測試與手動觸發 ───────────────────────────────────────
@@ -240,4 +409,19 @@ Future<void> main(List<String> args) async {
       'http://${server.address.host}:${server.port}');
   stdout.writeln('VAPID 公鑰：${keys.publicKeyBase64}');
   stdout.writeln('已有 ${store.length} 個帳號，每 $pollMinutes 分鐘輪詢一次');
+}
+
+
+/// 論壇的圖片網址常常不帶副檔名（attachment.php?aid=…），
+/// 靠開頭幾個位元組認格式，認不出來就交給瀏覽器自己嗅。
+String _guessImageType(List<int> b, String url) {
+  if (b.length > 3 && b[0] == 0xFF && b[1] == 0xD8) return 'image/jpeg';
+  if (b.length > 7 && b[0] == 0x89 && b[1] == 0x50) return 'image/png';
+  if (b.length > 5 && b[0] == 0x47 && b[1] == 0x49) return 'image/gif';
+  if (b.length > 11 && b[8] == 0x57 && b[9] == 0x45) return 'image/webp';
+  final lower = url.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'application/octet-stream';
 }
