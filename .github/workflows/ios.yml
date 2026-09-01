@@ -7,7 +7,11 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    # 一定要 macos-26（Xcode 26 + iOS 26 SDK）。macos-15 只有 Xcode 16，
+    # workmanager 的 iOS 端用了 BGContinuedProcessingTask、connectivity_plus 7.x
+    # 用了 NWPath.isUltraConstrained，都是 iOS 26 才有的 API；
+    # #available 只是執行期檢查，編譯期沒有該 SDK 一樣過不了。
+    runs-on: macos-26
     timeout-minutes: 30
 
     steps:

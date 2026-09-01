@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.0+16
+version: 1.3.0+17
 
 environment:
   sdk: ^3.13.1
@@ -48,9 +48,10 @@ dependencies:
   package_info_plus: ^10.2.1
   gal: ^2.3.3
   share_plus: ^13.3.0
-  # 鎖在 6.x：7.3.x 的 iOS 程式碼用了 NWPath.isUltraConstrained，
-  # 那需要 iOS 26 SDK（#available 只是執行期檢查，編譯期仍要有該 API），
-  # CI runner 的 Xcode 沒有就編不過。我們只用它判斷 Wi-Fi/行動網路。
+  # 鎖在 6.x。原因本來是 7.3.x 的 iOS 端用了 iOS 26 才有的
+  # NWPath.isUltraConstrained，CI 的 Xcode 編不過；現在 runner 換成
+  # macos-26 已經有那個 SDK，但我們只拿它判斷 Wi-Fi/行動網路，
+  # 升上去沒好處，就繼續鎖著少一個變數。
   connectivity_plus: 6.1.0
   webview_flutter: ^4.14.1
   flutter_svg: ^2.3.0
