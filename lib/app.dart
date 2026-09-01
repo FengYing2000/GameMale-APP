@@ -44,6 +44,7 @@ import 'ui/pages/tools_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
+import 'ui/widgets/red_dot.dart';
 import 'ui/widgets/web_onboarding.dart';
 
 class GameMaleApp extends StatefulWidget {
@@ -91,6 +92,22 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     }
   }
 
+  bool _onboarding = false;
+
+  /// 網頁版的首次引導。登入狀態改變時會再被叫一次，所以要自己防重入。
+  void _maybeOnboard() {
+    if (_onboarding) return;
+    _onboarding = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        await maybeShowWebOnboarding(ctx, loggedIn: _session.loggedIn);
+      }
+      _onboarding = false;
+    });
+  }
+
   /// 依設定決定要不要掛背景檢查（只有登入了才有意義）
   Future<void> _applyBackgroundBadges() async {
     try {
@@ -121,11 +138,10 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
 
     // 網頁版第一次開起來要教他加到主畫面／問要不要開通知。
     // 等第一幀畫完才有可用的 context，而且要讓使用者先看到畫面再跳。
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future<void>.delayed(const Duration(milliseconds: 900));
-      final ctx = rootNavigatorKey.currentContext;
-      if (ctx != null && ctx.mounted) await maybeShowWebOnboarding(ctx);
-    });
+    _maybeOnboard();
+    // 加到主畫面之後是全新的儲存空間，一定是未登入狀態，所以通知那張
+    // 要等他登入完才問——登入狀態一變就再試一次。
+    _session.addListener(_maybeOnboard);
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
@@ -191,15 +207,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
 /// 所以需要一個不依賴當下畫面的 context。
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
-/// 底部分頁的圖示，未讀數 > 0 時掛上數字
-Widget _tabIcon(IconData icon, int count) {
-  if (count <= 0) return Icon(icon);
-  return Badge(
-    label: Text(count > 99 ? '99+' : '$count'),
-    backgroundColor: const Color(0xFFFF1744),
-    child: Icon(icon),
-  );
-}
+/// 底部分頁的圖示，未讀數 > 0 時掛上霓虹數字
+Widget _tabIcon(IconData icon, int count) =>
+    RedDot(count: count, child: Icon(icon));
 
 GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
   return GoRouter(

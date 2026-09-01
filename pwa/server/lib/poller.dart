@@ -160,6 +160,8 @@ class Poller {
       for (final account in store.all) {
         try {
           await _pollAccount(account);
+          stdout.writeln('輪詢 ${account.username}：'
+              '提醒 ${account.lastNotice}／私訊 ${account.lastPm}');
         } catch (e) {
           // 一個帳號出事不該讓其他帳號的通知也停掉
           stdout.writeln('輪詢 ${account.username} 失敗：$e');
@@ -205,6 +207,9 @@ class Poller {
   Future<void> _send(Account account, Outgoing message) async {
     for (final sub in [...account.subscriptions]) {
       final res = await push.send(subscription: sub, payload: message.toPayload());
+      // 成功也要留一筆：不然「使用者說沒收到」時完全查不出是沒送、
+      // 送失敗、還是送出去了但手機沒顯示
+      if (res.ok) stdout.writeln('已推播給 ${account.username}：$message');
       if (res.outcome == PushOutcome.gone) {
         // 使用者移除了 App 或關掉通知，留著只會每輪都失敗
         await store.removeSubscription(sub.endpoint);

@@ -169,27 +169,42 @@ class PollSnapshot {
 
 /// 查一次未讀數，順便判斷還在不在登入狀態。
 ///
-/// **刻意只發一個請求**：登入判斷與未讀數都在頁首那一頁上，分兩次抓等於
-/// 每個帳號每輪都多敲論壇一次，沒有必要。
-///
-/// 用頁首的提醒選單而**不是** fetchNotice——後者會把提醒標成已讀，
+/// **提醒**用頁首的提醒選單，不要用 fetchNotice——後者會把提醒標成已讀，
 /// 等於一邊查一邊把使用者的紅點清掉。
+///
+/// **私訊要另外抓對話列表**，不能用頁首那個數字。頁首的私訊數是一個
+/// 「新訊息提示」，使用者只要瞄一眼訊息列表，論壇就把它清成 0——可是
+/// 對話本身還是未讀的。只看頁首的話，實際有好幾則沒讀卻永遠推不出通知。
+/// 每則對話自己的未讀數才是真的，跟 App 裡紅點用的是同一個來源。
 Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
+      final bool loggedIn;
+      final int notice;
+      var pm = 0;
       try {
-        final doc = parse.toDoc(await Api.instance.get('forum.php', desktop: true));
+        final doc =
+            parse.toDoc(await Api.instance.get('forum.php', desktop: true));
         final b = api.parsePromptCounts(doc);
-        return PollSnapshot(
-          reachable: true,
-          loggedIn: parse.isLoggedIn(doc),
-          notice: b.notice,
-          pm: b.pm,
-        );
+        loggedIn = parse.isLoggedIn(doc);
+        notice = b.notice;
+        pm = b.pm;
       } catch (_) {
         // 連不上不代表登出。這種時候什麼都不做，下一輪再試，
         // 免得網路抖一下就把使用者標成過期、逼他重新登入。
         return const PollSnapshot(
             reachable: false, loggedIn: true, notice: 0, pm: 0);
       }
+
+      if (loggedIn) {
+        try {
+          final list = await api.fetchPmList();
+          pm = list.items.fold(0, (sum, i) => sum + i.unread);
+        } catch (_) {
+          // 對話列表抓不到就退回頁首那個數字，至少不會完全沒有通知
+        }
+      }
+
+      return PollSnapshot(
+          reachable: true, loggedIn: loggedIn, notice: notice, pm: pm);
     });
 
 Future<SubmitResult> signFor(Api target) => asAccount(target, api.doSign);

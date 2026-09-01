@@ -8,6 +8,7 @@ import '../../services/web_push_stub.dart'
     if (dart.library.js_interop) '../../services/web_push.dart';
 
 const _kAskedKey = 'web_push_asked';
+const _kInstallKey = 'web_install_shown';
 
 /// 網頁版第一次開起來時該講的兩件事。
 ///
@@ -17,21 +18,31 @@ const _kAskedKey = 'web_push_asked';
 /// **不能自動跳權限視窗**：瀏覽器規定 `Notification.requestPermission()`
 /// 一定要在使用者的點擊裡呼叫，自動跑會被擋掉，而且擋掉之後就再也問不了。
 /// 所以這裡先問一次「要不要開」，按了才去要權限。
-Future<void> maybeShowWebOnboarding(BuildContext context) async {
+Future<void> maybeShowWebOnboarding(
+  BuildContext context, {
+  required bool loggedIn,
+}) async {
   if (!kIsWeb) return;
 
   final support = WebPush.support;
   if (support == WebPushSupport.unsupported) return;
 
-  // 已經開好了就不用再囉嗦
-  if (support == WebPushSupport.ok && WebPush.permission == 'granted') return;
-
-  final prefs = await SharedPreferences.getInstance();
-  // 問過一次就不再自動跳；使用者之後隨時能在設定裡開
-  if (prefs.getBool(_kAskedKey) ?? false) return;
-  if (!context.mounted) return;
-
   final installing = support == WebPushSupport.needInstall;
+  final prefs = await SharedPreferences.getInstance();
+
+  if (installing) {
+    // 還在瀏覽器分頁裡：教他加到主畫面。這步跟有沒有登入無關。
+    if (prefs.getBool(_kInstallKey) ?? false) return;
+  } else {
+    // 已經開好了就不用再囉嗦
+    if (WebPush.permission == 'granted') return;
+    // **還沒登入就先別問**：綁定通知需要論壇的登入狀態，這時候問了、
+    // 使用者按了同意，也只會拿到一句「請先登入」。
+    // 加到主畫面之後是全新的儲存空間，本來就會是未登入狀態，很常見。
+    if (!loggedIn) return;
+    if (prefs.getBool(_kAskedKey) ?? false) return;
+  }
+  if (!context.mounted) return;
   final done = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -40,7 +51,9 @@ Future<void> maybeShowWebOnboarding(BuildContext context) async {
   );
   // 只有真的處理完（開好了、或明確說以後再說）才記起來。
   // 中途出錯就不要記，否則使用者下次再也不會被問到。
-  if (done == true) await prefs.setBool(_kAskedKey, true);
+  if (done == true) {
+    await prefs.setBool(installing ? _kInstallKey : _kAskedKey, true);
+  }
 }
 
 class _OnboardingSheet extends StatefulWidget {

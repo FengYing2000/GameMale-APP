@@ -19,8 +19,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'GameMale', {
       body: data.body || '',
-      icon: 'icons/Icon-192.png',
-      badge: 'icons/Icon-192.png',
+      icon: 'icons/Icon-180.png',
+      badge: 'icons/Icon-180.png',
       tag: data.tag || 'gm',
       renotify: true,
       data: { url: data.url || '/' },

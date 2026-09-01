@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/red_dot.dart';
 import '../widgets/require_login.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -243,17 +244,10 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
-            // 用 Material 的 Badge：IconButton 也會裁切，自己疊會被切掉
-            icon: Builder(builder: (_) {
-              final n = context.watch<SessionStore>().noticeCount;
-              const bell = Icon(LucideIcons.bell);
-              if (n <= 0) return bell;
-              return Badge(
-                label: Text(n > 99 ? '99+' : '$n'),
-                backgroundColor: const Color(0xFFFF1744),
-                child: bell,
-              );
-            }),
+            icon: RedDot(
+              count: context.watch<SessionStore>().noticeCount,
+              child: const Icon(LucideIcons.bell),
+            ),
             tooltip: tr('通知'),
             onPressed: () => context.push('/notice'),
           ),
