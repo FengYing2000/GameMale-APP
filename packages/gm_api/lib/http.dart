@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'models.dart';
 
@@ -24,16 +23,23 @@ class Api {
   late final CookieJar _jar;
   bool _ready = false;
 
+  /// cookie 要存在哪，由呼叫端決定。
+  ///
+  /// 這個套件是純 Dart 的，不能用 path_provider（那是 Flutter 外掛）。
+  /// Flutter App 在 main() 裡注入指向 app 支援目錄的 PersistCookieJar；
+  /// 伺服器注入自己的路徑；測試不注入就用記憶體版。
+  ///
+  /// 一定要在 [init] 之前設定。
+  static CookieJar Function()? cookieJarFactory;
+
   Future<void> init() async {
     if (_ready) return;
 
-    // 測試環境沒有 path_provider 外掛，退回記憶體 cookie jar，
-    // 這樣端對端測試才跑得起來，正式環境也不會因為取不到目錄就整個掛掉。
     try {
-      final dir = await getApplicationSupportDirectory();
-      _jar = PersistCookieJar(storage: FileStorage('${dir.path}/cookies'));
+      _jar = cookieJarFactory?.call() ?? CookieJar();
     } catch (_) {
-      // 不要退回 PersistCookieJar()——它預設會在工作目錄建 .cookies 資料夾
+      // 注入的那個建不起來（例如目錄沒權限）也不該讓整個 App 掛掉。
+      // 不要退回 PersistCookieJar()——它預設會在工作目錄偷建 .cookies
       _jar = CookieJar();
     }
 

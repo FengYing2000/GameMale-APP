@@ -265,6 +265,8 @@ APK 用 Flutter 自動產生的 debug 金鑰簽章 —— 側載裝得起來，�
 
 ## PWA（實驗中，另一條路）
 
+> **共用資料層**：論壇解析抽成 `packages/gm_api`（純 Dart，不依賴 Flutter），與 PWA 後端共用；平台專屬的 cookie 儲存與資產讀取由 `lib/platform_bindings.dart` 注入。
+
 `pwa/` 底下另外開了一條路線：把論壇做成「加到主畫面」的網頁 App。
 現有的 Flutter 版不受影響，兩者並存。
 

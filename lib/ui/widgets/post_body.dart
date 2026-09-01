@@ -7,8 +7,8 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../api/http.dart';
-import '../../api/parse.dart';
+import 'package:gm_api/http.dart';
+import 'package:gm_api/parse.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import 'image_actions.dart';

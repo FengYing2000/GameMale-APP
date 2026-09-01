@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../api/discuz.dart' as discuz;
-import '../../api/http.dart';
+import 'package:gm_api/discuz.dart' as discuz;
+import 'package:gm_api/http.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import 'toast.dart';

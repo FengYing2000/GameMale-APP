@@ -1,10 +1,15 @@
 // 簡→繁（台灣用語）。規則寫在 tool/zh_rules.py，改完要跑 build_zh_table.py 重產。
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gamemale/i18n/s2t.dart';
+import 'package:gamemale/platform_bindings.dart';
+import 'package:gm_api/s2t.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() async => S2T.instance.load());
+  setUpAll(() async {
+    // gm_api 是純 Dart 的，對照表怎麼讀要由平台端注入
+    await installFlutterBindings();
+    await S2T.instance.load();
+  });
 
   String c(String s) => S2T.instance.convert(s);
 

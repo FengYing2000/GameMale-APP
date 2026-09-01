@@ -5,14 +5,14 @@
 //
 // 沒帶 cookie 就整組略過，CI 不會因此失敗。
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gamemale/api/discuz.dart' as api;
-import 'package:gamemale/api/http.dart';
-import 'package:gamemale/api/models.dart';
-import 'package:gamemale/api/group.dart' as group;
-import 'package:gamemale/api/register.dart' as register;
-import 'package:gamemale/api/search.dart' as search;
-import 'package:gamemale/api/smilies.dart' as smilies;
-import 'package:gamemale/api/space.dart' as space;
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/http.dart';
+import 'package:gm_api/models.dart';
+import 'package:gm_api/group.dart' as group;
+import 'package:gm_api/register.dart' as register;
+import 'package:gm_api/search.dart' as search;
+import 'package:gm_api/smilies.dart' as smilies;
+import 'package:gm_api/space.dart' as space;
 
 const _cookie = String.fromEnvironment('GM_COOKIE');
 

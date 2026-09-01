@@ -3,7 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../api/http.dart';
+import 'package:gm_api/http.dart';
 import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';

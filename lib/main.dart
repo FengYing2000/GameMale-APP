@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'api/http.dart';
+import 'package:gm_api/http.dart';
 import 'app.dart';
+import 'platform_bindings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // cookie jar 要先備妥，否則首次請求會漏掉登入狀態
+  // gm_api 是純 Dart 的，path_provider/rootBundle 要從這裡接上去
+  await installFlutterBindings();
   await Api.instance.init();
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

@@ -79,8 +79,11 @@ Future<void> main(List<String> args) async {
         final res = await push.send(
           subscription: sub,
           payload: {
-            'title': 'GameMale',
-            'body': '推播測試成功 —— ${DateTime.now().toString().substring(11, 19)}',
+            // 標題別寫 App 名字：iOS 會自己在底下加一行「from GameMale」，
+            // 兩個都叫 GameMale 會變成「GameMale from GameMale」
+            'title': '推播測試',
+            'body': '收到這則就表示通了 —— '
+                '${DateTime.now().toString().substring(11, 19)}',
             'url': '/',
           },
         );

@@ -2,9 +2,10 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
-import '../api/discuz.dart' as api;
-import '../api/http.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/http.dart';
 import '../i18n/ui.dart';
+import '../platform_bindings.dart';
 import 'notifications.dart';
 
 /// iOS 這個名字必須同時寫進 Info.plist 的 BGTaskSchedulerPermittedIdentifiers，
@@ -34,7 +35,10 @@ void backgroundDispatcher() {
 /// 那會把提醒標成已讀，等於一邊查一邊清掉。
 Future<void> checkBadgesInBackground() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 背景是另一個 isolate，cookie jar 與語言表都要自己備妥
+  // 背景是另一個 isolate，cookie jar 與語言表都要自己備妥。
+  // gm_api 是純 Dart 的，path_provider/rootBundle 得先接上去，
+  // 而且 main() 做的注入不會跨 isolate。
+  await installFlutterBindings();
   await Api.instance.init();
   try {
     await UiLang.instance.load();

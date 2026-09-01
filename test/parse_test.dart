@@ -4,15 +4,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:html/dom.dart' as dom;
-import 'package:gamemale/api/discuz.dart' as api;
-import 'package:gamemale/api/group.dart' as group_api;
-import 'package:gamemale/api/http.dart';
-import 'package:gamemale/api/models.dart';
-import 'package:gamemale/api/parse.dart';
-import 'package:gamemale/api/register.dart' as register;
-import 'package:gamemale/api/smilies.dart' as smilies;
-import 'package:gamemale/api/space.dart' as space;
-import 'package:gamemale/i18n/s2t.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/group.dart' as group_api;
+import 'package:gm_api/http.dart';
+import 'package:gm_api/models.dart';
+import 'package:gm_api/parse.dart';
+import 'package:gm_api/register.dart' as register;
+import 'package:gm_api/smilies.dart' as smilies;
+import 'package:gm_api/space.dart' as space;
+import 'package:gamemale/platform_bindings.dart';
+import 'package:gm_api/s2t.dart';
 import 'package:gamemale/ui/widgets/smart_image.dart';
 
 File _f(String name) => File('test/fixtures/$name');
@@ -25,7 +26,11 @@ dom.Document? _load(String name) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() async => S2T.instance.load());
+  setUpAll(() async {
+    // gm_api 是純 Dart 的，對照表怎麼讀要由平台端注入
+    await installFlutterBindings();
+    await S2T.instance.load();
+  });
 
   group('首頁 板塊列表', () {
     final doc = _load('index.html');

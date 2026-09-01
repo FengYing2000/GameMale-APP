@@ -336,6 +336,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.3"
+  gm_api:
+    dependency: "direct main"
+    description:
+      path: "packages/gm_api"
+      relative: true
+    source: path
+    version: "1.0.0"
   go_router:
     dependency: "direct main"
     description:

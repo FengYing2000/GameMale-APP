@@ -6,8 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../api/discuz.dart' as api;
-import '../../api/models.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import 'external_link.dart';

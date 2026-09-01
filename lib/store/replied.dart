@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../api/http.dart';
+import 'package:gm_api/http.dart';
 
 /// 「我回過這帖沒有」的即時查詢。
 ///

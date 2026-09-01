@@ -265,6 +265,8 @@ APK 用 Flutter 自动生成的 debug 密钥签名 —— 侧载装得起来，�
 
 ## PWA（实验中，另一条路）
 
+> **共用数据层**：论坛解析抽成 `packages/gm_api`（纯 Dart，不依赖 Flutter），与 PWA 后端共用；平台专属的 cookie 存储与资源读取由 `lib/platform_bindings.dart` 注入。
+
 `pwa/` 底下另外开了一条路线：把论坛做成「加到主屏幕」的网页 App。
 现有的 Flutter 版不受影响，两者并存。
 

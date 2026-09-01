@@ -2,9 +2,9 @@ import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../api/discuz.dart' as api;
+import 'package:gm_api/discuz.dart' as api;
 import '../../store/session.dart';
-import '../../api/models.dart';
+import 'package:gm_api/models.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';

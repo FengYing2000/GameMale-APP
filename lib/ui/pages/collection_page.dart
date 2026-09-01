@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/discuz.dart' as api;
-import '../../api/models.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import '../widgets/external_link.dart';

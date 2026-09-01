@@ -4,11 +4,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../api/http.dart';
-import '../../api/discuz.dart' as discuz;
-import '../../api/models.dart';
-import '../../api/parse.dart';
-import '../../api/search.dart' as api;
+import 'package:gm_api/http.dart';
+import 'package:gm_api/discuz.dart' as discuz;
+import 'package:gm_api/models.dart';
+import 'package:gm_api/parse.dart';
+import 'package:gm_api/search.dart' as api;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';

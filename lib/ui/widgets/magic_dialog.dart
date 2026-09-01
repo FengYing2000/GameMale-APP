@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../api/discuz.dart' as api;
-import '../../api/models.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import 'require_login.dart';

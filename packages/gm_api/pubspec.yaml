@@ -1,0 +1,20 @@
+name: gm_api
+description: GameMale 論壇（Discuz! X）的資料層 —— 純 Dart，不依賴 Flutter
+publish_to: none
+version: 1.0.0
+
+# 刻意保持純 Dart：Flutter App 與 PWA 後端共用同一套解析。
+# 這裡累積了十幾輪踩出來的選擇器與端點知識，用別的語言重寫一次
+# 等於把那些雷全部重踩一遍。
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  cookie_jar: ^4.0.9
+  dio: ^5.11.0
+  dio_cookie_manager: ^3.5.0
+  html: ^0.15.6
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0

@@ -6,7 +6,7 @@ import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../api/http.dart';
+import 'package:gm_api/http.dart';
 import 'toast.dart';
 
 /// 長按圖片時的動作選單

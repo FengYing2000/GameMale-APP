@@ -1,0 +1,16 @@
+# build context 是專案根目錄（pwa/Dockerfile 需要 packages/gm_api），
+# 這裡把用不到又肥大的東西擋掉，不然每次 build 都要傳一整包
+.git
+build/
+.dart_tool/
+**/.dart_tool/
+ios/
+android/
+windows/
+macos/
+linux/
+test/
+lib/ui/
+pwa/data/
+pwa/.env
+*.iml

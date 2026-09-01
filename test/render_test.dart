@@ -4,9 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gamemale/api/discuz.dart' as api;
-import 'package:gamemale/api/models.dart';
-import 'package:gamemale/api/parse.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
+import 'package:gm_api/parse.dart';
 import 'package:gamemale/ui/widgets/post_body.dart';
 import 'package:gamemale/ui/widgets/state_box.dart';
 import 'package:gamemale/store/favorites.dart';

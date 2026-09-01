@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/discuz.dart' as discuz;
-import '../../api/group.dart' as api;
-import '../../api/http.dart';
-import '../../api/models.dart';
+import 'package:gm_api/discuz.dart' as discuz;
+import 'package:gm_api/group.dart' as api;
+import 'package:gm_api/http.dart';
+import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import '../widgets/pager_bar.dart';

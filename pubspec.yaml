@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.0+17
+version: 1.4.0+18
 
 environment:
   sdk: ^3.13.1
@@ -40,6 +40,10 @@ dependencies:
   path_provider: ^2.1.6
   shared_preferences: ^2.5.5
   html: ^0.15.6
+  # 論壇資料層。抽成純 Dart 套件是為了讓 PWA 後端能重用同一套解析，
+  # 不必用別的語言把十幾輪踩出來的選擇器知識重寫一遍。
+  gm_api:
+    path: packages/gm_api
   flutter_widget_from_html_core: ^0.17.2
   cached_network_image: ^3.4.1
   go_router: ^17.5.0

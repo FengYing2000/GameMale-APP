@@ -2,8 +2,8 @@ import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/discuz.dart' as api;
-import '../../api/models.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
 import '../../theme.dart';
 import 'toast.dart';
 

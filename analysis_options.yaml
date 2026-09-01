@@ -12,6 +12,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - build/**
+    # PWA 後端是獨立的 Dart 套件，有自己的 lint 設定，在它自己的資料夾裡跑
+    - pwa/**
     - android/**
     - ios/**
     - web/**

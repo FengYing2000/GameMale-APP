@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/models.dart';
+import 'package:gm_api/models.dart';
 import '../../theme.dart';
 
 /// 提示氣泡。論壇整體是 RPG 風格，所以做成一張有邊框與微光的卡，

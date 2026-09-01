@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../api/discuz.dart' as api;
-import '../api/models.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
 
 class SessionStore extends ChangeNotifier {
   static const _key = 'gm.user';

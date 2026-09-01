@@ -3,7 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../api/http.dart';
+import 'package:gm_api/http.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 

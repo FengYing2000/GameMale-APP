@@ -1,0 +1,29 @@
+# GameMale PWA 後端。
+#
+# 這個檔案放在專案根目錄而不是 pwa/ 底下，是因為 build context 必須是根目錄
+# ——伺服器透過 path 依賴共用 packages/gm_api（跟 Flutter App 同一套論壇解析），
+# 那個資料夾在 pwa/ 外面。放這裡也讓 Dockge 在 /opt/stacks/<名字>/ 直接看得到，
+# 伺服器上的目錄結構跟這個 repo 一模一樣，不會有「本機一套、線上一套」的問題。
+#
+# 跟站上其他服務一致：不綁主機埠，加入共用的 web 網路，由 Caddy 用容器名代理。
+services:
+  gm-push:
+    build:
+      context: .
+      dockerfile: pwa/Dockerfile
+    container_name: gm-push
+    restart: unless-stopped
+    environment:
+      # 用 pwa/server/bin/vapid_keygen.dart 產一次，存進 .env 就別再換：
+      # 換金鑰會讓所有既有訂閱失效，每台裝置都要重新授權通知
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?先在 .env 設 VAPID_PRIVATE_KEY}
+      # push service 出問題時他們會照這個聯絡你
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@xingkong.tw}
+    volumes:
+      - ./pwa/data:/data
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

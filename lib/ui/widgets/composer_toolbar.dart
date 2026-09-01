@@ -2,9 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/http.dart';
-import '../../api/models.dart';
-import '../../api/smilies.dart' as api;
+import 'package:gm_api/http.dart';
+import 'package:gm_api/models.dart';
+import 'package:gm_api/smilies.dart' as api;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 

@@ -2,7 +2,7 @@ import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/models.dart';
+import 'package:gm_api/models.dart';
 import '../../theme.dart';
 
 /// 固定在底部的分頁列，不必捲到最後才看得到。

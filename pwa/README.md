@@ -19,7 +19,8 @@ iOS 16.4 起支援 Web Push，而且**不需要付費開發者帳號**——這�
 
 ## 目前的進度
 
-**只做到「證明推播會響」。** 論壇功能還沒接進來。
+**推播已經在實機上驗證通過**（iOS 18.7，加到主畫面後收得到）。
+論壇功能還沒接上去，但資料層已經共用了。
 
 這個順序是刻意的：整個計畫的成敗全押在「Web Push 在你的 iPhone 上真的會跳
 通知」，而那是唯一沒辦法從程式碼確定的事。先花一天證明它會動，比先寫兩星期
@@ -33,8 +34,27 @@ iOS 16.4 起支援 Web Push，而且**不需要付費開發者帳號**——這�
 - **RFC 8292 VAPID 授權**（`server/lib/vapid.dart`）——金鑰產生、JWT 簽章。
 - **推播發送**（`server/lib/push_client.dart`）——含訂閱失效自動清除。
 - **診斷用的 PWA**（`web/`）——會逐項顯示哪個前置條件沒過。
+- **共用論壇資料層**——把原本 `lib/api/` 那 6400 行抽成純 Dart 套件
+  `packages/gm_api`，Flutter App 與這個後端**用同一份程式碼**解析論壇。
+  那些選擇器和端點是十幾輪踩出來的，用別的語言重寫一次等於把雷全部再踩一遍。
 
 還沒做：論壇登入、伺服器輪詢、真正的 App 介面。
+
+## 共用資料層是怎麼共用的
+
+`packages/gm_api` 刻意**不依賴 Flutter**，代價是它拿不到 `path_provider`
+與 `rootBundle`，所以那兩件事改成由平台端注入：
+
+| | Flutter App | PWA 後端 |
+|---|---|---|
+| 注入的地方 | `lib/platform_bindings.dart` | `pwa/server/lib/forum.dart` |
+| cookie 存哪 | `PersistCookieJar`（app 支援目錄） | `PersistCookieJar`（`/data`） |
+| 簡繁對照表 | `rootBundle.loadString` | 從 `/srv/assets` 讀檔 |
+
+**任何進入點都要先呼叫一次注入函式**——App 是 `main()` 和背景任務（背景是
+另一個 isolate，`main()` 的注入不會跟過去），測試則在 `setUpAll` 裡呼叫。
+`pwa/server/test/shared_parser_test.dart` 就是在守這件事：哪天有人在
+`gm_api` 裡不小心 import 了 Flutter 的東西，那支測試會第一個編不過。
 
 ## 跑起來
 

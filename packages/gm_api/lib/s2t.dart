@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/services.dart' show rootBundle;
 
 /// 簡體轉繁體（台灣用字）。
 ///
@@ -24,10 +23,24 @@ class S2T {
   /// 字形轉換（简→繁）不受影響，一直都是開的。
   bool useTaiwanWords = false;
 
+  /// 對照表從哪裡讀，由呼叫端決定。
+  ///
+  /// 這個套件是純 Dart 的，用不了 rootBundle（那是 Flutter 的東西）。
+  /// Flutter App 注入 rootBundle.loadString，伺服器注入檔案讀取。
+  /// 沒注入的話 [load] 會安靜地維持未載入狀態，`convert` 原樣回傳——
+  /// 轉換表載不到不該讓整個 App 掛掉。
+  static Future<String> Function(String assetPath)? assetLoader;
+
+  Future<String> _load(String path) {
+    final loader = assetLoader;
+    if (loader == null) throw StateError('S2T.assetLoader 還沒注入');
+    return loader(path);
+  }
+
   Future<void> load() async {
     if (_ready) return;
     try {
-      final raw = await rootBundle.loadString('assets/s2t.json');
+      final raw = await _load('assets/s2t.json');
       final data = jsonDecode(raw) as Map<String, dynamic>;
       _chars = (data['chars'] as Map).cast<String, String>();
       _phrases = (data['phrases'] as Map).cast<String, String>();

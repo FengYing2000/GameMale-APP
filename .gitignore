@@ -56,3 +56,7 @@ test/fixtures/
 # IDE
 *.iml
 .idea/
+
+# PWA 後端的機密與執行期資料
+.env
+pwa/data/

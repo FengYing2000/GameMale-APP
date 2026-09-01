@@ -7,7 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../api/http.dart';
+import 'package:gm_api/http.dart';
 import '../../services/background.dart';
 import '../../services/notifications.dart';
 import '../../store/session.dart';

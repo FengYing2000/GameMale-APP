@@ -1,4 +1,4 @@
-import '../../i18n/s2t.dart';
+import 'package:gm_api/s2t.dart';
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 import 'package:flutter/material.dart';
@@ -7,8 +7,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../api/discuz.dart' as api;
-import '../../api/models.dart';
+import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/models.dart';
 import '../../store/favorites.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';

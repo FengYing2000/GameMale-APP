@@ -3,8 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../api/models.dart';
-import '../../api/space.dart' as api;
+import 'package:gm_api/models.dart';
+import 'package:gm_api/space.dart' as api;
 import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../theme.dart';

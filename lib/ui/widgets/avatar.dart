@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../api/http.dart';
+import 'package:gm_api/http.dart';
 
 class Avatar extends StatelessWidget {
   const Avatar(this.url, {super.key, this.size = 38, this.onTap});

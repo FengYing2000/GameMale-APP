@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../api/http.dart';
+import 'package:gm_api/http.dart';
 
 /// 帖子裡的圖片有三種來源，各要不同的解碼路徑：
 ///

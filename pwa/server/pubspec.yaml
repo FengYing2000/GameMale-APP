@@ -7,6 +7,11 @@ environment:
   sdk: ^3.6.0
 
 dependencies:
+  # 跟 Flutter App 共用的論壇資料層。這 6000 多行解析累積了十幾輪
+  # 踩出來的選擇器與端點知識，抽成純 Dart 套件就是為了在這裡重用，
+  # 不必用別的語言重寫一遍。
+  gm_api:
+    path: ../../packages/gm_api
   pointycastle: ^4.0.0
   http: ^1.2.0
   shelf: ^1.4.2
