@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import '../../i18n/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -6,9 +8,12 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/http.dart';
+import '../../services/background.dart';
+import '../../services/notifications.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
+import '../widgets/toast.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -26,6 +31,23 @@ class _SettingsPageState extends State<SettingsPage> {
     PackageInfo.fromPlatform().then((info) {
       if (mounted) setState(() => _version = '${info.version} (${info.buildNumber})');
     });
+  }
+
+  /// 打開通知要先跟系統要權限；使用者拒絕就不要把開關留在開著
+  Future<void> _setNotify(SettingsStore settings, bool on) async {
+    if (!on) {
+      await settings.setNotifyBackground(false);
+      await disableBackgroundBadges();
+      return;
+    }
+    final granted = await Notifications.requestPermission();
+    if (!mounted) return;
+    if (!granted) {
+      toast(context, tr('沒有通知權限，請到系統設定裡允許'), kind: ToastKind.warn);
+      return;
+    }
+    await settings.setNotifyBackground(true);
+    await enableBackgroundBadges();
   }
 
   @override
@@ -127,6 +149,22 @@ class _SettingsPageState extends State<SettingsPage> {
                     style: const TextStyle(fontSize: 12),
                   ),
                   onChanged: settings.setAutoSign,
+                ),
+                const Divider(indent: 56, endIndent: 14),
+                SwitchListTile(
+                  value: settings.notifyBackground,
+                  secondary: const Icon(LucideIcons.bellRing),
+                  title: Text(tr('新提醒通知')),
+                  subtitle: Text(
+                    Platform.isIOS
+                        ? tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
+                            'iOS 由系統決定何時喚醒，通常隔十幾分鐘到幾小時；'
+                            '把 App 從切換器上滑掉強制關閉就完全不會查。')
+                        : tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
+                            '最短 15 分鐘一次；被系統「強制停止」或省電機制清掉才會停。'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onChanged: (v) => _setNotify(settings, v),
                 ),
               ],
             ),

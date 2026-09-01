@@ -51,6 +51,7 @@ class SettingsStore extends ChangeNotifier {
   static const _kTwWords = 'gm.twWords';
   static const _kTools = 'gm.tools';
   static const _kAutoSign = 'gm.autoSign';
+  static const _kNotify = 'gm.notifyBackground';
 
   ImagePolicy imagePolicy = ImagePolicy.always;
   AppLang lang = AppLang.auto;
@@ -66,6 +67,9 @@ class SettingsStore extends ChangeNotifier {
 
   /// 登入狀態下每天開 App 自動簽到。預設開（含覆蓋安裝時使用者沒手動關過的情況）
   bool autoSign = true;
+
+  /// 背景檢查有沒有新提醒／新私訊，有就發本地通知
+  bool notifyBackground = true;
 
   /// 側邊欄「論壇功能」的顯示順序；沒設定過就用內建順序。
   /// 值是工具的 id，不在清單裡的代表被關掉了
@@ -125,6 +129,7 @@ class SettingsStore extends ChangeNotifier {
     // 未設定過就預設開 —— 覆蓋安裝時沒手動關過的人也會是開的。
     // 之後新增的增強功能開關，一律沿用「?? true」讓覆蓋安裝預設開。
     autoSign = prefs.getBool(_kAutoSign) ?? true;
+    notifyBackground = prefs.getBool(_kNotify) ?? true;
     _toolOrder = prefs.getStringList(_kTools);
 
     await _refreshNetwork();
@@ -223,6 +228,13 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kAutoSign, v);
+  }
+
+  Future<void> setNotifyBackground(bool v) async {
+    notifyBackground = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kNotify, v);
   }
 
   Future<void> setThemeMode(ThemeMode v) async {

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'api/parse.dart' as parse;
 import 'api/discuz.dart' as api;
+import 'services/background.dart';
 import 'i18n/s2t.dart';
 import 'api/http.dart';
 import 'store/favorites.dart';
@@ -83,8 +84,23 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     try {
       final b = await api.fetchBadges();
       _session.setBadges(notice: b.notice, pm: b.pm);
+      // 前景已經看到的數字寫成基準，背景才不會為同一批再通知一次
+      await syncBadgeBaseline(notice: b.notice, pm: b.pm);
     } on Exception {
       // 抓不到就維持原狀
+    }
+  }
+
+  /// 依設定決定要不要掛背景檢查（只有登入了才有意義）
+  Future<void> _applyBackgroundBadges() async {
+    try {
+      if (_settings.notifyBackground && _session.loggedIn) {
+        await enableBackgroundBadges();
+      } else {
+        await disableBackgroundBadges();
+      }
+    } on Exception {
+      // 排不上就算了，不影響 App 其他部分
     }
   }
 
@@ -101,6 +117,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     await _session.restore();
     // 登入狀態確定之後才問得到紅點
     _refreshBadges();
+    _applyBackgroundBadges();
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換

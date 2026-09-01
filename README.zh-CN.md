@@ -10,6 +10,7 @@ Flutter 打造 · 直连论坛 · 不经第三方服务器
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#产出-ipa)
+[![Android](https://img.shields.io/badge/Android-6.0%2B-3DDC84?logo=android&logoColor=white)](#产出-apkandroid)
 [![Tests](https://img.shields.io/badge/测试-293%20项-4CAF50)](#测试策略)
 [![License](https://img.shields.io/badge/用途-个人自用-lightgrey)](#授权与隐私)
 
@@ -87,7 +88,7 @@ PHP 确实执行了（会返回 `Set-Cookie`），但所有 JSON 模块都返回
 <tr><td><b>互动</b></td><td>回复 · 引用回复 · 发表主题 · 编辑自己的帖子 · 收藏主题／版块（黄星切换）· 顶／踩 · 淘帖入专辑 · 使用道具（提升泵／亮色刷）· 举报 · 评分 · 投票 · 快速跳楼（顶部／首楼／指定楼层）</td></tr>
 <tr><td><b>淘帖</b></td><td>推荐／所有／我的专辑 · 专辑内页（订阅／取消）· 加入专辑 · 向作者推荐主题 · 评分评论＋看最新评论 · 标签搜索 · 我建的专辑可编辑／删除／邀请维护</td></tr>
 <tr><td><b>群组</b></td><td>群组首页（推荐／分类／积分排行）· 群组内页（群主／积分／等级／发帖）· 加入／退出／收藏 · 成员列表 · 我参与的／我管理的</td></tr>
-<tr><td><b>社区</b></td><td>私信（气泡对话）· 通知（两层分类）· 个人资料（角色组／勋章／管理版块／已加入群组）· 个人空间七个子页 · 加好友 · 打招呼 · 记录广场（时间／楼中楼回复／逐条回复）· 新提醒／新私信红点 · 提醒可回招呼／忽略 · 打招呼 14 种动作＋留言</td></tr>
+<tr><td><b>社区</b></td><td>私信（气泡对话）· 通知（两层分类）· 个人资料（角色组／勋章／管理版块／已加入群组）· 个人空间七个子页 · 加好友 · 打招呼 · 记录广场（时间／楼中楼回复／逐条回复）· 新提醒／新私信红点 · 后台检查＋本地通知 · 提醒可回招呼／忽略 · 打招呼 14 种动作＋留言</td></tr>
 <tr><td><b>搜索</b></td><td>帖子 · 日志 · 相册 · 群组 · 淘帖 · 用户 · 本版搜索 · 单字也能搜 · 高级搜索（全文／作者／主题范围／特殊主题／时间／排序）</td></tr>
 <tr><td><b>账号</b></td><td>账密登录（图形验证码／安全提问）· 注册问答 · 登出 · 每日签到（排行榜／补签卡／每天自动签到）· 我的收藏（帖子／版块／群组／日志／相册）／主题／回复 · 回帖记录</td></tr>
 <tr><td><b>体验</b></td><td>深／浅色 · 彩虹旗六色强调色 · RPG 风格提示气泡 · 繁简即时切换（换语言整页重绘）· 流量控制 · 表情选择器 · 外部链接跳转提示 · 回帖奖励横幅 · 已回帖标记 · Lucide 图标 · 内建浏览器（带登录状态）· 图片长按菜单 · 楼中楼 · 固定分页栏（切页回顶）· 下拉刷新</td></tr>
@@ -238,6 +239,27 @@ gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
 | **ESign / TrollStore** | 手机端 | 不用电脑 |
 
 免费 Apple ID 证书 7 天到期，**重签用同一个 IPA 即可，不必重编**。
+
+---
+
+## 产出 APK（Android）
+
+推上 `main` 会同时跑 `.github/workflows/android.yml`，在 **ubuntu** 上构建：
+
+```bash
+gh run download <run-id> -n GameMale-apk -D ./out
+```
+
+比 iOS 省事的地方：
+
+| | iOS | Android |
+|---|---|---|
+| CI 分钟数 | macOS，**10 倍**计 | ubuntu，**1 倍** |
+| 安装 | 未签名 IPA，要侧载工具重签 | APK 直接装 |
+| 有效期 | 免费证书 **7 天**到期要重签 | **不会过期** |
+| 后台通知 | 系统决定何时唤醒，强制关闭就停 | WorkManager 按周期跑，可靠得多 |
+
+APK 用 Flutter 自动生成的 debug 密钥签名 —— 侧载装得起来，但**不能上架 Google Play**。
 
 ---
 
