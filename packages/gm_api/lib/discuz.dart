@@ -8,7 +8,11 @@ import 'models.dart';
 import 'parse.dart';
 
 /// 全站共用的 formhash，換頁時順手更新
-String? _formhash;
+// formhash 綁 session，多帳號時絕對不能共用一份。實際存在 Api 實例上，
+// 這裡只是轉發，好讓底下二十幾處 `_formhash` 的寫法都不用改。
+String? get _formhash => Api.instance.formhash;
+set _formhash(String? v) => Api.instance.formhash = v;
+
 String? get formhash => _formhash;
 
 String? _capture(dom.Document doc, [String? html]) {

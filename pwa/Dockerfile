@@ -31,7 +31,7 @@ COPY pwa/web/ /srv/web/
 # 簡繁轉換表，通知文字要用；讀不到的話會原樣輸出簡體，不會掛
 COPY assets/s2t.json /srv/assets/s2t.json
 ENV WEB_ROOT=/srv/web \
-    DATA_FILE=/data/subs.json \
+    DATA_FILE=/data/accounts.json \
     ASSET_DIR=/srv/assets \
     TZ=Asia/Taipei \
     PORT=8080

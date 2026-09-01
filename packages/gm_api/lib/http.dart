@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -17,7 +18,36 @@ const String _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
 /// 這裡得自己用 PersistCookieJar 落地，否則每次冷啟動都要重新登入。
 class Api {
   Api._();
-  static final Api instance = Api._();
+
+  static final Api _default = Api._();
+
+  /// 目前這個 Zone 要用的連線。
+  ///
+  /// App 端永遠只有一個帳號，拿到的就是 [_default]，行為跟以前一樣。
+  /// 伺服器要同時服務多個帳號，每個帳號的 cookie 與 formhash 都必須分開，
+  /// 所以用 Zone 帶著走——見 [runAs]。這樣 6000 多行裡那些
+  /// `Api.instance.xxx` 一行都不用改。
+  static Api get instance => (Zone.current[#gmApi] as Api?) ?? _default;
+
+  /// 另外開一條帶自己 cookie 的連線（伺服器每個帳號一條）
+  static Future<Api> forAccount(CookieJar jar) async {
+    final api = Api._();
+    await api.init(jar: jar);
+    return api;
+  }
+
+  /// 在 [api] 這條連線底下執行 [body]。
+  ///
+  /// 伺服器輪詢每個帳號時包一層，裡面所有 `Api.instance` 就會指到它。
+  static Future<T> runAs<T>(Api api, Future<T> Function() body) =>
+      runZoned(body, zoneValues: {#gmApi: api});
+
+  /// 這條連線的 formhash。
+  ///
+  /// **綁 session，所以放在實例上而不是模組層**——多帳號共用一份的話，
+  /// A 帳號的 hash 會被拿去送 B 帳號的請求，論壇會回「請重新登入」，
+  /// 而且那種錯很難查。
+  String? formhash;
 
   late final Dio _dio;
   late final CookieJar _jar;
@@ -32,11 +62,11 @@ class Api {
   /// 一定要在 [init] 之前設定。
   static CookieJar Function()? cookieJarFactory;
 
-  Future<void> init() async {
+  Future<void> init({CookieJar? jar}) async {
     if (_ready) return;
 
     try {
-      _jar = cookieJarFactory?.call() ?? CookieJar();
+      _jar = jar ?? cookieJarFactory?.call() ?? CookieJar();
     } catch (_) {
       // 注入的那個建不起來（例如目錄沒權限）也不該讓整個 App 掛掉。
       // 不要退回 PersistCookieJar()——它預設會在工作目錄偷建 .cookies
@@ -61,6 +91,15 @@ class Api {
 
     _dio.interceptors.add(CookieManager(_jar));
     _ready = true;
+  }
+
+  /// 這條連線目前持有的 cookie。
+  ///
+  /// 伺服器登入完要把它存起來，下次輪詢直接用，不必再登入一次。
+  /// App 端用不到——它的 cookie 由 PersistCookieJar 自己落地。
+  Future<List<Cookie>> cookiesFor(Uri uri) async {
+    await init();
+    return _jar.loadForRequest(uri);
   }
 
   /// 補上 mobile=2，Discuz 才會回手機版模板

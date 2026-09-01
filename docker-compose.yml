@@ -19,6 +19,11 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?先在 .env 設 VAPID_PRIVATE_KEY}
       # push service 出問題時他們會照這個聯絡你
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@xingkong.tw}
+      # 加密論壇 cookie 用（pwa/server/bin/secret_keygen.dart 產一次）。
+      # 換掉會讓所有人的登入解不開，都得重新登入
+      SECRET_KEY: ${SECRET_KEY:?先在 .env 設 SECRET_KEY}
+      # 多久查一次論壇
+      POLL_MINUTES: ${POLL_MINUTES:-5}
     volumes:
       - ./pwa/data:/data
     networks:

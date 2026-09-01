@@ -1,104 +1,229 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:gm_server/accounts.dart';
+import 'package:gm_server/forum.dart';
+import 'package:gm_server/poller.dart';
 import 'package:gm_server/push_client.dart';
-import 'package:gm_server/store.dart';
+import 'package:gm_server/secret_box.dart';
 import 'package:gm_server/vapid.dart';
 import 'package:gm_server/webpush.dart';
+import 'package:gm_api/discuz.dart' as api;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
-/// 第一階段的目標只有一個：**證明 Web Push 在 iPhone 上真的會響**。
-/// 論壇的東西還沒接進來，先把管道打通再說——推播不通的話，
-/// 後面整個 PWA 都是白做的。
 Future<void> main(List<String> args) async {
   final env = Platform.environment;
 
-  final privateKey = env['VAPID_PRIVATE_KEY'];
-  if (privateKey == null || privateKey.isEmpty) {
+  final vapidKey = env['VAPID_PRIVATE_KEY'];
+  if (vapidKey == null || vapidKey.isEmpty) {
     stderr.writeln('沒有設 VAPID_PRIVATE_KEY。先跑：');
     stderr.writeln('  dart run bin/vapid_keygen.dart');
-    stderr.writeln('把印出來的那行存進 .env 或環境變數再啟動。');
     exit(1);
   }
-  final keys = VapidKeys.fromPrivateKey(privateKey);
+  final secretKey = env['SECRET_KEY'];
+  if (secretKey == null || secretKey.isEmpty) {
+    stderr.writeln('沒有設 SECRET_KEY（用來加密論壇 cookie）。先跑：');
+    stderr.writeln('  dart run bin/secret_keygen.dart');
+    exit(1);
+  }
+
+  final keys = VapidKeys.fromPrivateKey(vapidKey);
   final subject = env['VAPID_SUBJECT'] ?? 'mailto:admin@example.com';
   final port = int.tryParse(env['PORT'] ?? '') ?? 8080;
   final webRoot = env['WEB_ROOT'] ?? '../web';
+  final assetDir = env['ASSET_DIR'] ?? '../../assets';
+  final pollMinutes = int.tryParse(env['POLL_MINUTES'] ?? '') ?? 5;
 
-  final store = SubscriptionStore(File(env['DATA_FILE'] ?? 'data/subs.json'));
+  await installServerBindings(assetDir: assetDir);
+
+  final store = AccountStore(
+    File(env['DATA_FILE'] ?? 'data/accounts.json'),
+    SecretBox.fromBase64(secretKey),
+  );
   await store.load();
 
   final push = PushClient(keys: keys, subject: subject);
+  final logins = LoginSessions();
+  final poller = Poller(
+    store: store,
+    push: push,
+    interval: Duration(minutes: pollMinutes),
+  );
 
   Response ok(Object body) => Response.ok(
         json.encode(body),
         headers: {'content-type': 'application/json; charset=utf-8'},
       );
+  Response bad(String message, [int code = 400]) => Response(
+        code,
+        body: json.encode({'error': message}),
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
 
-  final api = Router()
-    // 前端訂閱時要用的公鑰
+  Account? whoIs(Request r) {
+    final auth = r.headers['authorization'] ?? '';
+    if (!auth.startsWith('Bearer ')) return null;
+    return store.byToken(auth.substring(7));
+  }
+
+  Future<Map<String, dynamic>> bodyOf(Request r) async {
+    final raw = await r.readAsString();
+    if (raw.isEmpty) return {};
+    return (json.decode(raw) as Map).cast<String, dynamic>();
+  }
+
+  Map<String, dynamic> stateOf(Account a) => {
+        'username': a.username,
+        'cookieStatus': a.cookieStatus,
+        'autoSign': a.autoSign,
+        'signReminderAt': a.signReminderAt,
+        'notifyNotice': a.notifyNotice,
+        'notifyPm': a.notifyPm,
+        'notice': a.lastNotice,
+        'pm': a.lastPm,
+        'lastSignDate': a.lastSignDate,
+        'lastCheckedAt': a.lastCheckedAt,
+        'devices': a.subscriptions.length,
+      };
+
+  final router = Router()
     ..get('/api/config', (Request r) => ok({
           'vapidPublicKey': keys.publicKeyBase64,
-          'subscribers': store.length,
+          'pollMinutes': pollMinutes,
         }))
-    ..post('/api/subscribe', (Request r) async {
-      final body = json.decode(await r.readAsString()) as Map<String, dynamic>;
+
+    // ── 登入（兩步：先取表單，再送出）──────────────────────────
+    ..post('/api/login/begin', (Request r) async {
       try {
-        final sub = PushSubscription.fromJson(body);
-        await store.add(sub);
-        stdout.writeln('新訂閱：${_short(sub.endpoint)}（共 ${store.length} 筆）');
-        return ok({'ok': true, 'subscribers': store.length});
-      } on FormatException catch (e) {
-        return Response.badRequest(
-          body: json.encode({'error': e.message}),
-          headers: {'content-type': 'application/json; charset=utf-8'},
-        );
+        final s = await logins.begin();
+        return ok({
+          'id': s.id,
+          'needSeccode': s.meta.needSeccode,
+          'captcha': s.meta.seccodeImage == null
+              ? null
+              : 'data:image/png;base64,${base64.encode(s.meta.seccodeImage!)}',
+          'questions': [
+            for (final q in s.meta.questions) {'id': q.id, 'name': q.name}
+          ],
+        });
       } catch (e) {
-        return Response.badRequest(
-          body: json.encode({'error': '訂閱資料看不懂：$e'}),
-          headers: {'content-type': 'application/json; charset=utf-8'},
-        );
+        return bad('連不上論壇的登入頁：$e', 502);
+      }
+    })
+    ..post('/api/login/finish', (Request r) async {
+      final b = await bodyOf(r);
+      final pending = logins.take(b['id'] as String? ?? '');
+      if (pending == null) {
+        return bad('登入階段已過期，請重新開始');
+      }
+      final username = (b['username'] as String? ?? '').trim();
+      final password = b['password'] as String? ?? '';
+      if (username.isEmpty || password.isEmpty) {
+        return bad('帳號與密碼都要填');
+      }
+
+      final result = await asAccount(pending.api, () => api.login(
+            username: username,
+            password: password,
+            meta: pending.meta,
+            questionid: b['questionid'] as String? ?? '0',
+            answer: b['answer'] as String? ?? '',
+            seccode: b['seccode'] as String? ?? '',
+          ));
+      if (!result.ok) return bad(result.message, 401);
+
+      // 只把登入後的 cookie 存起來——**密碼不留**，它從頭到尾
+      // 只是轉手送去論壇，這裡不寫進任何檔案
+      final account = await store.upsert(
+        username: username,
+        cookiePlain: await dumpCookies(pending.api),
+      );
+      final token = await store.issueToken(account);
+      stdout.writeln('登入成功：$username');
+      return ok({'token': token, 'account': stateOf(account)});
+    })
+
+    ..get('/api/me', (Request r) async {
+      final a = whoIs(r);
+      if (a == null) return bad('尚未登入', 401);
+      return ok(stateOf(a));
+    })
+
+    ..post('/api/logout', (Request r) async {
+      final auth = r.headers['authorization'] ?? '';
+      if (auth.startsWith('Bearer ')) await store.revokeToken(auth.substring(7));
+      return ok({'ok': true});
+    })
+
+    ..post('/api/settings', (Request r) async {
+      final a = whoIs(r);
+      if (a == null) return bad('尚未登入', 401);
+      final b = await bodyOf(r);
+      if (b['autoSign'] is bool) a.autoSign = b['autoSign'] as bool;
+      if (b['notifyNotice'] is bool) a.notifyNotice = b['notifyNotice'] as bool;
+      if (b['notifyPm'] is bool) a.notifyPm = b['notifyPm'] as bool;
+      final at = b['signReminderAt'] as String?;
+      if (at != null) {
+        if (!RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(at)) {
+          return bad('提醒時間要是 HH:mm');
+        }
+        a.signReminderAt = at;
+      }
+      await store.flush();
+      return ok(stateOf(a));
+    })
+
+    // ── 裝置訂閱 ─────────────────────────────────────────────
+    ..post('/api/subscribe', (Request r) async {
+      final a = whoIs(r);
+      if (a == null) return bad('要先登入才能綁定通知', 401);
+      try {
+        await store.addSubscription(a, PushSubscription.fromJson(await bodyOf(r)));
+        return ok(stateOf(a));
+      } on FormatException catch (e) {
+        return bad(e.message);
       }
     })
     ..post('/api/unsubscribe', (Request r) async {
-      final body = json.decode(await r.readAsString()) as Map<String, dynamic>;
-      final removed = await store.remove(body['endpoint'] as String? ?? '');
-      return ok({'ok': removed, 'subscribers': store.length});
+      final b = await bodyOf(r);
+      final removed = await store.removeSubscription(b['endpoint'] as String? ?? '');
+      return ok({'ok': removed});
     })
-    // 測試用：推給所有已訂閱的裝置
+
+    // ── 測試與手動觸發 ───────────────────────────────────────
     ..post('/api/test-push', (Request r) async {
-      if (store.length == 0) {
-        return ok({'sent': 0, 'note': '還沒有任何裝置訂閱'});
-      }
-      final results = <String, String>{};
+      final a = whoIs(r);
+      if (a == null) return bad('尚未登入', 401);
+      if (a.subscriptions.isEmpty) return ok({'sent': 0, 'note': '這個帳號還沒有綁定裝置'});
       var sent = 0;
-      for (final sub in store.all) {
-        final res = await push.send(
-          subscription: sub,
-          payload: {
-            // 標題別寫 App 名字：iOS 會自己在底下加一行「from GameMale」，
-            // 兩個都叫 GameMale 會變成「GameMale from GameMale」
-            'title': '推播測試',
-            'body': '收到這則就表示通了 —— '
-                '${DateTime.now().toString().substring(11, 19)}',
-            'url': '/',
-          },
-        );
-        results[_short(sub.endpoint)] = res.toString();
+      final results = <String, String>{};
+      for (final sub in [...a.subscriptions]) {
+        final res = await push.send(subscription: sub, payload: {
+          'title': '推播測試',
+          'body': '收到這則就表示通了 —— ${nowHhmmTaipei()}',
+          'tag': 'test',
+          'url': '/',
+        });
+        results[Uri.parse(sub.endpoint).host] = res.toString();
         if (res.ok) sent++;
-        // 訂閱失效就順手清掉，不然每次都會失敗
-        if (res.outcome == PushOutcome.gone) await store.remove(sub.endpoint);
+        if (res.outcome == PushOutcome.gone) {
+          await store.removeSubscription(sub.endpoint);
+        }
       }
-      stdout.writeln('測試推播：成功 $sent／${results.length}  $results');
       return ok({'sent': sent, 'results': results});
+    })
+    ..post('/api/poll-now', (Request r) async {
+      final a = whoIs(r);
+      if (a == null) return bad('尚未登入', 401);
+      await poller.tick();
+      return ok(stateOf(a));
     });
 
-  // API 找不到的路徑才交給靜態檔，這樣 /api/* 打錯不會回一個 HTML
   final handler = Cascade()
-      .add(api.call)
+      .add(router.call)
       .add(createStaticHandler(webRoot,
           defaultDocument: 'index.html', useHeaderBytesForContentType: true))
       .handler;
@@ -109,13 +234,10 @@ Future<void> main(List<String> args) async {
     port,
   );
 
-  stdout.writeln('GameMale PWA 後端啟動於 http://${server.address.host}:${server.port}');
-  stdout.writeln('VAPID 公鑰：${keys.publicKeyBase64}');
-  stdout.writeln('已有 ${store.length} 筆訂閱');
-}
+  poller.start();
 
-String _short(String endpoint) {
-  final uri = Uri.parse(endpoint);
-  final tail = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
-  return '${uri.host}/…${tail.length > 8 ? tail.substring(tail.length - 8) : tail}';
+  stdout.writeln('GameMale PWA 後端啟動於 '
+      'http://${server.address.host}:${server.port}');
+  stdout.writeln('VAPID 公鑰：${keys.publicKeyBase64}');
+  stdout.writeln('已有 ${store.length} 個帳號，每 $pollMinutes 分鐘輪詢一次');
 }
