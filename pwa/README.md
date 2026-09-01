@@ -51,20 +51,36 @@ VAPID_PRIVATE_KEY=剛剛那串 dart run bin/server.dart
 開 <http://localhost:8080>。**本機只能測到訂閱為止**——localhost 算安全來源，
 service worker 註冊得起來，但手機要連得到才能收推播，所以真正的驗證要部署上去。
 
-### 部署到香港 VPS
+### 部署到香港 VPS（已經架好了）
+
+目前跑在 <https://160.236.111.8.sslip.io>，Dockge 裡的 stack 名稱 `gamemale-pwa`
+（`/opt/stacks/gamemale-pwa`）。
 
 ```bash
 cp .env.example .env       # 填入 VAPID_PRIVATE_KEY
 docker compose up -d --build
 ```
 
-Caddy 那邊加一段（**一定要 HTTPS**，service worker 在純 HTTP 下不會註冊）：
+容器不綁主機埠，跟站上其他服務一樣加入共用的 `web` 網路，由 Caddy 用容器名代理。
+Caddy 那邊加的區塊**刻意不 import common**：
 
 ```
-gm.xingkong.tw {
-    reverse_proxy 127.0.0.1:8099
+160.236.111.8.sslip.io {
+    encode zstd gzip
+    reverse_proxy gm-push:8080
 }
 ```
+
+`common` 帶的是 Cloudflare Origin 憑證，只有 CF 信任得過；這站是 DNS 直連不走
+Cloudflare，所以不寫 `tls`，讓 Caddy 自己跟 Let's Encrypt 要一張公開受信任的憑證
+——**iOS 一定要憑證受信任才肯註冊 service worker，自簽的不行**。
+
+`sslip.io` 是把 IP 編進主機名的公用 DNS（`160.236.111.8.sslip.io` 就解析到
+`160.236.111.8`），所以完全不用動 Cloudflare 的 DNS 記錄。要換成正式子網域，
+把主機名改掉、DNS 指過來（**灰雲，不能開橘雲代理**）即可。
+
+改完 Caddyfile 要 `docker restart caddy`——設定裡 `admin off`，沒辦法熱重載，
+重啟會讓站上所有服務中斷兩三秒。
 
 ## 在 iPhone 上驗證
 
