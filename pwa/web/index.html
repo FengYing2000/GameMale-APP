@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GameMale 推播測試</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GameMale">
+<meta name="theme-color" content="#0f1115">
+<style>
+  :root { color-scheme: dark; --bg:#0f1115; --card:#181b22; --line:#282d38;
+          --text:#e7e9ee; --dim:#9099ab; --ok:#3fb950; --bad:#f85149; --warn:#d29922;
+          --accent:#4c8dff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",
+              "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+         padding: max(16px, env(safe-area-inset-top)) 16px
+                  max(16px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  h1 { font-size:20px; margin:8px 0 4px; }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line);
+          border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .row { display:flex; align-items:flex-start; gap:10px; padding:7px 0; }
+  .row + .row { border-top:1px solid var(--line); }
+  .dot { flex:none; width:9px; height:9px; border-radius:50%; margin-top:8px; }
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+  .dot.warn{background:var(--warn)} .dot.idle{background:var(--dim)}
+  .k { flex:1; }
+  .k b { font-weight:600; }
+  .k small { display:block; color:var(--dim); font-size:12px; }
+  button { width:100%; padding:13px; border-radius:10px; border:0;
+           background:var(--accent); color:#fff; font-size:16px; font-weight:600;
+           margin-top:10px; cursor:pointer; }
+  button:disabled { background:#2c3140; color:var(--dim); cursor:default; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  .steps { counter-reset:s; padding:0; margin:10px 0 0; list-style:none; }
+  .steps li { counter-increment:s; position:relative; padding:5px 0 5px 30px;
+              color:var(--dim); font-size:14px; }
+  .steps li::before { content:counter(s); position:absolute; left:0; top:6px;
+        width:20px; height:20px; border-radius:50%; background:var(--line);
+        color:var(--text); font-size:12px; text-align:center; line-height:20px; }
+  #log { font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+         color:var(--dim); white-space:pre-wrap; word-break:break-all;
+         max-height:190px; overflow:auto; }
+  .hint { font-size:13px; color:var(--warn); margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GameMale 推播測試</h1>
+  <div class="sub">先確認 Web Push 在這台裝置上收得到，再決定要不要整個搬過來。</div>
+
+  <div class="card" id="checks"></div>
+
+  <div class="card" id="installCard" hidden>
+    <b>先加到主畫面</b>
+    <div class="sub" style="margin:4px 0 0">
+      iOS 只讓「已加到主畫面」的網頁收推播，在 Safari 分頁裡不管怎麼弄都不會有。
+    </div>
+    <ol class="steps">
+      <li>點 Safari 下方正中間的「分享」鈕</li>
+      <li>往下捲，選「加入主畫面」</li>
+      <li>回到主畫面，從那個圖示打開</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <button id="enable" disabled>開啟通知</button>
+    <button id="test" class="ghost" disabled>送一則測試通知</button>
+    <div class="hint" id="hint" hidden></div>
+  </div>
+
+  <div class="card"><div id="log">啟動中…</div></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const logEl = $('log');
+const logLines = [];
+function log(msg) {
+  logLines.push(new Date().toTimeString().slice(0, 8) + '  ' + msg);
+  logEl.textContent = logLines.join('\n');
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// iOS 的判斷跟別的平台不一樣：navigator.standalone 是 Safari 專有的
+const isStandalone =
+  window.navigator.standalone === true ||
+  window.matchMedia('(display-mode: standalone)').matches;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+function iosVersion() {
+  const m = navigator.userAgent.match(/OS (\d+)[._](\d+)/);
+  return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : null;
+}
+
+let checks = [];
+function check(state, name, detail) { checks.push({ state, name, detail }); }
+
+function renderChecks() {
+  $('checks').innerHTML = checks.map((c) =>
+    '<div class="row"><div class="dot ' + c.state + '"></div><div class="k"><b>' +
+    c.name + '</b><small>' + c.detail + '</small></div></div>'
+  ).join('');
+}
+
+let registration = null;
+let vapidKey = null;
+
+function urlBase64ToUint8Array(base64) {
+  const padded = (base64 + '='.repeat((4 - base64.length % 4) % 4))
+    .replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(padded);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function boot() {
+  checks = [];
+  const ver = iosVersion();
+  if (isIOS) {
+    const okVer = !ver || ver[0] > 16 || (ver[0] === 16 && ver[1] >= 4);
+    check(okVer ? 'ok' : 'bad', 'iOS 版本',
+      ver ? ('iOS ' + ver[0] + '.' + ver[1] + (okVer ? '（16.4 以上才有 Web Push）'
+        : ' —— 要 16.4 以上才有 Web Push')) : '偵測不到，當作支援');
+  }
+
+  check(isStandalone ? 'ok' : (isIOS ? 'bad' : 'warn'), '已加到主畫面',
+    isStandalone ? '是，正以獨立 App 模式執行'
+      : (isIOS ? '否 —— iOS 一定要加到主畫面才收得到推播'
+               : '否（非 iOS 平台在分頁裡也收得到）'));
+
+  const hasSW = 'serviceWorker' in navigator;
+  const hasPush = 'PushManager' in window;
+  const hasNoti = 'Notification' in window;
+  check(hasSW && hasPush && hasNoti ? 'ok' : 'bad', '瀏覽器支援',
+    'ServiceWorker ' + (hasSW ? '✓' : '✗') +
+    '　PushManager ' + (hasPush ? '✓' : '✗') +
+    '　Notification ' + (hasNoti ? '✓' : '✗'));
+
+  const secure = window.isSecureContext;
+  check(secure ? 'ok' : 'bad', '安全連線',
+    secure ? location.protocol + '//' + location.host
+      : '要 HTTPS（或 localhost）才能註冊 service worker');
+
+  const perm = hasNoti ? Notification.permission : 'unsupported';
+  check(perm === 'granted' ? 'ok' : perm === 'denied' ? 'bad' : 'idle',
+    '通知權限',
+    { granted: '已允許', denied: '被拒絕 —— 要到系統設定裡改回來',
+      default: '還沒問過' }[perm] || perm);
+
+  renderChecks();
+
+  if (!hasSW || !hasPush || !secure) {
+    log('前置條件沒過，不往下做了。');
+    $('installCard').hidden = isStandalone || !isIOS;
+    return;
+  }
+  $('installCard').hidden = isStandalone;
+
+  try {
+    registration = await navigator.serviceWorker.register('/sw.js');
+    log('service worker 已註冊');
+    await navigator.serviceWorker.ready;
+    log('service worker 就緒');
+  } catch (e) {
+    log('service worker 註冊失敗：' + e);
+    return;
+  }
+
+  try {
+    const cfg = await (await fetch('/api/config')).json();
+    vapidKey = cfg.vapidPublicKey;
+    log('拿到 VAPID 公鑰（目前 ' + cfg.subscribers + ' 台裝置已訂閱）');
+  } catch (e) {
+    log('拿不到伺服器設定：' + e);
+    return;
+  }
+
+  const existing = await registration.pushManager.getSubscription();
+  if (existing && perm === 'granted') {
+    log('這台裝置已經訂閱過了');
+    $('test').disabled = false;
+    $('enable').textContent = '重新訂閱';
+  }
+  $('enable').disabled = false;
+
+  if (isIOS && !isStandalone) {
+    $('enable').disabled = true;
+    $('hint').hidden = false;
+    $('hint').textContent = '在 Safari 分頁裡開不了通知，請先加到主畫面。';
+  }
+}
+
+$('enable').onclick = async () => {
+  $('enable').disabled = true;
+  try {
+    // 權限一定要在使用者手勢裡要，寫在 boot() 裡自動跑會被瀏覽器擋掉
+    const perm = await Notification.requestPermission();
+    log('權限結果：' + perm);
+    if (perm !== 'granted') {
+      $('hint').hidden = false;
+      $('hint').textContent = perm === 'denied'
+        ? '已被拒絕。要到「設定 → 通知 → GameMale」裡重新打開。'
+        : '沒授權就收不到通知。';
+      return;
+    }
+
+    const sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    });
+    log('已向 push service 取得訂閱');
+
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    log('已回報伺服器：' + JSON.stringify(await res.json()));
+
+    $('test').disabled = false;
+    $('enable').textContent = '重新訂閱';
+    await boot();
+  } catch (e) {
+    log('訂閱失敗：' + e);
+  } finally {
+    $('enable').disabled = false;
+  }
+};
+
+$('test').onclick = async () => {
+  $('test').disabled = true;
+  log('請伺服器推一則…');
+  try {
+    const out = await (await fetch('/api/test-push', { method: 'POST' })).json();
+    log('伺服器回覆：' + JSON.stringify(out));
+    log('沒跳出來的話，把 App 切到背景再試一次 —— 前景時 iOS 常常不顯示橫幅。');
+  } catch (e) {
+    log('測試失敗：' + e);
+  } finally {
+    $('test').disabled = false;
+  }
+};
+
+boot();
+</script>
+</body>
+</html>
