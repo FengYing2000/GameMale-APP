@@ -10,9 +10,15 @@
   <!-- 加到主畫面之後才會以獨立 App 的樣子開啟；iOS 也只讓主畫面 App 收推播 -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- 不是 black-translucent：那會讓內容鑽到狀態列底下 -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="GameMale">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <!-- 刻意**不加** viewport-fit=cover。
+       加了畫面會延伸到瀏海與圓角底下，底部導覽被切掉，而且要自己用
+       env(safe-area-inset-*) 補；Flutter 網頁版又不會讀那些 CSS 變數，
+       只知道視窗大小，補了反而讓「畫出來的位置」跟「摸到的位置」對不上。
+       不加的話 iOS 直接把可視區收在安全範圍內，兩個問題一起消失。 -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0F1115">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
@@ -25,20 +31,11 @@
        深色主題下特別刺眼。 */
     html, body { margin:0; padding:0; height:100%; background:#0F1115; }
 
-    /* 擋掉 Safari 自己的左右滑動返回。
-       iOS 16.4 起主畫面 App 也有那個手勢，會跟 Flutter 內建的
-       Cupertino 拖曳返回打架——滑一次跑兩遍動畫。擋掉之後手勢
-       完全交給 Flutter，跟原生 App 一模一樣。 */
-    html, body { overscroll-behavior-x: none; overscroll-behavior-y: none; }
+    /* iOS Safari 其實不理會 overscroll-behavior-x 的返回手勢，
+       真正的解法是不要產生瀏覽器歷史（見 services/url_strategy_web.dart）。
+       這行留著擋下拉重整之類的其他過捲行為。 */
+    html, body { overscroll-behavior: none; }
 
-    /* 安全區域。Flutter 網頁版不會自己讀 env(safe-area-inset-*)，
-       它只知道視窗大小，所以底部導覽會被圓角和 home indicator 切掉。
-       這裡把可視區域收進安全範圍內，露出來的邊框就是底色。 */
-    body {
-      padding: env(safe-area-inset-top) env(safe-area-inset-right)
-               env(safe-area-inset-bottom) env(safe-area-inset-left);
-      box-sizing: border-box;
-    }
     #boot { position:fixed; inset:0; display:flex; align-items:center;
       justify-content:center; flex-direction:column; gap:14px;
       color:#9099ab; background:#0F1115;

@@ -266,7 +266,11 @@ Future<void> main(List<String> args) async {
     // 網頁版是直接用論壇帳號登入的（透過 /gm 轉發），瀏覽器手上已經有
     // 論壇的 cookie。**不要再要求它登入我們一次**——那等於同一個人登入兩遍。
     // 這裡拿請求上的 cookie 去問論壇「你是誰」，認得出來就建帳號、綁訂閱。
-    ..post('/api/web-subscribe', (Request r) async {
+    //
+    // ⚠️ 路徑刻意放在 /gm/ 底下。早期版本把論壇 cookie 設成 Path=/gm，
+    // 那些已經存在使用者瀏覽器裡的 cookie 不會送到 /api/*——端點放 /api 下
+    // 會對已經登入過的人一直說「請先登入」。放這裡新舊都收得到。
+    ..post('/gm/__subscribe', (Request r) async {
       final cookie = r.headers['cookie'] ?? '';
       if (cookie.isEmpty) return bad('沒有論壇登入狀態，請先登入論壇', 401);
       try {
@@ -455,6 +459,8 @@ Future<void> main(List<String> args) async {
   // 論壇轉發：讓瀏覽器裡的 Flutter 網頁版能打到論壇（它自己不准跨網域）
   final proxy = ForumProxy();
   Handler withProxy(Handler inner) => (Request r) {
+        // 我們自己掛在 /gm/ 底下的端點要先讓過，不要被當成論壇路徑轉出去
+        if (r.url.path.startsWith('gm/__')) return inner(r);
         if (r.url.path == 'gm' || r.url.path.startsWith('gm/')) {
           return proxy.handle(r.change(path: 'gm'));
         }

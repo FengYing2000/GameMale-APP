@@ -32,13 +32,15 @@ Future<void> maybeShowWebOnboarding(BuildContext context) async {
   if (!context.mounted) return;
 
   final installing = support == WebPushSupport.needInstall;
-  await showModalBottomSheet<void>(
+  final done = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (sheet) => _OnboardingSheet(installing: installing),
   );
-  await prefs.setBool(_kAskedKey, true);
+  // 只有真的處理完（開好了、或明確說以後再說）才記起來。
+  // 中途出錯就不要記，否則使用者下次再也不會被問到。
+  if (done == true) await prefs.setBool(_kAskedKey, true);
 }
 
 class _OnboardingSheet extends StatefulWidget {
@@ -66,7 +68,7 @@ class _OnboardingSheetState extends State<_OnboardingSheet> {
       _busy = false;
       _error = err;
     });
-    if (err == null && mounted) Navigator.pop(context);
+    if (err == null && mounted) Navigator.pop(context, true);
   }
 
   @override
@@ -103,7 +105,7 @@ class _OnboardingSheetState extends State<_OnboardingSheet> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.tonal(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(context, true),
                   child: Text(tr('知道了')),
                 ),
               ),
@@ -128,7 +130,7 @@ class _OnboardingSheetState extends State<_OnboardingSheet> {
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
-                  onPressed: _busy ? null : () => Navigator.pop(context),
+                  onPressed: _busy ? null : () => Navigator.pop(context, true),
                   child: Text(tr('以後再說')),
                 ),
               ),

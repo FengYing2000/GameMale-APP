@@ -55,7 +55,7 @@ class WebPush {
     try {
       // 打的是**我們自己的**伺服器，不是論壇——Api 那條已經被指到
       // 論壇的轉發路徑上了，不能共用。
-      await _own.post<void>('/api/web-subscribe', data: raw);
+      await _own.post<void>('/gm/__subscribe', data: raw);
       return null;
     } on DioException catch (e) {
       final body = e.response?.data;

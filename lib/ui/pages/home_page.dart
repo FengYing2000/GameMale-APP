@@ -15,7 +15,6 @@ import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_body.dart';
 import '../widgets/quick_menu.dart';
-import '../widgets/red_dot.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 
@@ -244,10 +243,17 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
-            icon: RedDot(
-              count: context.watch<SessionStore>().noticeCount,
-              child: const Icon(LucideIcons.bell),
-            ),
+            // 用 Material 的 Badge：IconButton 也會裁切，自己疊會被切掉
+            icon: Builder(builder: (_) {
+              final n = context.watch<SessionStore>().noticeCount;
+              const bell = Icon(LucideIcons.bell);
+              if (n <= 0) return bell;
+              return Badge(
+                label: Text(n > 99 ? '99+' : '$n'),
+                backgroundColor: const Color(0xFFFF1744),
+                child: bell,
+              );
+            }),
             tooltip: tr('通知'),
             onPressed: () => context.push('/notice'),
           ),

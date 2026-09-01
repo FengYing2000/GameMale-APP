@@ -44,7 +44,6 @@ import 'ui/pages/tools_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
-import 'ui/widgets/red_dot.dart';
 import 'ui/widgets/web_onboarding.dart';
 
 class GameMaleApp extends StatefulWidget {
@@ -192,6 +191,16 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
 /// 所以需要一個不依賴當下畫面的 context。
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// 底部分頁的圖示，未讀數 > 0 時掛上數字
+Widget _tabIcon(IconData icon, int count) {
+  if (count <= 0) return Icon(icon);
+  return Badge(
+    label: Text(count > 99 ? '99+' : '$count'),
+    backgroundColor: const Color(0xFFFF1744),
+    child: Icon(icon),
+  );
+}
+
 GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -337,11 +346,12 @@ class _Scaffold extends StatelessWidget {
         destinations: [
           for (final t in _tabs)
             NavigationDestination(
-              // 訊息分頁掛未讀數
-              icon: RedDot(
-                  count: t.$3 == '訊息' ? pmCount : 0, child: Icon(t.$1)),
-              selectedIcon: RedDot(
-                  count: t.$3 == '訊息' ? pmCount : 0, child: Icon(t.$2)),
+              // 訊息分頁掛未讀數。
+              // 這裡用 Material 的 Badge 而不是自家的 RedDot：
+              // NavigationBar 會把圖示裁進固定大小的容器，自己用
+              // Stack + Positioned 疊上去會被切掉，看不到數字。
+              icon: _tabIcon(t.$1, t.$3 == '訊息' ? pmCount : 0),
+              selectedIcon: _tabIcon(t.$2, t.$3 == '訊息' ? pmCount : 0),
               label: tr(t.$3),
             ),
         ],
