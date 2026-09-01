@@ -3,6 +3,12 @@ name: 建置 Android APK
 on:
   push:
     branches: [main]
+    # 只改 pwa/ 或文件不用重建 App。macOS 的分鐘數算 10 倍，
+    # 白跑一次很貴。
+    paths-ignore:
+      - 'pwa/**'
+      - '**.md'
+      - '.gitignore'
   workflow_dispatch:
 
 jobs:
