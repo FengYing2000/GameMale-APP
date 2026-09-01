@@ -61,7 +61,7 @@ class _MessagesPageState extends State<MessagesPage> {
         setState(() => _data = d);
         // 這份清單就是權威：還有沒有未讀，直接同步紅點
         context.read<SessionStore>()
-            .setPmUnread(d.items.any((i) => i.unread > 0));
+            .setPmUnreadCount(d.items.fold(0, (sum, i) => sum + i.unread));
       }
     } on DiscuzException catch (e) {
       if (mounted) setState(() => _err = e.message);
@@ -97,7 +97,7 @@ class _MessagesPageState extends State<MessagesPage> {
       ];
       setState(() => _data = PmListResult(items: items, message: d.message));
       context.read<SessionStore>()
-          .setPmUnread(items.any((i) => i.unread > 0));
+          .setPmUnreadCount(items.fold(0, (sum, i) => sum + i.unread));
     }
     // 再跟伺服器對一次（對方可能又回了新訊息）
     await _load();

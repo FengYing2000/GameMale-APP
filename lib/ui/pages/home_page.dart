@@ -245,7 +245,7 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: RedDot(
-              show: context.watch<SessionStore>().hasNewNotice,
+              count: context.watch<SessionStore>().noticeCount,
               child: const Icon(LucideIcons.bell),
             ),
             tooltip: tr('通知'),

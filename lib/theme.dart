@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 /// 品牌色沿用論壇的簽到按鈕綠
@@ -26,21 +25,6 @@ ThemeData _base(Brightness b, [Color seed = brand]) {
 
   return ThemeData(
     useMaterial3: true,
-    // 網頁版要拿掉 Flutter 自己的拖曳返回手勢。
-    //
-    // 預設在 iOS 上用的是 CupertinoPageTransitionsBuilder，它自帶邊緣拖曳返回；
-    // 而 iOS 16.4 起，加到主畫面的網頁 App **本身也有**滑動返回。兩個都在動，
-    // 滑一次就會看到返回動畫跑兩遍。
-    //
-    // 這裡換成只有視覺、沒有手勢的版本：手勢交給 Safari，Flutter 只負責畫
-    // 那一次轉場。外觀跟原本的 Cupertino 滑入一致。
-    pageTransitionsTheme: kIsWeb
-        ? const PageTransitionsTheme(builders: {
-            TargetPlatform.iOS: _SlideNoGestureTransitions(),
-            TargetPlatform.android: _SlideNoGestureTransitions(),
-            TargetPlatform.macOS: _SlideNoGestureTransitions(),
-          })
-        : null,
     colorScheme: scheme,
     scaffoldBackgroundColor: bg,
     fontFamily: '.SF Pro Text',
@@ -113,33 +97,4 @@ Color faint(BuildContext c) {
   final s = Theme.of(c).colorScheme;
   return s.onSurface
       .withValues(alpha: s.brightness == Brightness.dark ? 0.46 : 0.60);
-}
-
-
-/// iOS 那種由右滑入、舊頁往左退的轉場，但**不含**拖曳返回手勢。
-///
-/// 只在網頁版用。原生版維持 Flutter 預設的 Cupertino 轉場（手勢要留著）。
-class _SlideNoGestureTransitions extends PageTransitionsBuilder {
-  const _SlideNoGestureTransitions();
-
-  @override
-  Widget buildTransitions<T>(
-    PageRoute<T> route,
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    const curve = Curves.fastEaseInToSlowEaseOut;
-    return SlideTransition(
-      position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
-          .animate(CurvedAnimation(parent: animation, curve: curve)),
-      child: SlideTransition(
-        // 舊頁往左退一小段，就是 iOS 的視差感
-        position: Tween<Offset>(begin: Offset.zero, end: const Offset(-0.25, 0))
-            .animate(CurvedAnimation(parent: secondaryAnimation, curve: curve)),
-        child: child,
-      ),
-    );
-  }
 }

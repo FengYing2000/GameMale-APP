@@ -45,6 +45,7 @@ import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
 import 'ui/widgets/red_dot.dart';
+import 'ui/widgets/web_onboarding.dart';
 
 class GameMaleApp extends StatefulWidget {
   const GameMaleApp({super.key});
@@ -118,6 +119,14 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     // 登入狀態確定之後才問得到紅點
     _refreshBadges();
     _applyBackgroundBadges();
+
+    // 網頁版第一次開起來要教他加到主畫面／問要不要開通知。
+    // 等第一幀畫完才有可用的 context，而且要讓使用者先看到畫面再跳。
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) await maybeShowWebOnboarding(ctx);
+    });
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
@@ -179,8 +188,13 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   }
 }
 
+/// 根 Navigator。網頁版的首次引導要在任何頁面之上跳出來，
+/// 所以需要一個不依賴當下畫面的 context。
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     // 換帳號要重導；換語言要讓整個頁面堆疊用新語言重建
     refreshListenable: Listenable.merge([session, settings.langTick]),
@@ -315,7 +329,7 @@ class _Scaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final newPm = context.watch<SessionStore>().hasNewPm;
+    final pmCount = context.watch<SessionStore>().pmCount;
     return Scaffold(
       body: shell,
       bottomNavigationBar: NavigationBar(
@@ -323,9 +337,11 @@ class _Scaffold extends StatelessWidget {
         destinations: [
           for (final t in _tabs)
             NavigationDestination(
-              // 訊息分頁有未讀私訊時掛個紅點
-              icon: RedDot(show: t.$3 == '訊息' && newPm, child: Icon(t.$1)),
-              selectedIcon: RedDot(show: t.$3 == '訊息' && newPm, child: Icon(t.$2)),
+              // 訊息分頁掛未讀數
+              icon: RedDot(
+                  count: t.$3 == '訊息' ? pmCount : 0, child: Icon(t.$1)),
+              selectedIcon: RedDot(
+                  count: t.$3 == '訊息' ? pmCount : 0, child: Icon(t.$2)),
               label: tr(t.$3),
             ),
         ],

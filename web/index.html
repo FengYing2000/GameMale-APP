@@ -24,6 +24,21 @@
     /* Flutter 載入前的底色。不設的話首屏會閃一下白，
        深色主題下特別刺眼。 */
     html, body { margin:0; padding:0; height:100%; background:#0F1115; }
+
+    /* 擋掉 Safari 自己的左右滑動返回。
+       iOS 16.4 起主畫面 App 也有那個手勢，會跟 Flutter 內建的
+       Cupertino 拖曳返回打架——滑一次跑兩遍動畫。擋掉之後手勢
+       完全交給 Flutter，跟原生 App 一模一樣。 */
+    html, body { overscroll-behavior-x: none; overscroll-behavior-y: none; }
+
+    /* 安全區域。Flutter 網頁版不會自己讀 env(safe-area-inset-*)，
+       它只知道視窗大小，所以底部導覽會被圓角和 home indicator 切掉。
+       這裡把可視區域收進安全範圍內，露出來的邊框就是底色。 */
+    body {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+      box-sizing: border-box;
+    }
     #boot { position:fixed; inset:0; display:flex; align-items:center;
       justify-content:center; flex-direction:column; gap:14px;
       color:#9099ab; background:#0F1115;
@@ -114,6 +129,27 @@
     window.addEventListener('flutter-first-frame', function () {
       const b = document.getElementById('boot');
       if (b) b.remove();
+
+      // iOS 的主畫面 App 剛開起來時，視窗高度量到的是還沒扣掉狀態列／
+      // 安全區的值。Flutter 只在啟動時量一次，所以畫面的座標會跟實際
+      // 觸控的位置對不上——按鈕點不到、或點到旁邊的東西。
+      // 使用者「滑一下返回就正常了」就是因為那個動作觸發了重新量測。
+      // 這裡主動補幾次 resize 逼它重量。
+      const nudge = function () { window.dispatchEvent(new Event('resize')); };
+      nudge();
+      setTimeout(nudge, 100);
+      setTimeout(nudge, 400);
+      setTimeout(nudge, 1000);
+    });
+
+    // 轉向、鍵盤收合、從背景切回來都會改變可視區域，一律重量一次
+    window.addEventListener('orientationchange', function () {
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 250);
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 100);
+      }
     });
   </script>
 </body>

@@ -51,8 +51,15 @@ class ForumProxy {
     outgoing.headers['referer'] = '$kForumOrigin/forum.php?mobile=2';
     outgoing.headers['origin'] = kForumOrigin;
 
+    // 只轉論壇的 cookie，我們自己的 session token 不要送出去
     final cookie = request.headers['cookie'];
-    if (cookie != null && cookie.isNotEmpty) outgoing.headers['cookie'] = cookie;
+    if (cookie != null && cookie.isNotEmpty) {
+      final forwarded = cookie
+          .split(';')
+          .where((c) => !c.trimLeft().startsWith('gm_session='))
+          .join(';');
+      if (forwarded.trim().isNotEmpty) outgoing.headers['cookie'] = forwarded;
+    }
 
     if (request.method == 'POST' || request.method == 'PUT') {
       outgoing.bodyBytes = await request.read()
@@ -104,8 +111,11 @@ class ForumProxy {
             .trim()
             // Domain 指向論壇的話瀏覽器會整條丟掉
             .replaceAll(RegExp(r';\s*[Dd]omain=[^;]*'), '')
-            // 路徑統一收到轉發路徑底下
-            .replaceAll(RegExp(r';\s*[Pp]ath=[^;]*'), '; Path=$prefix')
+            // Path 一定要放成根目錄，**不能收在 $prefix 底下**。
+            // 收在 /gm 的話瀏覽器只會把論壇 cookie 送給 /gm/*，
+            // 我們自己的 /api/* 就收不到——網頁版要綁推播時，伺服器
+            // 會看不到登入狀態，回一句「請先登入」而使用者明明登入著。
+            .replaceAll(RegExp(r';\s*[Pp]ath=[^;]*'), '; Path=/')
     ];
   }
 
