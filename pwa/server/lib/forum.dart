@@ -158,6 +158,8 @@ class PollSnapshot {
     required this.loggedIn,
     required this.notice,
     required this.pm,
+    this.latestPmName = '',
+    this.latestPmPreview = '',
   });
 
   /// 論壇連得到嗎。連不到就什麼都不要判斷——網路抖一下不該被當成登出。
@@ -165,6 +167,11 @@ class PollSnapshot {
   final bool loggedIn;
   final int notice;
   final int pm;
+
+  /// 最新一則未讀私訊的寄件者與內容，讓通知能直接顯示訊息本身
+  /// 而不只是「你有 N 則未讀」。沒有未讀時為空字串。
+  final String latestPmName;
+  final String latestPmPreview;
 }
 
 /// 查一次未讀數，順便判斷還在不在登入狀態。
@@ -194,17 +201,33 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
             reachable: false, loggedIn: true, notice: 0, pm: 0);
       }
 
+      var latestName = '';
+      var latestPreview = '';
       if (loggedIn) {
         try {
           final list = await api.fetchPmList();
           pm = list.items.fold(0, (sum, i) => sum + i.unread);
+          // 列表本來就依時間排序，第一則未讀的就是最新那則
+          for (final it in list.items) {
+            if (it.unread > 0) {
+              latestName = it.name;
+              latestPreview = it.last;
+              break;
+            }
+          }
         } catch (_) {
           // 對話列表抓不到就退回頁首那個數字，至少不會完全沒有通知
         }
       }
 
       return PollSnapshot(
-          reachable: true, loggedIn: loggedIn, notice: notice, pm: pm);
+        reachable: true,
+        loggedIn: loggedIn,
+        notice: notice,
+        pm: pm,
+        latestPmName: latestName,
+        latestPmPreview: latestPreview,
+      );
     });
 
 Future<SubmitResult> signFor(Api target) => asAccount(target, api.doSign);

@@ -46,8 +46,8 @@ List<Outgoing> decideNotifications({
     if (account.cookieStatus != 'expired') {
       account.cookieStatus = 'expired';
       out.add(const Outgoing(
-        '登入已過期',
-        '論壇的登入狀態失效了，打開 App 重新登入才會繼續收到通知',
+        '登入憑證已失效',
+        '論壇登入狀態已過期，請重新登入以繼續接收通知',
         tag: 'auth',
       ));
     }
@@ -60,22 +60,21 @@ List<Outgoing> decideNotifications({
   // ── 新提醒／新私訊 ──────────────────────────────────────────
   // 只有「變多」才通知：讀掉變少不吵、沒變也不重複吵。
   if (account.notifyNotice && snapshot.notice > account.lastNotice) {
-    final delta = snapshot.notice - account.lastNotice;
     out.add(Outgoing(
-      '新提醒',
-      delta == snapshot.notice
-          ? '你有 ${snapshot.notice} 則未讀提醒'
-          : '新增 $delta 則提醒，共 ${snapshot.notice} 則未讀',
+      '論壇提醒',
+      '您有 ${snapshot.notice} 則未讀提醒',
       tag: 'notice',
     ));
   }
   if (account.notifyPm && snapshot.pm > account.lastPm) {
-    final delta = snapshot.pm - account.lastPm;
+    // 直接把訊息本身放進通知：標題是寄件者，內文是訊息預覽。
+    // 抓不到內容時退回未讀則數。
+    final hasContent = snapshot.latestPmName.isNotEmpty;
     out.add(Outgoing(
-      '新私訊',
-      delta == snapshot.pm
-          ? '你有 ${snapshot.pm} 則未讀私訊'
-          : '新增 $delta 則私訊，共 ${snapshot.pm} 則未讀',
+      hasContent ? snapshot.latestPmName : '私訊',
+      hasContent && snapshot.latestPmPreview.isNotEmpty
+          ? snapshot.latestPmPreview
+          : '您有 ${snapshot.pm} 則未讀私訊',
       tag: 'pm',
     ));
   }
@@ -89,7 +88,7 @@ List<Outgoing> decideNotifications({
     if (signResult != null) {
       account.lastSignDate = signResult.ok ? today : account.lastSignDate;
       out.add(Outgoing(
-        signResult.ok ? '簽到完成' : '簽到失敗',
+        signResult.ok ? '簽到成功' : '簽到失敗',
         signResult.message,
         tag: 'sign',
       ));
@@ -104,7 +103,7 @@ List<Outgoing> decideNotifications({
     // 改成「過了就提醒」，再用 lastRemindDate 保證一天只推一則。
     // HH:mm 補零過，字串比大小等於時間比大小。
     account.lastRemindDate = today;
-    out.add(const Outgoing('記得簽到', '今天還沒到論壇簽到', tag: 'sign'));
+    out.add(const Outgoing('簽到提醒', '您今日尚未完成簽到', tag: 'sign'));
   }
 
   return out;

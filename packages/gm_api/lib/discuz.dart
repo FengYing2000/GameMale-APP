@@ -1537,21 +1537,54 @@ Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) asy
 /// 私訊列表：li > a 內是 .avatar_img / .time / .num / .name / .grey，
 /// 不是一般的 h4+p 版型
 Future<PmListResult> fetchPmList() async {
-  final doc = await _page('home.php?mod=space&do=pm');
+  // 一定要用桌面版。手機版的私訊列表**沒有未讀標記**——每則對話長得
+  // 一模一樣，看不出哪些沒讀。桌面版才會在有新訊息的對話 <dl> 上掛
+  // `newpm` class，那是唯一可靠的未讀依據（會一直留到該對話被點開）。
+  final html = await Api.instance.get('home.php?mod=space&do=pm', desktop: true);
+  final doc = toDoc(html);
   final items = <PmItem>[];
-  for (final li in doc.querySelectorAll('.pmbox li')) {
-    final a = li.querySelector('a');
-    if (a == null) continue;
-    final href = attr(a, 'href');
-    final touid = paramInt(href, 'touid');
+
+  for (final dl in doc.querySelectorAll('dl[id^="pmlist_"]')) {
+    // 對方 uid：刪除用的核取方塊 value 最穩，退而求其次抓回覆連結
+    final box = dl.querySelector('input[name="deletepm_deluid[]"]');
+    var touid = int.tryParse(attr(box, 'value'));
+    touid ??= paramInt(
+        attr(dl.querySelector('a[href*="touid="]'), 'href'), 'touid');
     if (touid == null) continue;
+
+    // 未讀＝這則對話的 <dl> 有 newpm class（不是每則都有的 newpm_avt 圖示，
+    // 那個是靠 class 用 CSS 顯示/隱藏的，一直都在）
+    final unread = dl.classes.contains('newpm') ? 1 : 0;
+
+    // 預覽文字是 .pm_c 裡第一個 <br> 之後的那段文字節點
+    final body = dl.querySelector('.pm_c');
+    var preview = '';
+    if (body != null) {
+      var seenBr = false;
+      for (final node in body.nodes) {
+        if (node is dom.Element && node.localName == 'br') {
+          if (seenBr) break;
+          seenBr = true;
+        } else if (seenBr && node is dom.Text) {
+          final t = node.text.trim();
+          if (t.isNotEmpty) {
+            preview = t;
+            break;
+          }
+        }
+      }
+    }
+
+    final timeSpan = dl.querySelector('.xg1 span[title]');
     items.add(PmItem(
       touid: touid,
-      name: txt(li.querySelector('.name')),
-      last: txt(li.querySelector('.grey')),
-      time: txt(li.querySelector('.time')),
-      avatar: attr(li.querySelector('.avatar_img img'), 'src'),
-      unread: digits(txt(li.querySelector('.num'))),
+      name: txt(dl.querySelector('.xw1')),
+      last: preview,
+      time: attr(timeSpan, 'title').isNotEmpty
+          ? attr(timeSpan, 'title')
+          : txt(dl.querySelector('.xg1')),
+      avatar: attr(dl.querySelector('.avt img'), 'src'),
+      unread: unread,
     ));
   }
   return PmListResult(items: items, message: items.isEmpty ? '目前沒有私訊' : null);

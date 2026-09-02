@@ -29,6 +29,16 @@ Account acc({
       lastRemindDate: lastRemindDate,
     );
 
+PollSnapshot snapPm(int pm, {required String name, required String preview}) =>
+    PollSnapshot(
+      reachable: true,
+      loggedIn: true,
+      notice: 0,
+      pm: pm,
+      latestPmName: name,
+      latestPmPreview: preview,
+    );
+
 PollSnapshot snap({
   bool reachable = true,
   bool loggedIn = true,
@@ -95,9 +105,16 @@ void main() {
       expect(a.lastNotice, 9, reason: '不通知但基準仍要更新，免得之後打開就被舊帳灌爆');
     });
 
-    test('增量講得出來：本來 2 變 5 要說新增 3', () {
+    test('提醒通知講得出未讀總數', () {
       final a = acc(lastNotice: 2);
-      expect(decide(a, snap(notice: 5)).first.body, contains('3'));
+      expect(decide(a, snap(notice: 5)).first.body, contains('5'));
+    });
+
+    test('私訊通知直接顯示寄件者與內容', () {
+      final a = acc();
+      final out = decide(a, snapPm(2, name: 'YanShen', preview: '測試訊息'));
+      expect(out.single.title, 'YanShen');
+      expect(out.single.body, '測試訊息');
     });
   });
 
@@ -194,7 +211,7 @@ void main() {
     test('成功要推，並記下日期', () {
       final a = acc(autoSign: true);
       final out = decide(a, snap(), sign: const SubmitOutcome(true, '簽到成功，獲得 5 金幣'));
-      expect(out.single.title, '簽到完成');
+      expect(out.single.title, '簽到成功');
       expect(out.single.body, contains('5 金幣'));
       expect(a.lastSignDate, '2026-09-01');
     });
