@@ -22,6 +22,9 @@ external JSPromise<JSString> _enable();
 @JS('gmPush.disable')
 external JSPromise<JSString> _disable();
 
+@JS('gmPush.currentSubscription')
+external JSPromise<JSString> _current();
+
 enum WebPushSupport {
   /// 可以用
   ok,
@@ -63,6 +66,25 @@ class WebPush {
           ? '${body['error']}'
           : (e.message ?? '訂閱沒送出去');
     }
+  }
+
+  /// 這台裝置現在到底有沒有真的訂閱著。
+  ///
+  /// **不能只看本機的偏好設定**：把網頁重新加到主畫面會拿到全新的儲存空間
+  /// 與新的 service worker，舊的訂閱留在伺服器上、這台卻什麼都沒有。
+  /// 設定裡的開關看起來是開的，實際上一則都收不到。
+  static Future<bool> isSubscribed() async =>
+      (await _current().toDart).toDart.isNotEmpty;
+
+  /// 權限已經給過的話，靜靜地把訂閱補回去並回報伺服器。
+  ///
+  /// 每次啟動都跑一次，這樣不管使用者重裝、換裝置、還是瀏覽器自己
+  /// 換掉了訂閱，伺服器手上都會是最新的那一個。
+  /// 權限沒給過就什麼都不做——要權限一定得在使用者的點擊裡。
+  static Future<bool> ensureSubscribed() async {
+    if (permission != 'granted') return false;
+    if (support != WebPushSupport.ok) return false;
+    return await enable() == null;
   }
 
   static Future<void> disable() async {

@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/install_banner.dart';
 import '../widgets/red_dot.dart';
 import '../widgets/require_login.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -258,6 +259,8 @@ class _HomePageState extends State<HomePage> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
+            // 網頁版還在瀏覽器分頁裡時，教他加到主畫面（原生版不會顯示）
+            const InstallBanner(),
             ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
             if (data != null) ...[
               if (data.sign case final sign?) _SignCard(

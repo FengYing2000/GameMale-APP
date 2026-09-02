@@ -8,5 +8,7 @@ class WebPush {
   static WebPushSupport get support => WebPushSupport.unsupported;
   static String get permission => 'unsupported';
   static Future<String?> enable() async => '這個平台不用 Web Push';
+  static Future<bool> isSubscribed() async => false;
+  static Future<bool> ensureSubscribed() async => false;
   static Future<void> disable() async {}
 }

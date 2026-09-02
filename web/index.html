@@ -110,6 +110,15 @@
         }
       },
 
+      // 這台裝置目前的訂閱（沒有就回空字串）
+      currentSubscription: async function () {
+        try {
+          const reg = await ready();
+          const sub = reg && await reg.pushManager.getSubscription();
+          return sub ? JSON.stringify(sub.toJSON()) : '';
+        } catch (e) { return ''; }
+      },
+
       disable: async function () {
         try {
           const reg = await ready();

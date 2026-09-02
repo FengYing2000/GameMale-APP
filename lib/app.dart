@@ -1,4 +1,5 @@
 import 'i18n/ui.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +45,8 @@ import 'ui/pages/tools_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
+import 'services/web_push_stub.dart'
+    if (dart.library.js_interop) 'services/web_push.dart';
 import 'ui/widgets/red_dot.dart';
 import 'ui/widgets/web_onboarding.dart';
 
@@ -90,6 +93,19 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     } on Exception {
       // 抓不到就維持原狀
     }
+
+    // 私訊要另外問對話列表。
+    //
+    // 頁首那個私訊數是「新訊息提示」，只要開過訊息列表論壇就把它清成 0，
+    // 可是對話本身還是未讀的——只看頁首的話，紅點要等使用者自己點進
+    // 訊息分頁才會出現，而那時候他早就看到了，等於沒有提示的作用。
+    try {
+      final list = await api.fetchPmList();
+      _session
+          .setPmUnreadCount(list.items.fold(0, (sum, i) => sum + i.unread));
+    } on Exception {
+      // 抓不到就沿用頁首那個數字
+    }
   }
 
   bool _onboarding = false;
@@ -111,6 +127,19 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   /// 依設定決定要不要掛背景檢查（只有登入了才有意義）
   Future<void> _applyBackgroundBadges() async {
     try {
+      if (kIsWeb) {
+        // 網頁版的背景檢查是伺服器在做，這裡要顧的是「這台裝置還在不在
+        // 伺服器的名單上」。
+        //
+        // 把網頁重新加到主畫面會拿到全新的儲存空間與新的 service worker，
+        // 舊訂閱留在伺服器上、這台卻什麼都沒有——設定看起來是開的，
+        // 實際上一則都收不到。每次啟動都補一次，並讓開關反映真實狀態。
+        final on = _session.loggedIn && await WebPush.ensureSubscribed();
+        if (_settings.notifyBackground != on) {
+          await _settings.setNotifyBackground(on);
+        }
+        return;
+      }
       if (_settings.notifyBackground && _session.loggedIn) {
         await enableBackgroundBadges();
       } else {
@@ -142,6 +171,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     // 加到主畫面之後是全新的儲存空間，一定是未登入狀態，所以通知那張
     // 要等他登入完才問——登入狀態一變就再試一次。
     _session.addListener(_maybeOnboard);
+    _session.addListener(_applyBackgroundBadges);
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換
