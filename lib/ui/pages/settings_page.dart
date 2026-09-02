@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:gm_api/http.dart';
 import '../../services/background.dart';
+import '../../services/cache_manager.dart';
 import '../../services/web_push_stub.dart'
     if (dart.library.js_interop) '../../services/web_push.dart';
 import '../../services/notifications.dart';
@@ -234,6 +235,11 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
+          _section(context, tr('儲存空間')),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: _CacheTile(),
+          ),
           _section(context, tr('關於')),
           Card(
             clipBehavior: Clip.antiAlias,
@@ -384,4 +390,63 @@ class _SettingsPageState extends State<SettingsPage> {
         title: Text(label),
         trailing: Text(value, style: TextStyle(fontSize: 14, color: subtle(c))),
       );
+}
+
+
+/// 圖片快取的大小與清除。網頁版量不到磁碟大小（瀏覽器自己管），
+/// 那時只顯示清除鈕。
+class _CacheTile extends StatefulWidget {
+  @override
+  State<_CacheTile> createState() => _CacheTileState();
+}
+
+class _CacheTileState extends State<_CacheTile> {
+  int? _bytes;
+  bool _known = false;
+  bool _clearing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _measure();
+  }
+
+  Future<void> _measure() async {
+    final b = await cacheSizeBytes();
+    if (!mounted) return;
+    setState(() {
+      _bytes = b;
+      _known = true;
+    });
+  }
+
+  Future<void> _clear() async {
+    setState(() => _clearing = true);
+    await clearImageCache();
+    await _measure();
+    if (!mounted) return;
+    setState(() => _clearing = false);
+    toast(context, tr('已清除圖片快取'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _bytes != null ? formatBytes(_bytes) : null;
+    return ListTile(
+      leading: const Icon(LucideIcons.hardDrive),
+      title: Text(tr('清除圖片快取')),
+      subtitle: Text(
+        !_known
+            ? tr('計算中…')
+            : size != null
+                ? tr('目前佔用 ') + size
+                : tr('由瀏覽器管理，無法顯示大小'),
+        style: const TextStyle(fontSize: 12),
+      ),
+      trailing: _clearing
+          ? const SizedBox(
+              width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : TextButton(onPressed: _clear, child: Text(tr('清除'))),
+    );
+  }
 }

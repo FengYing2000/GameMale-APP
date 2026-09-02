@@ -69,15 +69,17 @@ class RedDot extends StatelessWidget {
             ),
           );
 
-    // 右上角留出角標的空間，整組畫在同一個方框裡——外層再怎麼裁都切不到
-    final pad = label == null ? 6.0 : 13.0;
+    // 整組畫在同一個稍大的方框裡（外層再怎麼裁都切不到），
+    // **圖示置中**、角標貼右上角。左右各留一樣的空間，圖示才不會偏。
+    final over = label == null ? 6.0 : 18.0;
     return SizedBox(
-      width: 24 + pad,
-      height: 24 + 6,
+      width: 24 + over * 2,
+      height: 30,
       child: Stack(
+        alignment: Alignment.center,
         children: [
-          Positioned(left: 0, top: 6, child: SizedBox(width: 24, height: 24, child: child)),
-          Positioned(right: 0, top: 0, child: marker),
+          SizedBox(width: 24, height: 24, child: Center(child: child)),
+          Positioned(top: 0, right: 0, child: marker),
         ],
       ),
     );

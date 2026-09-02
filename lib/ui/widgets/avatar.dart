@@ -1,8 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'package:gm_api/http.dart';
+import 'net_image.dart';
 
 class Avatar extends StatelessWidget {
   const Avatar(this.url, {super.key, this.size = 38, this.onTap});
@@ -35,14 +34,13 @@ class Avatar extends StatelessWidget {
           child: ClipOval(
             child: url.isEmpty
                 ? ph
-                : CachedNetworkImage(
-                    imageUrl: url,
-                    httpHeaders: Api.imageHeaders,
+                : NetImage(
+                    url: url,
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
-                    placeholder: (c, _) => ph,
-                    errorWidget: (c, _, _) => ph,
+                    placeholder: ph,
+                    errorWidget: ph,
                   ),
           ),
         ),

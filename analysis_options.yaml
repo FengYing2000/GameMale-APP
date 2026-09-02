@@ -14,6 +14,10 @@ analyzer:
     - build/**
     # PWA 後端是獨立的 Dart 套件，有自己的 lint 設定，在它自己的資料夾裡跑
     - pwa/**
+    # gm_api 的測試用它自己的 dev_dependency（package:test），主專案不會
+    # 幫它 pub get，所以從根目錄 analyze 會找不到而報一堆假錯——CI 就是
+    # 這樣掛的。它的 lib 由 App import 時照樣會被檢查；測試在自己的目錄跑。
+    - packages/*/test/**
     - android/**
     - ios/**
     - web/**
