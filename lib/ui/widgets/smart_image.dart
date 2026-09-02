@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'net_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -91,14 +91,15 @@ class SmartImage extends StatelessWidget {
       );
     }
 
-    return CachedNetworkImage(
-      imageUrl: src,
-      httpHeaders: Api.imageHeaders,
+    // 網頁版用瀏覽器原生載入（會跟 301 轉址、快取交給瀏覽器）；
+    // 原生版維持 CachedNetworkImage 的磁碟快取。細節見 NetImage。
+    return NetImage(
+      url: src,
       width: width,
       height: height,
       fit: fit,
-      placeholder: placeholder == null ? null : (c, _) => placeholder!,
-      errorWidget: (c, _, _) => fallback,
+      placeholder: placeholder,
+      errorWidget: fallback,
     );
   }
 }
