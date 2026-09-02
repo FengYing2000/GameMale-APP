@@ -1,15 +1,10 @@
-import 'package:flutter_web_plugins/url_strategy.dart';
-
-/// 讓網頁版**完全不碰瀏覽器歷史**。
+/// 網頁版保留瀏覽器歷史。
 ///
-/// 為什麼要這樣：iOS 16.4 起，加到主畫面的網頁 App 有自己的邊緣滑動返回，
-/// 而 Flutter 的 Cupertino 轉場也有一個。兩個同時作用，滑一次就會看到
-/// 返回動畫跑兩遍，還會有「好幾層頁面疊在一起」的錯覺。
+/// 早期版本這裡呼叫 `setUrlStrategy(null)` 想關掉歷史、讓 iOS 的原生滑動
+/// 沒東西可退，只留 Flutter 自己的手勢。但那條路的雙重動畫治不乾淨
+/// （iOS 的滑動即使在歷史根部仍會有視覺）。改成相反的策略：**保留歷史**，
+/// 讓 iOS 原生滑動正常運作，而把 Flutter 的頁面轉場整個拿掉
+/// （見 theme.dart 的 _NoTransition），這樣只剩 iOS 一套動畫。
 ///
-/// 試過 `overscroll-behavior-x: none`——**iOS Safari 不理它**，那個手勢照跑。
-/// 真正有效的是讓歷史裡根本沒有可以回去的項目：沒有上一頁，系統的手勢
-/// 就不會有任何動作，返回完全交給 Flutter 自己處理，跟原生 App 一致。
-///
-/// 代價是網址列不會反映目前頁面（主畫面 App 本來就沒有網址列），
-/// 而且重新整理會回到首頁。
-void installNoHistoryUrlStrategy() => setUrlStrategy(null);
+/// 所以這裡現在什麼都不做——保留預設的歷史整合。
+void configureWebUrlStrategy() {}

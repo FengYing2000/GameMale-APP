@@ -10,9 +10,9 @@ import 'services/url_strategy_stub.dart'
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 網頁版：不要產生瀏覽器歷史，否則 iOS 的系統返回手勢會跟
-  // Flutter 自己的拖曳返回打架，動畫跑兩遍
-  installNoHistoryUrlStrategy();
+  // 網頁版的返回手勢設定（保留瀏覽器歷史，見該函式說明）。
+  // Flutter 這邊不做頁面轉場（theme.dart），返回交給 iOS 原生滑動。
+  configureWebUrlStrategy();
 
   // gm_api 是純 Dart 的，path_provider/rootBundle 要從這裡接上去
   await installFlutterBindings();

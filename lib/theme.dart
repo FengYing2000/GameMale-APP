@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 /// 品牌色沿用論壇的簽到按鈕綠
@@ -25,6 +26,23 @@ ThemeData _base(Brightness b, [Color seed = brand]) {
 
   return ThemeData(
     useMaterial3: true,
+    // 網頁版：頁面切換不做任何 Flutter 動畫。
+    //
+    // 為什麼：iOS 加到主畫面的 App 本身就有原生的邊緣滑動返回（會滑出
+    // 上一頁的快照）。只要 Flutter 這邊也有轉場或滑動手勢，兩個就會疊在
+    // 一起——使用者看到的「返回跳兩次／好幾頁疊著」就是這麼來的。
+    // 把 Flutter 的轉場整個拿掉，返回動畫完全交給 iOS 原生那一套，
+    // 就只剩一個、而且是最順的原生手感。前進（點進帖子）變成瞬間出現，
+    // 少了滑入動畫，但換來乾淨不打架。原生 App 不受影響。
+    pageTransitionsTheme: kIsWeb
+        ? const PageTransitionsTheme(builders: {
+            TargetPlatform.iOS: _NoTransition(),
+            TargetPlatform.android: _NoTransition(),
+            TargetPlatform.macOS: _NoTransition(),
+            TargetPlatform.windows: _NoTransition(),
+            TargetPlatform.linux: _NoTransition(),
+          })
+        : null,
     colorScheme: scheme,
     scaffoldBackgroundColor: bg,
     fontFamily: '.SF Pro Text',
@@ -97,4 +115,21 @@ Color faint(BuildContext c) {
   final s = Theme.of(c).colorScheme;
   return s.onSurface
       .withValues(alpha: s.brightness == Brightness.dark ? 0.46 : 0.60);
+}
+
+
+/// 網頁版專用：頁面瞬間切換，不做任何動畫也不帶滑動手勢。
+/// 返回的視覺完全交給 iOS 主畫面 App 的原生邊緣滑動。
+class _NoTransition extends PageTransitionsBuilder {
+  const _NoTransition();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) =>
+      child;
 }
