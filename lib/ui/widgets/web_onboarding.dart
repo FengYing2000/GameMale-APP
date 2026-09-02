@@ -9,56 +9,74 @@ import '../../services/web_push_stub.dart'
 
 const _kAskedKey = 'web_push_asked';
 
-/// 網頁版第一次開起來時該講的兩件事。
+/// 這次開啟已經跳過引導了嗎（只存在記憶體裡）。
 ///
-/// * 還在 Safari 分頁裡 → 教他加到主畫面（不加就永遠收不到推播）
-/// * 已經是主畫面 App 但沒開通知 → 問一次要不要開
+/// 加到主畫面的引導用這個而不是持久化：使用者還沒裝好之前，每次開網頁
+/// 都值得再提醒一次，但同一次瀏覽裡不要每換一頁就跳。
+bool _shownThisSession = false;
+
+/// 網頁版的引導。**從首頁的 post-frame 呼叫**——那裡一定有可用的 Scaffold
+/// context，比從根導覽器抓可靠得多（之前那樣常常抓不到，整個沒跳）。
 ///
-/// **不能自動跳權限視窗**：瀏覽器規定 `Notification.requestPermission()`
-/// 一定要在使用者的點擊裡呼叫，自動跑會被擋掉，而且擋掉之後就再也問不了。
-/// 所以這裡先問一次「要不要開」，按了才去要權限。
+/// 兩種情況：
+/// * 還在 Safari 分頁裡 → 教他加到主畫面（不裝就永遠收不到推播）。
+///   每次瀏覽提醒一次；首頁也有一張常駐橫幅可以隨時再看。
+/// * 已經是主畫面 App 但沒開通知 → 問要不要開（要登入後才問，因為綁定
+///   通知需要論壇登入狀態）。
 Future<void> maybeShowWebOnboarding(
   BuildContext context, {
   required bool loggedIn,
 }) async {
   if (!kIsWeb) return;
+  if (_shownThisSession) return;
 
   final support = WebPush.support;
   if (support == WebPushSupport.unsupported) return;
 
-  // 還在瀏覽器分頁裡的話，加到主畫面的引導交給首頁那張常駐橫幅
-  // （見 widgets/install_banner.dart）——啟動時跳一次的視窗太容易錯過。
-  if (support == WebPushSupport.needInstall) return;
+  final installing = support == WebPushSupport.needInstall;
 
-  // 已經開好了就不用再囉嗦
+  if (installing) {
+    // 加到主畫面：每次瀏覽跳一次就好
+    _shownThisSession = true;
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _Sheet(installing: true),
+    );
+    return;
+  }
+
+  // 已經是主畫面 App。
   if (WebPush.permission == 'granted') return;
-  // **還沒登入就先別問**：綁定通知需要論壇的登入狀態，這時候問了、
-  // 使用者按了同意，也只會拿到一句「請先登入」。
-  // 加到主畫面之後是全新的儲存空間，本來就會是未登入狀態，很常見。
+  // 還沒登入就先別問——綁定通知需要論壇登入狀態，這時候問了、使用者按了
+  // 同意，也只會拿到一句「請先登入」。加到主畫面後本來就是未登入狀態。
   if (!loggedIn) return;
 
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getBool(_kAskedKey) ?? false) return;
+  _shownThisSession = true;
   if (!context.mounted) return;
   final done = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (sheet) => const _OnboardingSheet(),
+    builder: (_) => const _Sheet(installing: false),
   );
-  // 只有真的處理完（開好了、或明確說以後再說）才記起來。
-  // 中途出錯就不要記，否則使用者下次再也不會被問到。
+  // 中途出錯就不要記成問過，否則使用者下次再也不會被問到
   if (done == true) await prefs.setBool(_kAskedKey, true);
 }
 
-class _OnboardingSheet extends StatefulWidget {
-  const _OnboardingSheet();
+class _Sheet extends StatefulWidget {
+  const _Sheet({required this.installing});
+  final bool installing;
 
   @override
-  State<_OnboardingSheet> createState() => _OnboardingSheetState();
+  State<_Sheet> createState() => _SheetState();
 }
 
-class _OnboardingSheetState extends State<_OnboardingSheet> {
+class _SheetState extends State<_Sheet> {
   bool _busy = false;
   String? _error;
 
@@ -85,47 +103,92 @@ class _OnboardingSheetState extends State<_OnboardingSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(LucideIcons.bellRing, size: 30, color: scheme.primary),
-            const SizedBox(height: 14),
-            Text(
-              tr('要開啟通知嗎？'),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              tr('有新提醒或新私訊時通知你。就算沒開著也收得到。'),
-              style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 18),
-            
-              if (_error != null) ...[
-                Text(tr(_error!),
-                    style: TextStyle(fontSize: 13, color: scheme.error)),
-                const SizedBox(height: 10),
-              ],
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _busy ? null : _enable,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(tr('開啟通知')),
-                ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: _busy ? null : () => Navigator.pop(context, true),
-                  child: Text(tr('以後再說')),
-                ),
-              ),
-          ],
+          children:
+              widget.installing ? _installBody(scheme) : _notifyBody(scheme),
         ),
       ),
     );
   }
+
+  List<Widget> _installBody(ColorScheme scheme) => [
+        Icon(LucideIcons.share, size: 30, color: scheme.primary),
+        const SizedBox(height: 14),
+        Text(tr('把 GameMale 加到主畫面'),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Text(
+          tr('加到主畫面後，開起來就跟一般 App 一樣（沒有網址列、全螢幕），'
+              '而且才收得到新提醒與私訊的推播 —— iOS 只讓主畫面的 App 收推播。'),
+          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 18),
+        _step(scheme, 1, tr('點瀏覽器下方正中間的「分享」鈕'), LucideIcons.share),
+        _step(scheme, 2, tr('往下捲，選「加入主畫面」'), LucideIcons.squarePlus),
+        _step(scheme, 3, tr('回到主畫面，從 GameMale 圖示打開'), LucideIcons.house),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonal(
+            onPressed: () => Navigator.pop(context),
+            child: Text(tr('知道了')),
+          ),
+        ),
+      ];
+
+  List<Widget> _notifyBody(ColorScheme scheme) => [
+        Icon(LucideIcons.bellRing, size: 30, color: scheme.primary),
+        const SizedBox(height: 14),
+        Text(tr('要開啟通知嗎？'),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Text(tr('有新提醒或新私訊時通知你，就算沒開著也收得到。'),
+            style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant)),
+        const SizedBox(height: 18),
+        if (_error != null) ...[
+          Text(tr(_error!),
+              style: TextStyle(fontSize: 13, color: scheme.error)),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _busy ? null : _enable,
+            child: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(tr('開啟通知')),
+          ),
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: _busy ? null : () => Navigator.pop(context, true),
+            child: Text(tr('以後再說')),
+          ),
+        ),
+      ];
+
+  Widget _step(ColorScheme scheme, int n, String text, IconData icon) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: .15),
+                  shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Text('$n',
+                  style: TextStyle(fontSize: 12, color: scheme.primary)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 14.5))),
+            Icon(icon, size: 17, color: scheme.onSurfaceVariant),
+          ],
+        ),
+      );
 }

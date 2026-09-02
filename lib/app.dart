@@ -48,7 +48,6 @@ import 'ui/pages/thread_page.dart';
 import 'services/web_push_stub.dart'
     if (dart.library.js_interop) 'services/web_push.dart';
 import 'ui/widgets/red_dot.dart';
-import 'ui/widgets/web_onboarding.dart';
 
 class GameMaleApp extends StatefulWidget {
   const GameMaleApp({super.key});
@@ -108,22 +107,6 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     }
   }
 
-  bool _onboarding = false;
-
-  /// 網頁版的首次引導。登入狀態改變時會再被叫一次，所以要自己防重入。
-  void _maybeOnboard() {
-    if (_onboarding) return;
-    _onboarding = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future<void>.delayed(const Duration(milliseconds: 900));
-      final ctx = rootNavigatorKey.currentContext;
-      if (ctx != null && ctx.mounted) {
-        await maybeShowWebOnboarding(ctx, loggedIn: _session.loggedIn);
-      }
-      _onboarding = false;
-    });
-  }
-
   /// 依設定決定要不要掛背景檢查（只有登入了才有意義）
   Future<void> _applyBackgroundBadges() async {
     try {
@@ -165,12 +148,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     _refreshBadges();
     _applyBackgroundBadges();
 
-    // 網頁版第一次開起來要教他加到主畫面／問要不要開通知。
-    // 等第一幀畫完才有可用的 context，而且要讓使用者先看到畫面再跳。
-    _maybeOnboard();
-    // 加到主畫面之後是全新的儲存空間，一定是未登入狀態，所以通知那張
-    // 要等他登入完才問——登入狀態一變就再試一次。
-    _session.addListener(_maybeOnboard);
+    // 網頁版的引導改由首頁自己跳（那裡的 context 才可靠，見 home_page）。
     _session.addListener(_applyBackgroundBadges);
   }
 

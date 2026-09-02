@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import '../widgets/web_onboarding.dart';
 import '../widgets/install_banner.dart';
 import '../widgets/red_dot.dart';
 import '../widgets/require_login.dart';
@@ -78,6 +79,14 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _load();
+    // 網頁版的引導從這裡跳（首頁一定有可用的 Scaffold context）。
+    // 讓畫面先畫出來再跳，比較不突兀。
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      if (!mounted) return;
+      await maybeShowWebOnboarding(context,
+          loggedIn: context.read<SessionStore>().loggedIn);
+    });
   }
 
   Future<void> _load() async {
