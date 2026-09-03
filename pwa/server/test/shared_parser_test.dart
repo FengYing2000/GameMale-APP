@@ -9,6 +9,8 @@ import 'package:test/test.dart';
 /// 如果哪天有人在 gm_api 裡不小心 import 了 Flutter 的東西，
 /// 這裡會第一個編不過。
 void main() {
+  _proxyQuery();
+
   group('共用解析層在伺服器端能跑', () {
     test('頁首提醒選單的未讀數', () {
       // 這是論壇桌面版頁首 #myprompt_menu 的結構
@@ -64,6 +66,22 @@ void main() {
       expect(S2T.instance.ready, isFalse);
       expect(sys('汉化补丁'), '汉化补丁');
       expect(zh('汉化补丁'), '汉化补丁');
+    });
+  });
+}
+
+void _proxyQuery() {
+  group('轉發要保留原始 query', () {
+    // 論壇有些網址會帶重複參數（`&mobile=no&mobile=2`）。用 Map 重建會
+    // 只留最後一個，論壇因此回不同模板，解析器就抓不到東西。
+    test('重複的參數不能被吃掉', () {
+      final url = Uri.parse('/gm/home.php?mod=space&do=doing&mobile=no&mobile=2');
+      // Map 會把重複的 key 壓成一個——這正是不能用它的原因
+      expect(url.queryParameters['mobile'], '2');
+      expect(url.queryParametersAll['mobile'], ['no', '2']);
+      // 原始字串則完整保留
+      expect(url.query, contains('mobile=no'));
+      expect(url.query, contains('mobile=2'));
     });
   });
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../i18n/ui.dart';
+import '../../store/settings.dart';
 import '../../services/web_push_stub.dart'
     if (dart.library.js_interop) '../../services/web_push.dart';
 
@@ -93,7 +95,11 @@ class _SheetState extends State<_Sheet> {
       _busy = false;
       _error = err;
     });
-    if (err == null && mounted) Navigator.pop(context, true);
+    if (err != null) return;
+    // 訂閱成功後一定要同步設定，否則設定頁那個開關還是顯示關的，
+    // 要重開 App 才會對上。
+    await context.read<SettingsStore>().setNotifyBackground(true);
+    if (mounted) Navigator.pop(context, true);
   }
 
   @override
@@ -124,9 +130,10 @@ class _SheetState extends State<_Sheet> {
           style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: 18),
-        _step(scheme, 1, tr('點瀏覽器下方正中間的「分享」鈕'), LucideIcons.share),
-        _step(scheme, 2, tr('往下捲，選「加入主畫面」'), LucideIcons.squarePlus),
-        _step(scheme, 3, tr('回到主畫面，從 GameMale 圖示打開'), LucideIcons.house),
+        _step(scheme, 1, tr('點瀏覽器右下角的「⋯」開啟選單'), LucideIcons.ellipsis),
+        _step(scheme, 2, tr('選最上面的「分享」'), LucideIcons.share),
+        _step(scheme, 3, tr('往下捲，選「加入主畫面」'), LucideIcons.squarePlus),
+        _step(scheme, 4, tr('回到主畫面，從 GameMale 圖示打開'), LucideIcons.house),
         const SizedBox(height: 14),
         SizedBox(
           width: double.infinity,

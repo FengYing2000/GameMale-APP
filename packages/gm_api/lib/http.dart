@@ -188,12 +188,15 @@ class Api {
     if (m == null) return null;
 
     // 提示頁給的是絕對網址，直接丟回 get() 會被接在 baseUrl 後面變成 /https://…
+    //
+    // **兩種來源都要認**：kOrigin 在網頁版是我們自己的轉發位址
+    // （https://自家網域/gm），但頁面內容是論壇原樣吐回來的，裡面的連結
+    // 一律是 https://www.gamemale.com/…。只比對 kOrigin 的話，網頁版會把
+    // 它當成站外連結而不跟過去，結果拿到的是提示頁而不是內容——
+    // 記錄廣場、搜尋、日誌、相簿、群組整片空白就是這樣來的。
     var target = m.group(1)!.replaceAll('&amp;', '&');
-    if (target.startsWith(kOrigin)) {
-      target = target.substring(kOrigin.length);
-    } else if (target.startsWith('http')) {
-      return null;   // 指到站外就不跟了
-    }
+    target = _stripOrigin(target);
+    if (target.startsWith('http')) return null; // 真的指到站外就不跟
     return target.replaceFirst(RegExp(r'^/'), '');
   }
 
@@ -233,8 +236,8 @@ class Api {
     final location = res.headers.value('location');
     if (location == null || location.isEmpty) return body;
 
-    var target = location;
-    if (target.startsWith(kOrigin)) target = target.substring(kOrigin.length);
+    // 同上：論壇給的 Location 是它自己的網址，網頁版的 kOrigin 不是那個
+    var target = _stripOrigin(location);
     if (target.startsWith('http')) return body;   // 轉去站外就不跟了
     return get(target.replaceFirst(RegExp(r'^/'), ''), desktop: desktop);
   }
@@ -390,6 +393,16 @@ class Api {
         return e.message ?? '未知錯誤';
     }
   }
+}
+
+/// 去掉「自家位址」的前綴，留下站內路徑。
+///
+/// 要同時認 [kOrigin]（網頁版是自己的轉發位址）與 [kForumOrigin]
+/// （論壇本尊，頁面內容裡的連結都用這個）。原生版兩者相同。
+String _stripOrigin(String url) {
+  if (url.startsWith(kOrigin)) return url.substring(kOrigin.length);
+  if (url.startsWith(kForumOrigin)) return url.substring(kForumOrigin.length);
+  return url;
 }
 
 /// 把頁面裡的相對網址轉成絕對網址

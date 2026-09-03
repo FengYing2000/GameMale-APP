@@ -36,10 +36,14 @@ class ForumProxy {
 
   Future<Response> handle(Request request) async {
     final rest = request.url.path;
-    final target = Uri.parse('$kForumOrigin/$rest')
-        .replace(queryParameters: request.url.queryParameters.isEmpty
-            ? null
-            : request.url.queryParameters);
+    // ⚠️ 一定要用**原始的 query 字串**，不能用 queryParameters 重建。
+    // queryParameters 是 Map，存不下重複的 key——而論壇有些網址就是會帶
+    // 重複參數（例如 `...&mobile=no&mobile=2`，兩個 mobile）。用 Map 會
+    // 只留最後一個，論壇因此回了不同的模板，解析器就什麼都抓不到
+    // （記錄廣場整頁空白就是這樣來的）。
+    final query = request.url.query;
+    final target = Uri.parse(
+        '$kForumOrigin/$rest${query.isEmpty ? '' : '?$query'}');
 
     final outgoing = http.Request(request.method, target)
       ..followRedirects = false;

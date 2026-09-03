@@ -163,45 +163,52 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               children: [
                 SwitchListTile(
-                  value: settings.markReplied,
+                  // 沒登入就一律顯示關、也不給切——這三項都要有登入狀態
+                  // 才有作用，開著只會讓人以為在運作
+                  value: session.loggedIn && settings.markReplied,
                   secondary: const Icon(LucideIcons.replyAll),
                   title: Text(tr('標記已回過的帖')),
                   subtitle: Text(
-                    tr('主題列表會在標題前標「已回」。每個主題都要單獨問論壇一次，'
-                        '列表出來後會慢慢補上'),
+                    session.loggedIn
+                        ? tr('主題列表會在標題前標「已回」。每個主題都要單獨問論壇一次，'
+                            '列表出來後會慢慢補上')
+                        : tr('請先登入論壇'),
                     style: const TextStyle(fontSize: 12),
                   ),
-                  onChanged: settings.setMarkReplied,
+                  onChanged:
+                      session.loggedIn ? settings.setMarkReplied : null,
                 ),
                 const Divider(indent: 56, endIndent: 14),
                 SwitchListTile(
-                  value: settings.autoSign,
+                  value: session.loggedIn && settings.autoSign,
                   secondary: const Icon(LucideIcons.calendarCheck),
                   title: Text(tr('每天自動簽到')),
                   subtitle: Text(
-                    tr('登入狀態下，每天第一次開 App 會自動幫你點簽到'),
+                    session.loggedIn
+                        ? tr('每天第一次開 App 會自動幫你點簽到')
+                        : tr('請先登入論壇'),
                     style: const TextStyle(fontSize: 12),
                   ),
-                  onChanged: settings.setAutoSign,
+                  onChanged: session.loggedIn ? settings.setAutoSign : null,
                 ),
                 const Divider(indent: 56, endIndent: 14),
                 SwitchListTile(
-                  value: settings.notifyBackground,
+                  value: session.loggedIn && settings.notifyBackground,
                   secondary: const Icon(LucideIcons.bellRing),
                   title: Text(tr('新提醒通知')),
-                  // 網頁版沒登入就不給開：綁定通知要拿論壇的登入狀態去
-                  // 認人，這時候按下去只會拿到一句「請先登入」，
-                  // 而且權限一旦被拒就再也問不了。
-                  onChanged: kIsWeb && !session.loggedIn
-                      ? null
-                      : (v) => _setNotify(settings, v),
+                  // 沒登入就不給開：綁定通知要拿論壇的登入狀態去認人，
+                  // 這時候按下去只會拿到一句「請先登入」，而且權限一旦
+                  // 被拒就再也問不了。
+                  onChanged: session.loggedIn
+                      ? (v) => _setNotify(settings, v)
+                      : null,
                   subtitle: Text(
                     // Platform.isIOS 在網頁版會直接丟例外，一定要先擋掉
                     kIsWeb
                         ? (session.loggedIn
                             ? tr('由伺服器定期查有沒有新提醒／私訊，有就推播過來。'
                                 '網頁版關掉也收得到，但 iOS 要先把網頁加入主畫面。')
-                            : tr('請先登入論壇才能開啟通知。'))
+                            : tr('請先登入論壇'))
                         : Platform.isIOS
                             ? tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
                                 'iOS 由系統決定何時喚醒，通常隔十幾分鐘到幾小時；'

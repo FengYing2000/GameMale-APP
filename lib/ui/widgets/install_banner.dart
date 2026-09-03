@@ -70,9 +70,10 @@ class _InstallBannerState extends State<InstallBanner> {
               ),
               if (_open) ...[
                 const SizedBox(height: 12),
-                _step(scheme, 1, tr('點瀏覽器下方正中間的「分享」鈕')),
-                _step(scheme, 2, tr('往下捲，選「加入主畫面」')),
-                _step(scheme, 3, tr('回到主畫面，從那個圖示打開')),
+                _step(scheme, 1, tr('點瀏覽器右下角的「⋯」開啟選單')),
+                _step(scheme, 2, tr('選最上面的「分享」')),
+                _step(scheme, 3, tr('往下捲，選「加入主畫面」')),
+                _step(scheme, 4, tr('回到主畫面，從 GameMale 圖示打開')),
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerRight,
