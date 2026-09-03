@@ -161,6 +161,7 @@ class PollSnapshot {
     this.latestPmName = '',
     this.latestPmPreview = '',
     this.signedOnForum,
+    this.noticeKinds = const <String, int>{},
   });
 
   /// 論壇連得到嗎。連不到就什麼都不要判斷——網路抖一下不該被當成登出。
@@ -181,7 +182,24 @@ class PollSnapshot {
   /// 還是照樣推「尚未簽到」。這裡直接問論壇。
   /// null = 這輪沒問到（連線失敗），呼叫端就沿用舊判斷。
   final bool? signedOnForum;
+
+  /// 各類提醒的未讀數（system / mypost / interactive / manage）。
+  ///
+  /// 頁首的提醒選單本來就分類列出來了，讀這個**不會**把提醒標成已讀
+  /// ——所以通知至少能講出「是哪一類」，不必為了內容去開提醒頁
+  /// （開了那一類就會被清成已讀）。
+  final Map<String, int> noticeKinds;
 }
+
+/// 提醒分類的顯示名稱
+String noticeKindLabel(String view) => switch (view) {
+      'system' => '系統提醒',
+      'mypost' => '回覆我的',
+      'interactive' => '互動',
+      'manage' => '管理',
+      'app' => '應用',
+      _ => '提醒',
+    };
 
 /// 查一次未讀數，順便判斷還在不在登入狀態。
 ///
@@ -196,6 +214,7 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
       final bool loggedIn;
       final int notice;
       var pm = 0;
+      var kinds = const <String, int>{};
       try {
         final doc =
             parse.toDoc(await Api.instance.get('forum.php', desktop: true));
@@ -203,6 +222,7 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
         loggedIn = parse.isLoggedIn(doc);
         notice = b.notice;
         pm = b.pm;
+        kinds = b.views;
       } catch (_) {
         // 連不上不代表登出。這種時候什麼都不做，下一輪再試，
         // 免得網路抖一下就把使用者標成過期、逼他重新登入。
@@ -243,6 +263,7 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
         latestPmName: latestName,
         latestPmPreview: latestPreview,
         signedOnForum: signed,
+        noticeKinds: kinds,
       );
     });
 

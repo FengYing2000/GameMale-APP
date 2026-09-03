@@ -60,8 +60,15 @@ List<Outgoing> decideNotifications({
   // ── 新提醒／新私訊 ──────────────────────────────────────────
   // 只有「變多」才通知：讀掉變少不吵、沒變也不重複吵。
   if (account.notifyNotice && snapshot.notice > account.lastNotice) {
+    // 講得出「是哪一類」。要顯示提醒的**內容**就得去開提醒頁，而那會把
+    // 該分類標成已讀（實測：抓 system 分類後頁首的提醒數就歸零了），
+    // 紅點會跟著消失。分類名稱從頁首就讀得到，沒有這個副作用。
+    final kinds = snapshot.noticeKinds.entries
+        .where((e) => e.value > 0)
+        .map((e) => noticeKindLabel(e.key))
+        .toList();
     out.add(Outgoing(
-      '[論壇提醒]',
+      kinds.isEmpty ? '[論壇提醒]' : '[${kinds.join('、')}]',
       '您有 ${snapshot.notice} 則未讀提醒',
       tag: 'notice',
     ));
