@@ -1,3 +1,8 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:gm_server/accounts.dart';
+import 'package:gm_server/secret_box.dart';
 import 'package:gm_server/webpush.dart';
 import 'package:test/test.dart';
 
@@ -76,6 +81,45 @@ void main() {
         expect(r.header.length, 86, reason: '$n bytes 的明文');
         expect(r.body.length, 86 + n + 1 + 16, reason: '$n bytes 的明文');
       }
+    });
+  });
+
+  group('一個帳號的訂閱數要有上限', () {
+    late Directory dir;
+    late AccountStore store;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('gm-subs-');
+      store = AccountStore(File('${dir.path}/accounts.json'),
+          SecretBox(Uint8List(32)));
+      await store.load();
+    });
+    tearDown(() => dir.delete(recursive: true));
+
+    PushSubscription sub(String id) =>
+        PushSubscription.fromJson({..._valid(), 'endpoint': 'https://web.push.apple.com/$id'});
+
+    test('累積太多筆時只留最近的', () async {
+      // 每次重新「加到主畫面」都會拿到一個新 endpoint，而舊的在 Apple
+      // 那邊還會存活一陣子。實機上一個人累積出 10 筆，每則通知就要送
+      // 10 次——手機只顯示一則（同 tag 會合併），其餘全是白花的請求。
+      final a = await store.upsert(username: 'tester', cookiePlain: 'c');
+      for (final n in ['1', '2', '3', '4', '5']) {
+        await store.addSubscription(a, sub(n));
+      }
+      expect(a.subscriptions.length, 3);
+      expect(
+        a.subscriptions.map((s) => s.endpoint.split('/').last),
+        ['3', '4', '5'],
+        reason: '真正在用的是最後訂閱的那台，要留新的丟舊的',
+      );
+    });
+
+    test('同一台重新訂閱不算新增', () async {
+      final a = await store.upsert(username: 'tester', cookiePlain: 'c');
+      await store.addSubscription(a, sub('same'));
+      await store.addSubscription(a, sub('same'));
+      expect(a.subscriptions.length, 1, reason: 'endpoint 當主鍵，換掉就好');
     });
   });
 }

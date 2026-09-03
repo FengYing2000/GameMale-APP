@@ -42,6 +42,12 @@ List<Outgoing> decideNotifications({
 
   // ── 登入過期 ────────────────────────────────────────────────
   if (!snapshot.loggedIn) {
+    // 這裡的 !loggedIn 已經是「確實看到登入入口」了（判讀不出來的頁面在
+    // pollOnce 就當成連不上）。即使如此仍要連兩輪才算數：單獨一次可能是
+    // 論壇那邊的暫時狀況，而這則通知會在半夜把人吵醒。
+    account.authFailStreak++;
+    if (account.authFailStreak < 2) return out;
+
     // 只在「剛變成過期」時推一次，不要每輪都吵
     if (account.cookieStatus != 'expired') {
       account.cookieStatus = 'expired';
@@ -55,6 +61,7 @@ List<Outgoing> decideNotifications({
     // 不然使用者讀完重新登入時會被當成「變多」而重複通知
     return out;
   }
+  account.authFailStreak = 0;
   account.cookieStatus = 'ok';
 
   // ── 新提醒／新私訊 ──────────────────────────────────────────

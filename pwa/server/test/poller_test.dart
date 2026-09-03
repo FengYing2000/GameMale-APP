@@ -11,6 +11,7 @@ Account acc({
   String? lastSignDate,
   String? lastRemindDate,
   String cookieStatus = 'ok',
+  int authFailStreak = 0,
   bool notifyNotice = true,
   bool notifyPm = true,
 }) =>
@@ -19,6 +20,7 @@ Account acc({
       username: 'tester',
       cookieSealed: 'x',
       cookieStatus: cookieStatus,
+      authFailStreak: authFailStreak,
       autoSign: autoSign,
       signReminderAt: signReminderAt,
       notifyNotice: notifyNotice,
@@ -128,22 +130,37 @@ void main() {
   });
 
   group('登入過期', () {
-    test('剛過期推一次', () {
+    test('第一輪不推，連兩輪才算真的過期', () {
+      // 實機上被這個咬過：半夜推了「登入憑證已失效」，而使用者的登入
+      // 好好的。單獨一次判定不作數，晚五分鐘知道遠比誤推好。
       final a = acc();
+      expect(decide(a, snap(loggedIn: false)), isEmpty,
+          reason: '第一輪只記次數，不推播');
+      expect(a.cookieStatus, 'ok', reason: '還沒確定就別改狀態');
+
       final out = decide(a, snap(loggedIn: false));
       expect(out.map((o) => o.tag), ['auth']);
       expect(a.cookieStatus, 'expired');
     });
 
+    test('中間只要成功一次就重新計數', () {
+      final a = acc();
+      decide(a, snap(loggedIn: false)); // 第 1 次
+      decide(a, snap(notice: 0)); // 登入正常
+      expect(a.authFailStreak, 0, reason: '成功一次就要歸零');
+      expect(decide(a, snap(loggedIn: false)), isEmpty,
+          reason: '重新從第 1 次算起，不能接著上次的數字直接推');
+    });
+
     test('已經是過期狀態就不要每輪都吵', () {
-      final a = acc(cookieStatus: 'expired');
+      final a = acc(cookieStatus: 'expired', authFailStreak: 5);
       expect(decide(a, snap(loggedIn: false)), isEmpty);
     });
 
     test('過期時不要順便判斷未讀', () {
       // 沒登入時未讀數都是 0，若照樣寫進基準，等他重新登入
       // 就會把原有的未讀當成「全部都是新的」再吵一次
-      final a = acc(lastNotice: 7, lastPm: 3);
+      final a = acc(lastNotice: 7, lastPm: 3, authFailStreak: 1);
       decide(a, snap(loggedIn: false));
       expect(a.lastNotice, 7);
       expect(a.lastPm, 3);
@@ -153,6 +170,16 @@ void main() {
       final a = acc(lastNotice: 7, cookieStatus: 'expired');
       final out = decide(a, snap(notice: 7));
       expect(out, isEmpty);
+      expect(a.cookieStatus, 'ok');
+      expect(a.authFailStreak, 0);
+    });
+
+    test('連不上時完全不碰登入狀態', () {
+      // 判讀不出來的頁面在 pollOnce 就會回 reachable:false，
+      // 走到這裡等於「這輪什麼都不知道」，不能累積過期次數
+      final a = acc();
+      expect(decide(a, snap(reachable: false, loggedIn: false)), isEmpty);
+      expect(a.authFailStreak, 0);
       expect(a.cookieStatus, 'ok');
     });
   });

@@ -6,6 +6,9 @@ import 'webpush.dart';
 
 import 'secret_box.dart';
 
+/// 一個帳號最多留幾筆推播訂閱
+const int _maxSubscriptions = 3;
+
 /// 一個論壇帳號，以及它綁的裝置。
 class Account {
   Account({
@@ -13,6 +16,7 @@ class Account {
     required this.username,
     required this.cookieSealed,
     this.cookieStatus = 'ok',
+    this.authFailStreak = 0,
     this.autoSign = false,
     this.signReminderAt = '09:00',
     this.notifyNotice = true,
@@ -30,6 +34,7 @@ class Account {
         username: j['username'] as String,
         cookieSealed: j['cookieSealed'] as String,
         cookieStatus: j['cookieStatus'] as String? ?? 'ok',
+        authFailStreak: j['authFailStreak'] as int? ?? 0,
         autoSign: j['autoSign'] as bool? ?? false,
         signReminderAt: j['signReminderAt'] as String? ?? '09:00',
         notifyNotice: j['notifyNotice'] as bool? ?? true,
@@ -54,6 +59,12 @@ class Account {
   /// `ok` 或 `expired`。過期會推一則請使用者重新登入，
   /// 並且停止繼續拿失效的 cookie 去敲論壇。
   String cookieStatus;
+
+  /// 連續幾輪明確看到訪客頁。
+  ///
+  /// 要連著兩輪才算真的過期。單獨一次可能是論壇那邊的暫時狀況，
+  /// 而「請重新登入」是會在半夜把人吵醒的通知，寧可晚五分鐘也不要誤推。
+  int authFailStreak;
 
   bool autoSign;
 
@@ -84,6 +95,7 @@ class Account {
         'username': username,
         'cookieSealed': cookieSealed,
         'cookieStatus': cookieStatus,
+        'authFailStreak': authFailStreak,
         'autoSign': autoSign,
         'signReminderAt': signReminderAt,
         'notifyNotice': notifyNotice,
@@ -160,6 +172,7 @@ class AccountStore {
     if (existing != null) {
       existing.cookieSealed = box.seal(cookiePlain);
       existing.cookieStatus = 'ok';
+      existing.authFailStreak = 0;
       await flush();
       return existing;
     }
@@ -195,6 +208,14 @@ class AccountStore {
       other.subscriptions.removeWhere((s) => s.endpoint == sub.endpoint);
     }
     a.subscriptions.add(sub);
+    // 每次重新「加到主畫面」都會拿到一個新的 endpoint，而舊的在 Apple 那邊
+    // 還會存活一段時間——不設上限的話一個人就累積出十幾筆，每則通知都要
+    // 送十幾次。手機上看起來只有一則（同 tag 會合併），但那是白花的請求。
+    // 保留最近幾筆就夠：真正在用的一定是最後訂閱的那台。
+    if (a.subscriptions.length > _maxSubscriptions) {
+      a.subscriptions.removeRange(
+          0, a.subscriptions.length - _maxSubscriptions);
+    }
     await flush();
   }
 

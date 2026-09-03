@@ -219,7 +219,24 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
         final doc =
             parse.toDoc(await Api.instance.get('forum.php', desktop: true));
         final b = api.parsePromptCounts(doc);
-        loggedIn = parse.isLoggedIn(doc);
+
+        // 登入狀態要**兩邊都拿正面證據**，不能只憑「沒有登出連結」就判定
+        // 登出。論壇偶爾會回一頁我們看不懂的東西（維護公告、限流擋頁、
+        // 被截斷的回應），那種頁面同樣沒有登出連結——照舊邏輯就會半夜推
+        // 一則「登入憑證已失效」，而使用者的登入其實好好的。
+        if (parse.isLoggedIn(doc)) {
+          loggedIn = true;
+        } else if (parse.isGuestPage(doc)) {
+          loggedIn = false; // 真的看到登入入口了
+        } else {
+          // 記下標題：下次再發生時不用猜是維護公告、限流擋頁還是別的東西
+          final title = doc.querySelector('title')?.text.trim() ?? '(無標題)';
+          stdout.writeln('輪詢：論壇回了判讀不出登入狀態的頁面，這輪不做判斷'
+              '（標題「$title」，${doc.body?.text.trim().length ?? 0} 字）');
+          return const PollSnapshot(
+              reachable: false, loggedIn: true, notice: 0, pm: 0);
+        }
+
         notice = b.notice;
         pm = b.pm;
         kinds = b.views;
