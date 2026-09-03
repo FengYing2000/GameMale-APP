@@ -15,12 +15,37 @@ void main() {
       expect(kOrigin, kForumOrigin);
     });
 
-    test('網頁版：論壇的絕對網址要被改寫成走代理', () {
+    test('網頁版：其他子網域的圖片走圖片代理', () {
       kOrigin = 'https://example.test/gm';
       kAssetProxyPrefix = 'https://example.test/gmimg?u=';
       final out = absolute('https://img.gamemale.com/a/b.png');
       expect(out, startsWith('https://example.test/gmimg?u='));
       expect(out, contains(Uri.encodeComponent('https://img.gamemale.com/a/b.png')));
+    });
+
+    test('網頁版：論壇本站的絕對網址走 /gm 轉發，**不能**丟進圖片代理', () {
+      // absolute() 同時用在圖片和連結上。連結（道具的使用／購買、收藏、
+      // 群組管理…）會被當成請求路徑再打一次，丟進圖片代理就會 404。
+      kOrigin = 'https://example.test/gm';
+      kAssetProxyPrefix = 'https://example.test/gmimg?u=';
+      expect(
+        absolute('https://www.gamemale.com/home.php?mod=magic&mid=k_misign:x'),
+        'https://example.test/gm/home.php?mod=magic&mid=k_misign:x',
+      );
+      expect(absolute('https://www.gamemale.com/forum.php'),
+          'https://example.test/gm/forum.php');
+    });
+
+    test('網頁版：本站的圖片一樣走 /gm（轉發本來就處理得了）', () {
+      kOrigin = 'https://example.test/gm';
+      kAssetProxyPrefix = 'https://example.test/gmimg?u=';
+      expect(absolute('https://www.gamemale.com/uc_server/avatar.php?uid=1'),
+          'https://example.test/gm/uc_server/avatar.php?uid=1');
+    });
+
+    test('原生版：絕對網址原樣不動', () {
+      expect(absolute('https://www.gamemale.com/forum.php'),
+          'https://www.gamemale.com/forum.php');
     });
 
     test('網頁版：相對網址接到轉發位址底下', () {

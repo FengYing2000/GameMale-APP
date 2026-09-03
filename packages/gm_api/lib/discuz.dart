@@ -307,7 +307,7 @@ List<ThreadItem> parseThreadList(dom.Document doc) {
     final count = li.querySelector('.count');
     final subj = li.querySelector('.threadSubject');
     final typeEl = subj?.querySelector('.threadType');
-    final avatar = attr(li.querySelector('.h_avatar img'), 'src');
+    final avatar = absolute(attr(li.querySelector('.h_avatar img'), 'src'));
     final digest = txt(li.querySelector('.xinruiInfo'));
 
     out.add(ThreadItem(
@@ -338,7 +338,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
   final head = doc.querySelector('.postlist .forumListHeader');
   final attrBox = head?.querySelector('.postUserAttr');
   final authorLink = attrBox?.querySelector('a');
-  final headAvatar = attr(attrBox?.querySelector('.h_avatar img'), 'src');
+  final headAvatar = absolute(attr(attrBox?.querySelector('.h_avatar img'), 'src'));
   final backHref = attr(doc.querySelector('header .goBack'), 'href');
   final headTitle = txt(head?.querySelector('h2'));
 
@@ -352,7 +352,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
     final body = con?.querySelector('.postmessage') ?? con;
     // 附件圖放在 .postListCon 之外的 ul.img_list，只取內文會整批漏掉
     final withAttachments = _mergeAttachments(body, it);
-    final av = attr(tit?.querySelector('.h_avatar img'), 'src');
+    final av = absolute(attr(tit?.querySelector('.h_avatar img'), 'src'));
     final avatar = av.isNotEmpty ? av : headAvatar;
     final time = txt(it.querySelector('.postListAttr'));
     final spans = attrBox?.querySelectorAll('span') ?? const <dom.Element>[];
@@ -1116,7 +1116,13 @@ Future<SubmitResult> reportPost({
 /// 用論壇給的完整收藏連結收藏（群組那種 `#a_favorite` 的 href）。一步 GET。
 Future<SubmitResult> favoriteByUrl(String url) async {
   var path = url.replaceAll('&amp;', '&');
-  if (path.startsWith(kOrigin)) path = path.substring(kOrigin.length);
+  // 兩種前綴都要認：網頁版的 kOrigin 是自家轉發位址，但頁面裡的連結
+  // 用的是論壇本尊的網址
+  if (path.startsWith(kOrigin)) {
+    path = path.substring(kOrigin.length);
+  } else if (path.startsWith(kForumOrigin)) {
+    path = path.substring(kForumOrigin.length);
+  }
   path = path.replaceFirst(RegExp(r'^/'), '');
   final sep = path.contains('?') ? '&' : '?';
   final html = await Api.instance.get('$path${sep}inajax=1', desktop: true);
@@ -1512,7 +1518,7 @@ Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) asy
         break;
       }
     }
-    final av = attr(dl.querySelector('.avt img'), 'src');
+    final av = absolute(attr(dl.querySelector('.avt img'), 'src'));
     // 提醒是論壇產生的系統文字（「XX 回覆了你的主題」），跟著介面語言走
     items.add(NoticeItem(
       id: attr(dl, 'notice'),
@@ -1583,7 +1589,7 @@ Future<PmListResult> fetchPmList() async {
       time: attr(timeSpan, 'title').isNotEmpty
           ? attr(timeSpan, 'title')
           : txt(dl.querySelector('.xg1')),
-      avatar: attr(dl.querySelector('.avt img'), 'src'),
+      avatar: absolute(attr(dl.querySelector('.avt img'), 'src')),
       unread: unread,
     ));
   }
@@ -1605,7 +1611,7 @@ Future<PmChat> fetchPmChat(int touid) async {
     msgs.add(PmMessage(
       html: sanitizeContent(body),
       text: t,
-      avatar: attr(box.querySelector('.avat img'), 'src'),
+      avatar: absolute(attr(box.querySelector('.avat img'), 'src')),
       time: txt(box.querySelector('.date')),
       mine: mine,
     ));
@@ -1911,7 +1917,7 @@ List<Attachment> parseAttachments(dom.Document doc) {
     final name = txt(a);
     if (name.isEmpty) continue;
 
-    final icon = attr(dl.querySelector('dt img'), 'src');
+    final icon = absolute(attr(dl.querySelector('dt img'), 'src'));
     if (RegExp(r'filetype/image').hasMatch(icon)) continue;
 
     var info = '';
@@ -2520,7 +2526,7 @@ DoingPage parseDoingPage(dom.Document doc, {int page = 1}) {
       uid: int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(href)?.group(1) ?? '') ??
           paramInt(href, 'uid'),
       name: txt(link),
-      avatar: attr(dl.querySelector('.avt img'), 'src'),
+      avatar: absolute(attr(dl.querySelector('.avt img'), 'src')),
       html: span == null ? '' : sanitizeContent(span),
       message: txt(span),
       time: attr(timeEl, 'title').isNotEmpty

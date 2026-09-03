@@ -414,8 +414,26 @@ String absolute(String? u) {
   if (s.startsWith('//')) s = 'https:$s';
 
   if (s.startsWith('http://') || s.startsWith('https://')) {
-    // 已經是絕對網址。網頁版遇到論壇自己的網域（含 img.gamemale.com
-    // 這種子網域）要改走代理，否則瀏覽器會因為 CORS 抓不到。
+    // 原生版直連論壇，絕對網址原樣用就好
+    if (kOrigin == kForumOrigin) return s;
+
+    final uri = Uri.tryParse(s);
+    if (uri == null) return s;
+
+    // 論壇**本站**的絕對網址 → 改成走 /gm 轉發。
+    //
+    // 這裡不能一律丟去圖片代理：absolute() 同時用在圖片**和連結**上，
+    // 而連結（道具的使用／購買、收藏、群組管理…）會被當成請求路徑再打
+    // 一次。丟進圖片代理的話那些路徑就變成 `/gmimg?u=…`，請求直接 404
+    // ——「拿不到道具資訊：伺服器回應404」就是這樣來的。
+    // /gm 轉發本來就能處理論壇本站的任何路徑，圖片與連結都適用。
+    if (uri.host == Uri.parse(kForumOrigin).host) {
+      return '$kOrigin${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}'
+          '${uri.hasFragment ? '#${uri.fragment}' : ''}';
+    }
+
+    // 其他子網域（img.gamemale.com 之類）/gm 轉不到，而且只會是靜態
+    // 資源，走圖片代理。
     if (kAssetProxyPrefix.isNotEmpty && _isForumHost(s)) {
       return '$kAssetProxyPrefix${Uri.encodeComponent(s)}';
     }
