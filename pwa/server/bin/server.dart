@@ -381,10 +381,15 @@ Future<void> main(List<String> args) async {
     ..get('/gmimg', (Request r) async {
       final raw = r.url.queryParameters['u'] ?? '';
       final uri = Uri.tryParse(raw);
-      // 只准代理論壇自己的網域，否則就變成別人的開放代理
-      if (uri == null ||
-          !(uri.host == 'gamemale.com' || uri.host.endsWith('.gamemale.com'))) {
-        return bad('只能代理論壇的資源');
+      // 白名單，不是萬用代理——只放行論壇實際會用到的來源：
+      // 它自己的子網域（img.gamemale.com…，那些沒送 CORS），
+      // 以及論壇拿來放表情符號的 jsDelivr。
+      final host = uri?.host ?? '';
+      final allowed = host == 'gamemale.com' ||
+          host.endsWith('.gamemale.com') ||
+          host.endsWith('jsdelivr.net');
+      if (uri == null || !allowed) {
+        return bad('只能代理論壇會用到的資源');
       }
       try {
         final res = await assetClient.get(uri, headers: {

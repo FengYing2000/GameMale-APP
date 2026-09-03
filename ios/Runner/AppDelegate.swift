@@ -22,9 +22,10 @@ import workmanager_apple
     // 都沒有真的排上。
     //
     // 這裡只註冊處理常式；真正的排程仍由 Dart 端的 Workmanager 發起。
+    // earliestBeginInSeconds 收的是 NSNumber?，Int 不會自動轉
     WorkmanagerPlugin.registerPeriodicTask(
       withIdentifier: Self.badgeTaskIdentifier,
-      earliestBeginInSeconds: 15 * 60
+      earliestBeginInSeconds: NSNumber(value: 15 * 60)
     )
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

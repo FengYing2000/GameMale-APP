@@ -54,6 +54,14 @@ void main() {
           'https://example.test/gm/forum.php?mod=index');
     });
 
+    test('表情符號的 CDN 也走代理（不受第三方連不連得上影響）', () {
+      kOrigin = 'https://example.test/gm';
+      kAssetProxyPrefix = 'https://example.test/gmimg?u=';
+      final out = absolute(
+          'https://gcore.jsdelivr.net/gh/googlefonts/noto-emoji/svg/emoji_u1f60d.svg');
+      expect(out, startsWith('https://example.test/gmimg?u='));
+    });
+
     test('站外的網址不動它', () {
       kOrigin = 'https://example.test/gm';
       kAssetProxyPrefix = 'https://example.test/gmimg?u=';

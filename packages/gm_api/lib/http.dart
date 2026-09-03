@@ -37,9 +37,18 @@ String kOrigin = kForumOrigin;
 /// 空字串＝不改寫（原生版直連，不需要）。
 String kAssetProxyPrefix = '';
 
-bool _isForumHost(String url) {
+/// 網頁版可以（也應該）走自家資源代理的圖片來源。
+///
+/// * 論壇自己的子網域：`img.gamemale.com` 之類，**完全沒送 CORS 標頭**，
+///   不走代理的話 App 把圖讀進 canvas 一定失敗。
+/// * 論壇拿來放表情符號的 CDN：雖然它有送 CORS，但走自家代理比較不會
+///   受第三方 CDN 在當地連不連得上影響。
+///
+/// 這是白名單而不是萬用代理——只放行論壇實際會用到的來源。
+bool _isProxyableAssetHost(String url) {
   final host = Uri.tryParse(url)?.host ?? '';
-  return host == 'gamemale.com' || host.endsWith('.gamemale.com');
+  if (host == 'gamemale.com' || host.endsWith('.gamemale.com')) return true;
+  return host.endsWith('jsdelivr.net');
 }
 
 const String _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
@@ -434,7 +443,7 @@ String absolute(String? u) {
 
     // 其他子網域（img.gamemale.com 之類）/gm 轉不到，而且只會是靜態
     // 資源，走圖片代理。
-    if (kAssetProxyPrefix.isNotEmpty && _isForumHost(s)) {
+    if (kAssetProxyPrefix.isNotEmpty && _isProxyableAssetHost(s)) {
       return '$kAssetProxyPrefix${Uri.encodeComponent(s)}';
     }
     return s;

@@ -15,13 +15,21 @@ import 'package:shelf/shelf.dart';
 /// 這裡刻意**不碰內容**：HTML 原樣回去，讓瀏覽器裡那 6000 多行 gm_api
 /// 照常解析。頁面裡的相對網址會自然落在 `/gm/` 底下，圖片也一樣。
 class ForumProxy {
-  ForumProxy({http.Client? client, this.prefix = '/gm'})
-      : _client = client ?? http.Client();
+  ForumProxy({
+    http.Client? client,
+    this.prefix = '/gm',
+    this.assetPrefix = '/gmimg?u=',
+  }) : _client = client ?? http.Client();
 
   final http.Client _client;
 
   /// 掛在哪個路徑底下
   final String prefix;
+
+  /// 跨子網域的資源代理前綴。論壇的圖片端點會 302 到 img.gamemale.com，
+  /// 那個網域一個 CORS 標頭都沒送，轉址一旦跳出同源，瀏覽器把圖讀進
+  /// canvas 時就會被擋掉——所以要把這種轉址也接回自己的網域。
+  final String assetPrefix;
 
   /// 這些標頭不能原樣轉——連線層自己會處理，照抄會壞掉
   static const _skipRequest = {
@@ -128,7 +136,15 @@ class ForumProxy {
       return '$prefix${location.substring(kForumOrigin.length)}';
     }
     if (location.startsWith('http://') || location.startsWith('https://')) {
-      // 轉去站外就讓它去，不要硬拉進代理
+      final host = Uri.tryParse(location)?.host ?? '';
+      // 論壇的其他子網域（img.gamemale.com…）只會放靜態資源，而且**沒有
+      // 送 CORS 標頭**。轉址一旦跳出同源，App 把圖讀進 canvas 就會失敗
+      // （在瀏覽器分頁直接開卻沒事，因為那是導覽不是讀像素）。
+      // 接回自己的資源代理，讓整條路徑都留在同源。
+      if (host == 'gamemale.com' || host.endsWith('.gamemale.com')) {
+        return '$assetPrefix${Uri.encodeComponent(location)}';
+      }
+      // 真的轉去站外就讓它去
       return location;
     }
     return '$prefix/${location.replaceFirst(RegExp(r'^/'), '')}';
