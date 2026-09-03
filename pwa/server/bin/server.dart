@@ -471,8 +471,10 @@ Future<void> main(List<String> args) async {
   // manifest.json，不能同時掛在根路徑）。手寫版是第一階段的原型，
   // 只有在還沒 build web 時才頂上。
   final hasApp = Directory(appRoot).existsSync();
-  final site = createStaticHandler(hasApp ? appRoot : webRoot,
-      defaultDocument: 'index.html', useHeaderBytesForContentType: true);
+  final site = _withCacheHeaders(createStaticHandler(
+      hasApp ? appRoot : webRoot,
+      defaultDocument: 'index.html',
+      useHeaderBytesForContentType: true));
 
   final handler =
       withProxy(Cascade().add(router.call).add(site).handler);
@@ -508,3 +510,28 @@ String _guessImageType(List<int> b, String url) {
   if (lower.endsWith('.webp')) return 'image/webp';
   return 'application/octet-stream';
 }
+
+
+/// 靜態檔的快取策略。
+///
+/// **為什麼一定要管**：Flutter 網頁版的 main.dart.js／flutter_bootstrap.js
+/// 檔名是固定的、不帶內容雜湊。若不送快取標頭，瀏覽器會用自己的啟發式
+/// 規則決定重用多久——結果就是每次部署完，使用者手上還是舊程式碼，
+/// 修好的東西看起來像沒修好。（這件事實際害我們來回除錯了好幾輪。）
+///
+/// 作法：會變動的入口檔一律 no-cache（仍會走 304，不會真的重下載全部），
+/// 帶版本路徑或本來就不會變的資源（canvaskit、字型、圖示）給長快取。
+Handler _withCacheHeaders(Handler inner) => (Request request) async {
+      final res = await inner(request);
+      final path = request.url.path;
+
+      final immutable = path.startsWith('canvaskit/') ||
+          path.startsWith('assets/') ||
+          path.startsWith('icons/');
+
+      return res.change(headers: {
+        'cache-control': immutable
+            ? 'public, max-age=604800'
+            : 'no-cache, must-revalidate',
+      });
+    };
