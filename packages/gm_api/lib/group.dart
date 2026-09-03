@@ -62,7 +62,7 @@ GroupData parseGroup(dom.Document doc, String html, int fid, {int page = 1}) {
   return GroupData(
     fid: fid,
     name: name,
-    icon: absolute(attr(doc.querySelector('.bm_c dl dd img'), 'src')),
+    icon: absoluteImage(attr(doc.querySelector('.bm_c dl dd img'), 'src')),
     desc: txt(doc.querySelector('.bm_c dl dd:not(.m):not(.cl)')),
     meta: txt(metaDd),
     master: txt(masterLink),
@@ -106,7 +106,7 @@ GroupIndex parseGroupIndexDoc(dom.Document doc) {
     recommended.add(GroupItem(
       fid: gid,
       name: txt(a),
-      icon: absolute(attr(dl.querySelector('dd.m img') ?? dl.querySelector('img'), 'src')),
+      icon: absoluteImage(attr(dl.querySelector('dd.m img') ?? dl.querySelector('img'), 'src')),
       desc: dds.length > 1 ? txt(dds.last) : '',
     ));
   }
@@ -178,7 +178,7 @@ Future<List<GroupItem>> fetchMyGroups({String view = 'join'}) async {
     out.add(GroupItem(
       fid: gid,
       name: name,
-      icon: absolute(attr(dl.querySelector('img'), 'src')),
+      icon: absoluteImage(attr(dl.querySelector('img'), 'src')),
     ));
   }
   return out;
@@ -208,7 +208,7 @@ Future<({List<GroupMember> members, PageInfo pager})> fetchGroupMembers(
       uid: paramInt(attr(nameLink, 'href'), 'uid') ??
           int.tryParse(
               RegExp(r'space-uid-(\d+)').firstMatch(attr(nameLink, 'href'))?.group(1) ?? ''),
-      avatar: absolute(attr(li.querySelector('img'), 'src')),
+      avatar: absoluteImage(attr(li.querySelector('img'), 'src')),
       title: attr(avt, 'title'),
     ));
   }

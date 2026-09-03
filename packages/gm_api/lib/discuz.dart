@@ -90,7 +90,7 @@ IndexData parseIndex(dom.Document doc) {
       forums.add(ForumItem(
         fid: paramInt(attr(a, 'href'), 'fid') ?? 0,
         name: sys(name),
-        icon: absolute(attr(li.querySelector('.f_icon img'), 'src')),
+        icon: absoluteImage(attr(li.querySelector('.f_icon img'), 'src')),
         threads: nums.isNotEmpty ? nums[0] : '',
         posts: attr(count?.querySelector('span[title]'), 'title').isNotEmpty
             ? attr(count?.querySelector('span[title]'), 'title')
@@ -159,7 +159,7 @@ Map<int, List<SubForum>> parseIndexSubforums(dom.Document doc) {
       subs.add(SubForum(
         fid: sid,
         name: sys(name),
-        icon: absolute(attr(a.querySelector('img'), 'src')),
+        icon: absoluteImage(attr(a.querySelector('img'), 'src')),
       ));
     }
     if (subs.isNotEmpty) out[fid] = subs;
@@ -307,7 +307,7 @@ List<ThreadItem> parseThreadList(dom.Document doc) {
     final count = li.querySelector('.count');
     final subj = li.querySelector('.threadSubject');
     final typeEl = subj?.querySelector('.threadType');
-    final avatar = absolute(attr(li.querySelector('.h_avatar img'), 'src'));
+    final avatar = absoluteImage(attr(li.querySelector('.h_avatar img'), 'src'));
     final digest = txt(li.querySelector('.xinruiInfo'));
 
     out.add(ThreadItem(
@@ -338,7 +338,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
   final head = doc.querySelector('.postlist .forumListHeader');
   final attrBox = head?.querySelector('.postUserAttr');
   final authorLink = attrBox?.querySelector('a');
-  final headAvatar = absolute(attr(attrBox?.querySelector('.h_avatar img'), 'src'));
+  final headAvatar = absoluteImage(attr(attrBox?.querySelector('.h_avatar img'), 'src'));
   final backHref = attr(doc.querySelector('header .goBack'), 'href');
   final headTitle = txt(head?.querySelector('h2'));
 
@@ -352,7 +352,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
     final body = con?.querySelector('.postmessage') ?? con;
     // 附件圖放在 .postListCon 之外的 ul.img_list，只取內文會整批漏掉
     final withAttachments = _mergeAttachments(body, it);
-    final av = absolute(attr(tit?.querySelector('.h_avatar img'), 'src'));
+    final av = absoluteImage(attr(tit?.querySelector('.h_avatar img'), 'src'));
     final avatar = av.isNotEmpty ? av : headAvatar;
     final time = txt(it.querySelector('.postListAttr'));
     final spans = attrBox?.querySelectorAll('span') ?? const <dom.Element>[];
@@ -1228,7 +1228,7 @@ Future<List<SignMagic>> fetchSignMagics() async {
     final ps = dl.querySelectorAll('dd p');
     out.add(SignMagic(
       name: sys(name),
-      icon: absolute(attr(dl.querySelector('dd.m img'), 'src')),
+      icon: absoluteImage(attr(dl.querySelector('dd.m img'), 'src')),
       desc: ps.isNotEmpty ? sys(txt(ps[0])) : '',
       detail: ps.length > 1 ? sys(txt(ps[1])) : '',
       useUrl: absolute(attr(dl.querySelector('a[id\$="_bq"]'), 'href')),
@@ -1306,7 +1306,7 @@ MagicOp parseMagicOp(dom.Document doc) {
     submitName: submitName,
     fields: fields,
     name: name,
-    icon: absolute(attr(form.querySelector('dd img') ?? form.querySelector('img'), 'src')),
+    icon: absoluteImage(attr(form.querySelector('dd img') ?? form.querySelector('img'), 'src')),
     lines: lines,
     hasNum: form.querySelector('#magicnum') != null,
     error: null,
@@ -1518,7 +1518,7 @@ Future<NoticeResult> fetchNotice({String view = 'mypost', String type = ''}) asy
         break;
       }
     }
-    final av = absolute(attr(dl.querySelector('.avt img'), 'src'));
+    final av = absoluteImage(attr(dl.querySelector('.avt img'), 'src'));
     // 提醒是論壇產生的系統文字（「XX 回覆了你的主題」），跟著介面語言走
     items.add(NoticeItem(
       id: attr(dl, 'notice'),
@@ -1589,7 +1589,7 @@ Future<PmListResult> fetchPmList() async {
       time: attr(timeSpan, 'title').isNotEmpty
           ? attr(timeSpan, 'title')
           : txt(dl.querySelector('.xg1')),
-      avatar: absolute(attr(dl.querySelector('.avt img'), 'src')),
+      avatar: absoluteImage(attr(dl.querySelector('.avt img'), 'src')),
       unread: unread,
     ));
   }
@@ -1611,7 +1611,7 @@ Future<PmChat> fetchPmChat(int touid) async {
     msgs.add(PmMessage(
       html: sanitizeContent(body),
       text: t,
-      avatar: absolute(attr(box.querySelector('.avat img'), 'src')),
+      avatar: absoluteImage(attr(box.querySelector('.avat img'), 'src')),
       time: txt(box.querySelector('.date')),
       mine: mine,
     ));
@@ -1745,7 +1745,7 @@ ProfileData parseProfile(dom.Document doc, int uid) {
 
     if (heading.contains('勋章') || heading.contains('勳章')) {
       for (final img in box.querySelectorAll('img')) {
-        final src = absolute(attr(img, 'src'));
+        final src = absoluteImage(attr(img, 'src'));
         if (src.isEmpty) continue;
         medals.add(parseMedal(src, attr(img, 'alt'), attr(img, 'tip')));
       }
@@ -1897,7 +1897,7 @@ List<Attachment> parseAttachments(dom.Document doc) {
           paramInt(record, 'aid'),
       name: txt(a),
       url: absolute(href),
-      icon: absolute(attr(span.previousElementSibling, 'src')),
+      icon: absoluteImage(attr(span.previousElementSibling, 'src')),
       info: txt(span.querySelector('em')).replaceAll(RegExp(r'^\(|\)$'), ''),
       price: RegExp(r'售价[:：]\s*([^\s\[]+)').firstMatch(tipText)?.group(1) ?? '',
       permission:
@@ -1917,7 +1917,7 @@ List<Attachment> parseAttachments(dom.Document doc) {
     final name = txt(a);
     if (name.isEmpty) continue;
 
-    final icon = absolute(attr(dl.querySelector('dt img'), 'src'));
+    final icon = absoluteImage(attr(dl.querySelector('dt img'), 'src'));
     if (RegExp(r'filetype/image').hasMatch(icon)) continue;
 
     var info = '';
@@ -1950,7 +1950,7 @@ List<Attachment> parseAttachments(dom.Document doc) {
               ''),
       name: name,
       url: absolute(href),
-      icon: absolute(icon),
+      icon: absoluteImage(icon),
       info: info,
       price: price,
       permission: permission,
@@ -2062,7 +2062,7 @@ Future<PokeForm> fetchPokeForm(int uid) async {
     // 名稱是 <label> 裡除了圖片以外的文字
     final label = input.parent;
     final name = sys(txt(label).trim());
-    final icon = absolute(attr(label?.querySelector('img'), 'src'));
+    final icon = absoluteImage(attr(label?.querySelector('img'), 'src'));
     if (attr(input, 'checked').isNotEmpty || input.attributes.containsKey('checked')) {
       defaultId = id;
     }
@@ -2526,7 +2526,7 @@ DoingPage parseDoingPage(dom.Document doc, {int page = 1}) {
       uid: int.tryParse(RegExp(r'space-uid-(\d+)').firstMatch(href)?.group(1) ?? '') ??
           paramInt(href, 'uid'),
       name: txt(link),
-      avatar: absolute(attr(dl.querySelector('.avt img'), 'src')),
+      avatar: absoluteImage(attr(dl.querySelector('.avt img'), 'src')),
       html: span == null ? '' : sanitizeContent(span),
       message: txt(span),
       time: attr(timeEl, 'title').isNotEmpty

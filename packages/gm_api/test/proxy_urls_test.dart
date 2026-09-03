@@ -75,4 +75,46 @@ void main() {
           'data:image/png;base64,AAAA');
     });
   });
+
+  group('圖片跟連結要分開處理', () {
+    setUp(() {
+      kOrigin = 'https://example.test/gm';
+      kAssetProxyPrefix = 'https://example.test/gmimg?u=';
+    });
+    tearDown(() {
+      kOrigin = kForumOrigin;
+      kAssetProxyPrefix = '';
+    });
+
+    test('第三方圖床的圖要走代理', () {
+      // 帖子裡的圖常常放在 i.imgs.ovh 之類的圖床，那些沒送 CORS 標頭，
+      // 直連的話瀏覽器不准 App 把圖讀進 canvas，一定顯示載入失敗。
+      final out = absoluteImage('https://i.imgs.ovh/2026/08/21/x.jpg');
+      expect(out, startsWith('https://example.test/gmimg?u='));
+      expect(out, contains(Uri.encodeComponent('https://i.imgs.ovh/2026/08/21/x.jpg')));
+    });
+
+    test('站外**連結**不能走圖片代理', () {
+      // 同一個網址如果是 <a href> 就必須原樣留著，
+      // 包進圖片代理的話點下去只會拿到一張圖或一個錯誤。
+      expect(absolute('https://i.imgs.ovh/2026/08/21/x.jpg'),
+          'https://i.imgs.ovh/2026/08/21/x.jpg');
+    });
+
+    test('已經指到自家網域的圖不再包一層', () {
+      expect(absoluteImage('https://www.gamemale.com/forum.php?mod=image&aid=1'),
+          startsWith('https://example.test/gm/'));
+    });
+
+    test('data: 圖片原樣', () {
+      expect(absoluteImage('data:image/png;base64,AAAA'),
+          'data:image/png;base64,AAAA');
+    });
+
+    test('原生版不代理任何圖片', () {
+      kOrigin = kForumOrigin;
+      kAssetProxyPrefix = '';
+      expect(absoluteImage('https://i.imgs.ovh/x.jpg'), 'https://i.imgs.ovh/x.jpg');
+    });
+  });
 }

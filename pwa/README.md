@@ -203,6 +203,13 @@ Cloudflare，所以不寫 `tls`，讓 Caddy 自己跟 Let's Encrypt 要一張公
   所以圖片走 `/api/img` 代理，而認證得改成 **HttpOnly cookie**，讓瀏覽器自己帶。
   把 token 塞進圖片網址會被寫進瀏覽器歷史與伺服器日誌，不要那樣做。
   代理只准 `*.gamemale.com`，否則就變成別人的開放代理。
+- **帖子圖的代理（`/gmimg`）不能只開白名單**：帖子裡的圖常常放在第三方圖床，
+  那些幾乎都沒送 CORS 標頭，而 CanvasKit 是把圖讀進 canvas 的，跨網域讀像素
+  一定被擋。主機因此必須全放，改用另外兩道界線守住：**回應不是 `image/*` 就不轉**，
+  以及**擋掉會打到內網的位址**（`isPrivateHost`：迴環、私有段、CGNAT、link-local——
+  `169.254.169.254` 那類雲端 metadata 是最典型的 SSRF 目標）。
+  這裡刻意不做 DNS 解析後再比對：解析結果跟等一下真正連線時未必相同
+  （DNS rebinding），擋不住卻會拖慢每一張圖，真正的界線是「只回圖片」。
 - **開提醒頁會把那一類標成已讀**：`/api/notice` 只有使用者真的點進通知分頁時
   才呼叫，背景輪詢一律走頁首紅點（`fetchBadges`）。
 - **登入過期時不要順便更新未讀基準**：沒登入時未讀數都是 0，照樣寫進去的話，
@@ -211,8 +218,8 @@ Cloudflare，所以不寫 `tls`，讓 Caddy 自己跟 Let's Encrypt 要一張公
 ## 測試
 
 ```bash
-cd pwa/server && dart test        # 90 項，不需要網路
-cd packages/gm_api && dart test   # 6 項，多帳號隔離
+cd pwa/server && dart test        # 121 項，不需要網路
+cd packages/gm_api && dart test   # 28 項，多帳號隔離、網址改寫、圖片守門
 ```
 
 涵蓋 RFC 8291 官方測試向量（逐個中間值）、VAPID 簽章與驗章、

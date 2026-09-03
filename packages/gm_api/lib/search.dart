@@ -141,7 +141,7 @@ List<SearchHit> _parseAlbumHits(dom.Document doc) {
     final href = attr(a, 'href');
     out.add(SearchHit(
       title: txt(a),
-      image: absolute(attr(li.querySelector('img'), 'src')),
+      image: absoluteImage(attr(li.querySelector('img'), 'src')),
       uid: paramInt(href, 'uid'),
       url: absolute(href),
     ));
@@ -161,7 +161,7 @@ List<SearchHit> _parseGroupHits(dom.Document doc) {
     out.add(SearchHit(
       title: txt(a),
       subtitle: dl.querySelectorAll('dd').map(txt).where((s) => s.isNotEmpty).join(' · '),
-      image: absolute(attr(dl.querySelector('img'), 'src')),
+      image: absoluteImage(attr(dl.querySelector('img'), 'src')),
       fid: fid,
       url: absolute(href),
     ));

@@ -453,5 +453,22 @@ String absolute(String? u) {
   return '$kOrigin/$s';
 }
 
+/// 圖片專用的網址處理。
+///
+/// 跟 [absolute] 的差別：網頁版會把**任何跨網域**的圖片改走自家的資源代理。
+/// 帖子裡的圖常常放在第三方圖床（i.imgs.ovh 之類），那些幾乎都沒送 CORS
+/// 標頭，而 App 是把圖讀進 canvas 的，跨網域讀像素會被瀏覽器擋掉。
+///
+/// **連結千萬不要用這支**——會把站外連結也變成代理網址。連結用 [absolute]。
+String absoluteImage(String? u) {
+  final s = absolute(u);
+  if (s.isEmpty || s.startsWith('data:')) return s;
+  if (kAssetProxyPrefix.isEmpty) return s; // 原生版直連，不需要代理
+  // 已經指到自家網域（/gm 或已經是代理網址）就別再包一層
+  if (s.startsWith(kOrigin) || s.startsWith(kAssetProxyPrefix)) return s;
+  if (!s.startsWith('http')) return s;
+  return '$kAssetProxyPrefix${Uri.encodeComponent(s)}';
+}
+
 String avatarUrl(int uid, {String size = 'middle'}) =>
     '$kOrigin/uc_server/avatar.php?uid=$uid&size=$size';

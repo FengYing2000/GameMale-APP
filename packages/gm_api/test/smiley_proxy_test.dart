@@ -57,4 +57,49 @@ void main() {
       );
     });
   });
+
+  group('noto-emoji 的 svg 要換成 png', () {
+    tearDown(() {
+      kOrigin = kForumOrigin;
+      kAssetProxyPrefix = '';
+    });
+
+    String srcOf(String html) {
+      final out = sanitizeContent(toDoc(html).body);
+      return RegExp(r'src="([^"]*)"').firstMatch(out)?.group(1) ?? '';
+    }
+
+    test('原生版：svg 換成 png', () {
+      // Flutter 內建的圖片解碼器**不會解 SVG**，所以論壇那些 noto-emoji
+      // 的 .svg 表情在原生版和網頁版都一樣顯示不出來。jsDelivr 上同一個
+      // 代號有現成的 png，換過去就好，不必為此拉一個 SVG 套件進來。
+      expect(
+        srcOf('<img src="https://gcore.jsdelivr.net/gh/googlefonts/'
+            'noto-emoji/svg/emoji_u1f60d.svg" width="15">'),
+        'https://gcore.jsdelivr.net/gh/googlefonts/noto-emoji/png/128/emoji_u1f60d.png',
+      );
+    });
+
+    test('網頁版：先換 png 再走代理', () {
+      kOrigin = 'https://example.test/gm';
+      kAssetProxyPrefix = 'https://example.test/gmimg?u=';
+      final src = srcOf('<img src="https://gcore.jsdelivr.net/gh/googlefonts/'
+          'noto-emoji/svg/emoji_u1f60d.svg" width="15">');
+      expect(src, startsWith('https://example.test/gmimg?u='));
+      expect(Uri.decodeComponent(src.split('u=').last), endsWith('/png/128/emoji_u1f60d.png'));
+    });
+
+    test('多碼位的組合表情也要換', () {
+      expect(
+        srcOf('<img src="https://gcore.jsdelivr.net/gh/googlefonts/'
+            'noto-emoji/svg/emoji_u1f468_200d_1f4bb.svg" width="15">'),
+        endsWith('/png/128/emoji_u1f468_200d_1f4bb.png'),
+      );
+    });
+
+    test('不是 noto-emoji 的 svg 不要亂動', () {
+      expect(srcOf('<img src="https://www.gamemale.com/a/logo.svg">'),
+          'https://www.gamemale.com/a/logo.svg');
+    });
+  });
 }

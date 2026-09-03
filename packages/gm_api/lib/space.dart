@@ -84,7 +84,7 @@ List<SpaceItem> _home(dom.Document doc) {
         url: a == null ? '' : absolute(attr(a, 'href')),
         uid: a == null ? null : _uidOf(attr(a, 'href')),
         tid: a == null ? null : _tidOf(attr(a, 'href')),
-        image: absolute(attr(li.querySelector('img'), 'src')),
+        image: absoluteImage(attr(li.querySelector('img'), 'src')),
       ));
     }
     if (links.isEmpty) continue;
@@ -105,7 +105,7 @@ List<SpaceItem> _doing(dom.Document doc) {
       title: txt(body),
       author: txt(who),
       uid: _uidOf(attr(who, 'href')),
-      avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
+      avatar: absoluteImage(attr(dl.querySelector('dd.avt img'), 'src')),
       date: attr(time, 'title').isEmpty ? txt(time) : attr(time, 'title'),
       children: [
         for (final li in dl.querySelectorAll('dd.cmt li'))
@@ -138,10 +138,10 @@ List<SpaceItem> _blog(dom.Document doc) {
       url: absolute(attr(a, 'href')),
       author: txt(dl.querySelector('dd:not(.m) a[href*="space-uid"]')),
       uid: _uidOf(attr(dl.querySelector('dd:not(.m) a[href*="space-uid"]'), 'href')),
-      avatar: absolute(attr(dl.querySelector('.avt img'), 'src')),
+      avatar: absoluteImage(attr(dl.querySelector('.avt img'), 'src')),
       date: txt(dl.querySelector('dd span.xg1')),
       body: txt(excerpt),
-      image: absolute(attr(excerpt?.querySelector('img'), 'src')),
+      image: absoluteImage(attr(excerpt?.querySelector('img'), 'src')),
       meta: txt(dl.querySelector('dd.xg1')),
       // 我的日誌那一頁論壇會多給編輯／刪除／置頂
       actions: {
@@ -166,7 +166,7 @@ List<SpaceItem> _album(dom.Document doc) {
     out.add(SpaceItem(
       title: txt(a),
       url: absolute(href),
-      image: absolute(attr(li.querySelector('img'), 'src')),
+      image: absoluteImage(attr(li.querySelector('img'), 'src')),
       meta: txt(li.querySelector('p.ptn')).replaceFirst(txt(a), '').trim(),
       albumId: paramInt(href, 'id'),
       uid: _uidOf(href),
@@ -225,7 +225,7 @@ List<SpaceItem> _wall(dom.Document doc) {
       title: txt(body),
       author: txt(who),
       uid: _uidOf(attr(who, 'href')),
-      avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
+      avatar: absoluteImage(attr(dl.querySelector('dd.avt img'), 'src')),
       date: txt(dl.querySelector('dt span.xg1')),
     ));
   }
@@ -292,7 +292,7 @@ AlbumData parseAlbum(dom.Document doc, {int page = 1}) {
   for (final li in grid.isNotEmpty ? grid : doc.querySelectorAll('.ml li')) {
     final img = li.querySelector('img');
     if (img == null) continue;
-    final thumb = absolute(attr(img, 'src'));
+    final thumb = absoluteImage(attr(img, 'src'));
     if (thumb.isEmpty) continue;
     photos.add(AlbumPhoto(
       thumb: thumb,
@@ -333,7 +333,7 @@ BlogData parseBlog(dom.Document doc) {
     reactions.add(BlogReaction(
       name: name,
       count: int.tryParse(txt(a.querySelector('em'))) ?? 0,
-      icon: absolute(attr(a.querySelector('img'), 'src')),
+      icon: absoluteImage(attr(a.querySelector('img'), 'src')),
       url: absolute(attr(a, 'href')),
     ));
   }
@@ -365,7 +365,7 @@ BlogData parseBlog(dom.Document doc) {
     comments.add(BlogComment(
       author: txt(who),
       uid: _uidOf(attr(who, 'href')),
-      avatar: absolute(attr(dl.querySelector('dd.avt img'), 'src')),
+      avatar: absoluteImage(attr(dl.querySelector('dd.avt img'), 'src')),
       date: txt(dl.querySelector('dt span.xg1')),
       editUrl: absolute(attr(dl.querySelector('a[href*="op=edit"]'), 'href')),
       deleteUrl:

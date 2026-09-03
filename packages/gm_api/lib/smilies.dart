@@ -55,7 +55,7 @@ List<SmileyGroup> parseSmilies(String js) {
     for (final e in _itemRe.allMatches(m.group(2)!)) {
       items.putIfAbsent(type, () => []).add(Smiley(
             code: '{:${type}_${e.group(1)}:}',
-            url: absolute('static/image/smiley/$folder/${e.group(2)}'),
+            url: absoluteImage('static/image/smiley/$folder/${e.group(2)}'),
           ));
     }
   }

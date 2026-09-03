@@ -93,6 +93,23 @@ const _strip = ['script', 'style', 'noscript', 'iframe', 'object', 'embed', 'for
 /// - 還原延遲載入圖（真正的網址在 file / zoomfile）
 /// - 所有網址絕對化，站內連結標上 data-inapp 給 App 內導航接手
 /// - spoiler 折疊區塊轉成 data-spoiler，由 PostBody 畫成可展開的區塊
+/// noto-emoji 的 SVG 換成同一個 repo 裡的 PNG。
+///
+/// **為什麼要換**：帖子裡的表情是刻意不攔截的（要維持行內排版），所以走
+/// HTML 元件的預設 <img> 渲染——而那個用 Image.network，**它不會解 SVG**。
+/// 結果使用者插的 noto-emoji 在原生與網頁版都畫不出來（跟 CORS 無關，
+/// 自簽版一樣不會顯示）。同一個 repo 有 png/128/ 版本，換過去就能沿用
+/// 預設的行內渲染，不必為了表情去動整個 HTML 的排版流程。
+String? _pngForEmojiSvg(String? url) {
+  if (url == null || !url.contains('noto-emoji')) return url;
+  // 要用 replaceFirstMapped：Dart 的 replaceFirst 收的是字面字串，
+  // 不會把 $1 當成捕獲群組展開。
+  return url.replaceFirstMapped(
+    RegExp(r'/svg/(emoji_[0-9a-fA-Fu_]+)\.svg'),
+    (m) => '/png/128/${m[1]}.png',
+  );
+}
+
 String sanitizeContent(dom.Element? el) {
   if (el == null) return '';
   final node = el.clone(true);
@@ -117,7 +134,8 @@ String sanitizeContent(dom.Element? el) {
         img.attributes['file'] ??
         img.attributes['data-original'] ??
         img.attributes['src'];
-    final src = absolute(real);
+    // 圖片用 absoluteImage：網頁版連第三方圖床也要走代理
+    final src = absoluteImage(_pngForEmojiSvg(real));
     img.attributes['src'] = src;
     // 尺寸要先讀下來再刪 —— 表情圖是靠它認出來的
     final w = int.tryParse(
@@ -154,7 +172,7 @@ String sanitizeContent(dom.Element? el) {
 
   for (final v in node.querySelectorAll('video, audio').toList()) {
     final src = v.attributes['src'];
-    if (src != null) v.attributes['src'] = absolute(src);
+    if (src != null) v.attributes['src'] = absoluteImage(src);
     v.attributes.remove('autoplay');
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:gm_server/accounts.dart';
+import 'package:gm_server/asset_guard.dart';
 import 'package:gm_server/forum.dart';
 import 'package:gm_server/forum_proxy.dart';
 import 'package:gm_server/json_api.dart';
@@ -11,6 +12,7 @@ import 'package:gm_server/secret_box.dart';
 import 'package:gm_server/vapid.dart';
 import 'package:gm_server/webpush.dart';
 import 'package:gm_api/discuz.dart' as api;
+
 import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import 'package:http/http.dart' as http;
@@ -381,24 +383,35 @@ Future<void> main(List<String> args) async {
     ..get('/gmimg', (Request r) async {
       final raw = r.url.queryParameters['u'] ?? '';
       final uri = Uri.tryParse(raw);
-      // 白名單，不是萬用代理——只放行論壇實際會用到的來源：
-      // 它自己的子網域（img.gamemale.com…，那些沒送 CORS），
-      // 以及論壇拿來放表情符號的 jsDelivr。
-      final host = uri?.host ?? '';
-      final allowed = host == 'gamemale.com' ||
-          host.endsWith('.gamemale.com') ||
-          host.endsWith('jsdelivr.net');
-      if (uri == null || !allowed) {
-        return bad('只能代理論壇會用到的資源');
+      // 帖子裡的圖常常放在第三方圖床，而那些幾乎都沒送 CORS 標頭，
+      // 所以主機不能只開白名單。改成「任何主機都代理，但只准圖片」，
+      // 並擋掉會打到內網的位址——不然這就變成別人可以拿來探測這台機器
+      // 內部服務的跳板（SSRF）。
+      if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+        return bad('只接受 http/https 的圖片網址');
+      }
+      if (isPrivateHost(uri.host)) {
+        return bad('不代理內網位址');
       }
       try {
         final res = await assetClient.get(uri, headers: {
           'User-Agent': Api.userAgent,
+          // 有些圖床會擋空 Referer，帶論壇的比較不會被拒
           'Referer': '$kForumOrigin/',
         });
         if (res.statusCode >= 400) return Response.notFound('');
+
+        final type = res.headers['content-type'] ?? '';
+        // 只回圖片。少了這道，這支就成了萬用的內容代理。
+        if (!isImageType(type)) {
+          return bad('這個網址不是圖片');
+        }
+        if (res.bodyBytes.length > kMaxAssetBytes) {
+          return bad('圖片太大');
+        }
+
         return Response.ok(res.bodyBytes, headers: {
-          'content-type': res.headers['content-type'] ?? 'application/octet-stream',
+          'content-type': type,
           'cache-control': 'public, max-age=604800',
         });
       } catch (_) {
