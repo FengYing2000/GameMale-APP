@@ -114,6 +114,16 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   Future<void> _applyBackgroundBadges() async {
     try {
       if (kIsWeb) {
+        // 先問伺服器推播是不是開著。這決定設定頁要不要顯示通知開關，
+        // 所以要在下面同步狀態之前拿到。
+        if (!_bootedPush) await WebPush.loadServerConfig();
+        if (!WebPush.serverEnabled) {
+          _bootedPush = true;
+          if (_settings.notifyBackground) {
+            await _settings.setNotifyBackground(false);
+          }
+          return;
+        }
         // 網頁版的背景檢查是伺服器在做，這裡要顧的是「這台裝置還在不在
         // 伺服器的名單上」。
         //

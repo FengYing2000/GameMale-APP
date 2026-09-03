@@ -5,6 +5,9 @@ enum WebPushSupport { ok, needInstall, unsupported }
 
 class WebPush {
   WebPush._();
+  static bool serverEnabled = true;
+  static Future<void> loadServerConfig() async {}
+  static bool get needsInstall => false;
   static WebPushSupport get support => WebPushSupport.unsupported;
   static String get permission => 'unsupported';
   static Future<String?> enable() async => '這個平台不用 Web Push';

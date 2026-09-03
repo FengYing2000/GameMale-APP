@@ -39,11 +39,37 @@ enum WebPushSupport {
 class WebPush {
   WebPush._();
 
-  static WebPushSupport get support => switch (_supported().toDart) {
-        'ok' => WebPushSupport.ok,
-        'need-install' => WebPushSupport.needInstall,
-        _ => WebPushSupport.unsupported,
-      };
+  /// 伺服器那邊有沒有把推播整套關掉（`PUSH_ENABLED=false`）。
+  ///
+  /// 關掉時它不輪詢論壇、也不收訂閱，所以介面上不該再留通知的開關——
+  /// 留著讓人按，按了也不會收到任何東西。
+  static bool serverEnabled = true;
+
+  /// 跟伺服器問一次設定。開機時做，失敗就沿用預設（當成開著）：
+  /// 寧可多顯示一個開關，也不要因為一次網路抖動就把功能藏起來。
+  static Future<void> loadServerConfig() async {
+    try {
+      final res = await _own.get<Map<String, dynamic>>('/api/config');
+      serverEnabled = res.data?['pushEnabled'] as bool? ?? true;
+    } catch (_) {
+      // 問不到就當它是開的
+    }
+  }
+
+  /// 這個瀏覽器還沒把網頁加到主畫面。
+  ///
+  /// **刻意不看 [serverEnabled]**：加到主畫面本身就有價值（沒有網址列、
+  /// 全螢幕、有自己的圖示），推播關掉了那個引導還是該留著。
+  static bool get needsInstall => _supported().toDart == 'need-install';
+
+  static WebPushSupport get support {
+    if (!serverEnabled) return WebPushSupport.unsupported;
+    return switch (_supported().toDart) {
+      'ok' => WebPushSupport.ok,
+      'need-install' => WebPushSupport.needInstall,
+      _ => WebPushSupport.unsupported,
+    };
+  }
 
   /// 'granted' / 'denied' / 'default' / 'unsupported'
   static String get permission => _status().toDart;

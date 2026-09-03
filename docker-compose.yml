@@ -24,6 +24,9 @@ services:
       SECRET_KEY: ${SECRET_KEY:?先在 .env 設 SECRET_KEY}
       # 多久查一次論壇
       POLL_MINUTES: ${POLL_MINUTES:-5}
+      # 推播通知的總開關。設成 false 就完全不輪詢論壇、不收訂閱、不送通知，
+      # 網頁版也不會再顯示通知相關的介面。要開回來改這一個值就好。
+      PUSH_ENABLED: ${PUSH_ENABLED:-true}
     volumes:
       - ./pwa/data:/data
     networks:

@@ -25,8 +25,7 @@ class _InstallBannerState extends State<InstallBanner> {
   bool _open = false;
   bool _hidden = false;
 
-  bool get _needed =>
-      kIsWeb && !_hidden && WebPush.support == WebPushSupport.needInstall;
+  bool get _needed => kIsWeb && !_hidden && WebPush.needsInstall;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +63,10 @@ class _InstallBannerState extends State<InstallBanner> {
               ),
               const SizedBox(height: 4),
               Text(
-                tr('開起來就跟一般 App 一樣，而且才收得到新提醒與私訊的推播'),
+                // 推播關掉時就別再拿推播當理由——加到主畫面本身還是有用的
+                WebPush.serverEnabled
+                    ? tr('開起來就跟一般 App 一樣，而且才收得到新提醒與私訊的推播')
+                    : tr('開起來就跟一般 App 一樣：沒有網址列、全螢幕、有自己的圖示'),
                 style: TextStyle(
                     fontSize: 13, color: scheme.onPrimaryContainer),
               ),

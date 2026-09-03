@@ -191,6 +191,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   onChanged: session.loggedIn ? settings.setAutoSign : null,
                 ),
+                // 網頁版的通知是伺服器在推的。伺服器把推播關掉時這個開關
+                // 按了也不會有任何效果，不如整個不要顯示。
+                if (!kIsWeb || WebPush.serverEnabled) ...[
                 const Divider(indent: 56, endIndent: 14),
                 SwitchListTile(
                   value: session.loggedIn && settings.notifyBackground,
@@ -218,6 +221,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
+                ],
               ],
             ),
           ),

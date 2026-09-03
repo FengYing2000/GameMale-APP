@@ -32,10 +32,8 @@ Future<void> maybeShowWebOnboarding(
 }) async {
   if (!kIsWeb) return;
 
-  final support = WebPush.support;
-  if (support == WebPushSupport.unsupported) return;
-
-  final installing = support == WebPushSupport.needInstall;
+  // 安裝引導跟推播開不開無關：加到主畫面本身就有價值。
+  final installing = WebPush.needsInstall;
 
   if (installing) {
     // 加到主畫面：每次瀏覽跳一次就好
@@ -52,6 +50,10 @@ Future<void> maybeShowWebOnboarding(
   }
 
   // 已經是主畫面 App。
+  // 伺服器把推播整套關掉時就別問了——問了、使用者也同意了，
+  // 伺服器一樣不會收訂閱，只是白白要一次權限。
+  if (!WebPush.serverEnabled) return;
+  if (WebPush.support == WebPushSupport.unsupported) return;
   if (WebPush.permission == 'granted') return;
   // 還沒登入就先別問——綁定通知需要論壇登入狀態，這時候問了、使用者按了
   // 同意，也只會拿到一句「請先登入」。加到主畫面後本來就是未登入狀態。

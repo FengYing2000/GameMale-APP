@@ -47,6 +47,10 @@ Future<void> main(List<String> args) async {
   final appRoot = env['APP_ROOT'] ?? '../../build/web';
   final assetDir = env['ASSET_DIR'] ?? '../../assets';
   final pollMinutes = int.tryParse(env['POLL_MINUTES'] ?? '') ?? 5;
+  // 推播整套的總開關。關掉時：不輪詢論壇、不收新訂閱、也不送任何通知。
+  // 做成開關而不是把程式碼刪掉，是因為要開回來只需要改這一個環境變數。
+  final pushEnabled =
+      !const {'false', '0', 'off', 'no'}.contains((env['PUSH_ENABLED'] ?? '').toLowerCase());
 
   await installServerBindings(assetDir: assetDir);
 
@@ -146,6 +150,9 @@ Future<void> main(List<String> args) async {
     ..get('/api/config', (Request r) => ok({
           'vapidPublicKey': keys.publicKeyBase64,
           'pollMinutes': pollMinutes,
+          // 網頁版靠這個決定要不要顯示通知相關的介面。
+          // 關掉卻還留著開關，使用者按了也不會收到任何東西。
+          'pushEnabled': pushEnabled,
         }))
 
     // ── 登入（兩步：先取表單，再送出）──────────────────────────
@@ -273,6 +280,7 @@ Future<void> main(List<String> args) async {
     // 那些已經存在使用者瀏覽器裡的 cookie 不會送到 /api/*——端點放 /api 下
     // 會對已經登入過的人一直說「請先登入」。放這裡新舊都收得到。
     ..post('/gm/__subscribe', (Request r) async {
+      if (!pushEnabled) return bad('這台伺服器已關閉推播通知', 503);
       final cookie = r.headers['cookie'] ?? '';
       if (cookie.isEmpty) return bad('沒有論壇登入狀態，請先登入論壇', 401);
       try {
@@ -468,6 +476,7 @@ Future<void> main(List<String> args) async {
       return ok({'sent': sent, 'results': results});
     })
     ..post('/api/poll-now', (Request r) async {
+      if (!pushEnabled) return bad('這台伺服器已關閉推播通知', 503);
       final a = whoIs(r);
       if (a == null) return bad('尚未登入', 401);
       await poller.tick();
@@ -503,12 +512,18 @@ Future<void> main(List<String> args) async {
     port,
   );
 
-  poller.start();
+  if (pushEnabled) {
+    poller.start();
+  } else {
+    stdout.writeln('推播通知：已關閉（PUSH_ENABLED=false）——不輪詢、不送通知');
+  }
 
   stdout.writeln('GameMale PWA 後端啟動於 '
       'http://${server.address.host}:${server.port}');
   stdout.writeln('VAPID 公鑰：${keys.publicKeyBase64}');
-  stdout.writeln('已有 ${store.length} 個帳號，每 $pollMinutes 分鐘輪詢一次');
+  stdout.writeln(pushEnabled
+      ? '已有 ${store.length} 個帳號，每 $pollMinutes 分鐘輪詢一次'
+      : '已有 ${store.length} 個帳號（推播已關閉，不輪詢）');
   stdout.writeln(hasApp
       ? 'Flutter 網頁版：已掛載（$appRoot）'
       : 'Flutter 網頁版：找不到 $appRoot，改用手寫的通知頁');
