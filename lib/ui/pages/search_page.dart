@@ -1,10 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:gm_api/http.dart';
 import 'package:gm_api/discuz.dart' as discuz;
 import 'package:gm_api/models.dart';
 import 'package:gm_api/parse.dart';
@@ -15,6 +13,7 @@ import '../widgets/avatar.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
+import '../widgets/net_image.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage(
@@ -552,13 +551,12 @@ class _HitTile extends StatelessWidget {
           : (hasCover
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: CachedNetworkImage(
-                    imageUrl: hit.image,
-                    httpHeaders: Api.imageHeaders,
+                  child: NetImage(
+                    url: hit.image,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorWidget: (c, _, _) => const Icon(LucideIcons.image),
+                    errorWidget: const Icon(LucideIcons.image),
                   ),
                 )
               : Avatar(hit.image, size: 40)),

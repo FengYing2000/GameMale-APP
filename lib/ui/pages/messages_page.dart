@@ -108,7 +108,7 @@ class _MessagesPageState extends State<MessagesPage> {
     final d = _data;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('訊息'))),
+      appBar: AppBar(title: Text(tr('消息'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

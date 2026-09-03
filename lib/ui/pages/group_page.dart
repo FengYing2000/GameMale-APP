@@ -1,11 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:gm_api/discuz.dart' as discuz;
 import 'package:gm_api/group.dart' as api;
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../theme.dart';
@@ -14,6 +12,7 @@ import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
 import '../widgets/thread_tile.dart';
 import '../widgets/toast.dart';
+import '../widgets/net_image.dart';
 
 /// 群組。只有桌面模板，所以走 desktop 抓再自己排版
 class GroupPage extends StatefulWidget {
@@ -188,14 +187,12 @@ class _GroupPageState extends State<GroupPage> {
                   if (d.icon.isNotEmpty) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: d.icon,
-                        httpHeaders: Api.imageHeaders,
+                      child: NetImage(
+                        url: d.icon,
                         width: 48,
                         height: 48,
                         fit: BoxFit.cover,
-                        errorWidget: (c, _, _) =>
-                            const Icon(LucideIcons.users),
+                        errorWidget: const Icon(LucideIcons.users),
                       ),
                     ),
                     const SizedBox(width: 12),

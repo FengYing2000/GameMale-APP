@@ -160,6 +160,7 @@ class PollSnapshot {
     required this.pm,
     this.latestPmName = '',
     this.latestPmPreview = '',
+    this.signedOnForum,
   });
 
   /// 論壇連得到嗎。連不到就什麼都不要判斷——網路抖一下不該被當成登出。
@@ -172,6 +173,14 @@ class PollSnapshot {
   /// 而不只是「你有 N 則未讀」。沒有未讀時為空字串。
   final String latestPmName;
   final String latestPmPreview;
+
+  /// 論壇上今天到底簽到了沒。
+  ///
+  /// **不能只看我們自己存的 lastSignDate**——那只記錄「伺服器代簽」的結果。
+  /// 使用者自己在 App 或論壇網頁上簽的，我們完全不知道，於是即使已經簽過
+  /// 還是照樣推「尚未簽到」。這裡直接問論壇。
+  /// null = 這輪沒問到（連線失敗），呼叫端就沿用舊判斷。
+  final bool? signedOnForum;
 }
 
 /// 查一次未讀數，順便判斷還在不在登入狀態。
@@ -203,6 +212,7 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
 
       var latestName = '';
       var latestPreview = '';
+      bool? signed;
       if (loggedIn) {
         try {
           final list = await api.fetchPmList();
@@ -218,6 +228,11 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
         } catch (_) {
           // 對話列表抓不到就退回頁首那個數字，至少不會完全沒有通知
         }
+        try {
+          signed = (await api.fetchSignPage()).signed;
+        } catch (_) {
+          // 問不到就讓呼叫端沿用舊判斷，不要誤推
+        }
       }
 
       return PollSnapshot(
@@ -227,6 +242,7 @@ Future<PollSnapshot> pollOnce(Api target) => asAccount(target, () async {
         pm: pm,
         latestPmName: latestName,
         latestPmPreview: latestPreview,
+        signedOnForum: signed,
       );
     });
 

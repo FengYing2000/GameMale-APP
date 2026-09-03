@@ -189,11 +189,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   value: settings.notifyBackground,
                   secondary: const Icon(LucideIcons.bellRing),
                   title: Text(tr('新提醒通知')),
+                  // 網頁版沒登入就不給開：綁定通知要拿論壇的登入狀態去
+                  // 認人，這時候按下去只會拿到一句「請先登入」，
+                  // 而且權限一旦被拒就再也問不了。
+                  onChanged: kIsWeb && !session.loggedIn
+                      ? null
+                      : (v) => _setNotify(settings, v),
                   subtitle: Text(
                     // Platform.isIOS 在網頁版會直接丟例外，一定要先擋掉
                     kIsWeb
-                        ? tr('由伺服器定期查有沒有新提醒／私訊，有就推播過來。'
-                            '網頁版關掉也收得到，但 iOS 要先把網頁加入主畫面。')
+                        ? (session.loggedIn
+                            ? tr('由伺服器定期查有沒有新提醒／私訊，有就推播過來。'
+                                '網頁版關掉也收得到，但 iOS 要先把網頁加入主畫面。')
+                            : tr('請先登入論壇才能開啟通知。'))
                         : Platform.isIOS
                             ? tr('背景時定期查有沒有新提醒／私訊，有就發通知。'
                                 'iOS 由系統決定何時喚醒，通常隔十幾分鐘到幾小時；'
@@ -202,7 +210,6 @@ class _SettingsPageState extends State<SettingsPage> {
                                 '最短 15 分鐘一次；被系統「強制停止」或省電機制清掉才會停。'),
                     style: const TextStyle(fontSize: 12),
                   ),
-                  onChanged: (v) => _setNotify(settings, v),
                 ),
               ],
             ),
@@ -439,8 +446,10 @@ class _CacheTileState extends State<_CacheTile> {
         !_known
             ? tr('計算中…')
             : size != null
-                ? tr('目前佔用 ') + size
-                : tr('由瀏覽器管理，無法顯示大小'),
+                ? (kIsWeb
+                    ? tr('記憶體中的圖片 ') + size + tr('（磁碟快取由瀏覽器管理）')
+                    : tr('目前佔用 ') + size)
+                : tr('無法取得大小'),
         style: const TextStyle(fontSize: 12),
       ),
       trailing: _clearing

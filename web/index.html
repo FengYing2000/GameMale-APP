@@ -24,6 +24,13 @@
   <link rel="apple-touch-icon" href="icons/Icon-180.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- CanvasKit 沒有內建中日韓字型，遇到沒有的字會即時去 Google Fonts
+       抓 Noto 的備援字型——那段空窗期就會看到「⌧」方框。先建立連線
+       可以讓它早一點抓到、縮短方框出現的時間。
+       要完全避免得把中文字型打包進去（好幾 MB），不划算。 -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+
   <title>GameMale</title>
   <link rel="manifest" href="manifest.json">
 
@@ -78,8 +85,16 @@
           window.matchMedia('(display-mode: standalone)').matches;
         const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+
+        // ⚠️ 順序很重要：iOS 的 Safari 分頁裡**根本沒有 PushManager**
+        // （要加到主畫面才會有）。先檢查 PushManager 的話，分頁裡一律
+        // 回 'unsupported'，「加到主畫面」的引導就永遠不會跳出來。
+        // 所以先判斷「iOS 而且還沒加到主畫面」。
         if (iOS && !standalone) return 'need-install';
+
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          return 'unsupported';
+        }
         return 'ok';
       },
 

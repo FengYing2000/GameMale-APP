@@ -1,14 +1,13 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import 'package:gm_api/space.dart' as api;
 import '../../i18n/ui.dart';
 import '../widgets/image_viewer.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
+import '../widgets/net_image.dart';
 
 /// 相冊內頁。縮圖排成格子，點開看原圖
 class AlbumPage extends StatefulWidget {
@@ -94,12 +93,10 @@ class _AlbumPageState extends State<AlbumPage> {
                   onTap: () => showImageViewer(context, d.photos[i].full),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
-                    child: CachedNetworkImage(
-                      imageUrl: d.photos[i].thumb,
-                      httpHeaders: Api.imageHeaders,
+                    child: NetImage(
+                      url: d.photos[i].thumb,
                       fit: BoxFit.cover,
-                      errorWidget: (c, _, _) =>
-                          const Icon(LucideIcons.imageOff),
+                      errorWidget: const Icon(LucideIcons.imageOff),
                     ),
                   ),
                 ),

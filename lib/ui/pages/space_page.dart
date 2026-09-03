@@ -1,10 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import 'package:gm_api/space.dart' as api;
 import '../../i18n/ui.dart';
@@ -14,6 +12,7 @@ import '../widgets/pager_bar.dart';
 import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
+import '../widgets/net_image.dart';
 
 /// 個人空間：記錄／日誌／相冊／主題／留言板／好友，全部走桌面模板
 class SpacePage extends StatefulWidget {
@@ -347,13 +346,11 @@ class _SpacePageState extends State<SpacePage>
                                         .surfaceContainerHighest,
                                     child: const Icon(LucideIcons.image),
                                   )
-                                : CachedNetworkImage(
-                                    imageUrl: it.image,
-                                    httpHeaders: Api.imageHeaders,
+                                : NetImage(
+                                    url: it.image,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    errorWidget: (c, _, _) =>
-                                        const Icon(LucideIcons.imageOff),
+                                    errorWidget: const Icon(LucideIcons.imageOff),
                                   ),
                           ),
                   ),
@@ -398,13 +395,12 @@ class _SpacePageState extends State<SpacePage>
             ? null
             : ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: CachedNetworkImage(
-                  imageUrl: it.image,
-                  httpHeaders: Api.imageHeaders,
+                child: NetImage(
+                  url: it.image,
                   width: 46,
                   height: 46,
                   fit: BoxFit.cover,
-                  errorWidget: (c, _, _) => const SizedBox.shrink(),
+                  errorWidget: const SizedBox.shrink(),
                 ),
               ),
       );

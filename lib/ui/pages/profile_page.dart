@@ -1,11 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:gm_api/discuz.dart' as api;
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../store/session.dart';
@@ -15,6 +13,7 @@ import '../widgets/poke_sheet.dart';
 import '../widgets/require_login.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
+import '../widgets/net_image.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.uid});
@@ -76,12 +75,10 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CachedNetworkImage(
-                  imageUrl: m.image,
-                  httpHeaders: Api.imageHeaders,
+                NetImage(
+                  url: m.image,
                   height: 58,
-                  errorWidget: (c, _, _) =>
-                      const Icon(LucideIcons.medal, size: 40),
+                  errorWidget: const Icon(LucideIcons.medal, size: 40),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -331,12 +328,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 for (final m in d.medals)
                   InkWell(
                     onTap: () => _openMedal(m),
-                    child: CachedNetworkImage(
-                      imageUrl: m.image,
-                      httpHeaders: Api.imageHeaders,
+                    child: NetImage(
+                      url: m.image,
                       height: 30,
-                      errorWidget: (c, _, _) =>
-                          const Icon(LucideIcons.medal, size: 26),
+                      errorWidget: const Icon(LucideIcons.medal, size: 26),
                     ),
                   ),
               ],

@@ -1,16 +1,15 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:gm_api/group.dart' as api;
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/state_box.dart';
+import '../widgets/net_image.dart';
 
 /// 群組首頁：推薦群組、群組分類、積分排行
 class GroupsPage extends StatefulWidget {
@@ -130,13 +129,12 @@ class _RecommendCard extends StatelessWidget {
             ? const Icon(LucideIcons.users, size: 34)
             : ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: item.icon,
-                  httpHeaders: Api.imageHeaders,
+                child: NetImage(
+                  url: item.icon,
                   width: 44,
                   height: 44,
                   fit: BoxFit.cover,
-                  errorWidget: (c, _, _) => const Icon(LucideIcons.users),
+                  errorWidget: const Icon(LucideIcons.users),
                 ),
               ),
         title: Text(item.name,

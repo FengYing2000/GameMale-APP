@@ -9,11 +9,12 @@ import '../../services/web_push_stub.dart'
 
 const _kAskedKey = 'web_push_asked';
 
-/// 這次開啟已經跳過引導了嗎（只存在記憶體裡）。
+/// 這次開啟已經跳過哪些引導了（只存在記憶體裡）。
 ///
-/// 加到主畫面的引導用這個而不是持久化：使用者還沒裝好之前，每次開網頁
-/// 都值得再提醒一次，但同一次瀏覽裡不要每換一頁就跳。
-bool _shownThisSession = false;
+/// 兩種分開記：使用者可能先在分頁裡看過安裝教學，加到主畫面、登入之後
+/// 還要再問一次通知。共用一個旗標的話第二個就永遠跳不出來。
+bool _installShown = false;
+bool _notifyAsked = false;
 
 /// 網頁版的引導。**從首頁的 post-frame 呼叫**——那裡一定有可用的 Scaffold
 /// context，比從根導覽器抓可靠得多（之前那樣常常抓不到，整個沒跳）。
@@ -28,7 +29,6 @@ Future<void> maybeShowWebOnboarding(
   required bool loggedIn,
 }) async {
   if (!kIsWeb) return;
-  if (_shownThisSession) return;
 
   final support = WebPush.support;
   if (support == WebPushSupport.unsupported) return;
@@ -37,7 +37,8 @@ Future<void> maybeShowWebOnboarding(
 
   if (installing) {
     // 加到主畫面：每次瀏覽跳一次就好
-    _shownThisSession = true;
+    if (_installShown) return;
+    _installShown = true;
     if (!context.mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -54,9 +55,10 @@ Future<void> maybeShowWebOnboarding(
   // 同意，也只會拿到一句「請先登入」。加到主畫面後本來就是未登入狀態。
   if (!loggedIn) return;
 
+  if (_notifyAsked) return;
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getBool(_kAskedKey) ?? false) return;
-  _shownThisSession = true;
+  _notifyAsked = true;
   if (!context.mounted) return;
   final done = await showModalBottomSheet<bool>(
     context: context,

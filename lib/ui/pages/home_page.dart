@@ -3,14 +3,12 @@ import '../widgets/web_onboarding.dart';
 import '../widgets/install_banner.dart';
 import '../widgets/red_dot.dart';
 import '../widgets/require_login.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:gm_api/discuz.dart' as api;
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';
@@ -20,6 +18,7 @@ import '../widgets/post_body.dart';
 import '../widgets/quick_menu.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
+import '../widgets/net_image.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -67,26 +66,35 @@ class _HomePageState extends State<HomePage> {
     }
     // 版塊名走 sys()，語言換了要重抓才會跟著變
     if (_rev != rev || _langTick != lang) {
+      final wasRev = _rev;
       _rev = rev;
       _langTick = lang;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _load();
       });
+      // 剛登入完才問要不要開通知——網頁版綁定通知需要論壇的登入狀態，
+      // 沒登入時問了也只會失敗。以前要重開 App 才會跳，就是因為引導
+      // 只在 initState 跑過一次。
+      if (wasRev != rev) _onboardLater();
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-    // 網頁版的引導從這裡跳（首頁一定有可用的 Scaffold context）。
-    // 讓畫面先畫出來再跳，比較不突兀。
+  /// 延遲一下再跳引導，讓使用者先看到畫面
+  void _onboardLater() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await Future<void>.delayed(const Duration(milliseconds: 700));
       if (!mounted) return;
       await maybeShowWebOnboarding(context,
           loggedIn: context.read<SessionStore>().loggedIn);
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    // 網頁版的引導從這裡跳（首頁一定有可用的 Scaffold context）
+    _onboardLater();
   }
 
   Future<void> _load() async {
@@ -546,14 +554,12 @@ class _SubForumRow extends StatelessWidget {
             if (item.icon.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(5),
-                child: CachedNetworkImage(
-                  imageUrl: item.icon,
-                  httpHeaders: Api.imageHeaders,
+                child: NetImage(
+                  url: item.icon,
                   width: 26,
                   height: 20,
                   fit: BoxFit.cover,
-                  errorWidget: (c, _, _) =>
-                      Icon(LucideIcons.cornerDownRight, size: 15, color: faint(c)),
+                  errorWidget: Icon(LucideIcons.cornerDownRight, size: 15, color: faint(context)),
                 ),
               )
             else
@@ -666,15 +672,13 @@ class _ForumRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                     child: item.icon.isEmpty
                         ? _placeholder(context, item.name)
-                        : CachedNetworkImage(
-                            imageUrl: item.icon,
-                            httpHeaders: Api.imageHeaders,
+                        : NetImage(
+                            url: item.icon,
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,
-                            placeholder: (c, _) => _placeholder(c, item.name),
-                            errorWidget: (c, _, _) =>
-                                _placeholder(c, item.name),
+                            placeholder: _placeholder(context, item.name),
+                            errorWidget: _placeholder(context, item.name),
                           ),
                   ),
                   if (_hasInfo)

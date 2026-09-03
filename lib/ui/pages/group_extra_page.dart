@@ -1,15 +1,14 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:gm_api/group.dart' as api;
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import '../../i18n/ui.dart';
 import '../widgets/avatar.dart';
 import '../widgets/pager_bar.dart';
 import '../widgets/state_box.dart';
+import '../widgets/net_image.dart';
 
 /// 我參與的 / 我管理的 群組
 class MyGroupsPage extends StatefulWidget {
@@ -99,14 +98,12 @@ class _MyGroupsPageState extends State<MyGroupsPage> {
                             ? const Icon(LucideIcons.users)
                             : ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
-                                child: CachedNetworkImage(
-                                  imageUrl: _items[i].icon,
-                                  httpHeaders: Api.imageHeaders,
+                                child: NetImage(
+                                  url: _items[i].icon,
                                   width: 38,
                                   height: 38,
                                   fit: BoxFit.cover,
-                                  errorWidget: (c, _, _) =>
-                                      const Icon(LucideIcons.users),
+                                  errorWidget: const Icon(LucideIcons.users),
                                 ),
                               ),
                         title: Text(_items[i].name,

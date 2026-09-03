@@ -113,7 +113,7 @@ void main() {
     test('私訊通知直接顯示寄件者與內容', () {
       final a = acc();
       final out = decide(a, snapPm(2, name: 'YanShen', preview: '測試訊息'));
-      expect(out.single.title, 'YanShen');
+      expect(out.single.title, '[私人消息] YanShen');
       expect(out.single.body, '測試訊息');
     });
   });
@@ -186,6 +186,31 @@ void main() {
       expect(decide(a, snap(), now: '09:00'), isEmpty);
     });
 
+    test('使用者自己在論壇簽的也算——不能只看伺服器的紀錄', () {
+      // 這是實際踩到的 bug：lastSignDate 只記錄伺服器代簽的結果，
+      // 使用者自己簽的我們不知道，於是一直推「尚未簽到」
+      final a = acc(signReminderAt: '09:00');
+      final s = PollSnapshot(
+        reachable: true, loggedIn: true, notice: 0, pm: 0,
+        signedOnForum: true,
+      );
+      expect(decideNotifications(
+        account: a, snapshot: s, today: '2026-09-01', nowHhmm: '09:00',
+      ), isEmpty);
+      expect(a.lastSignDate, '2026-09-01', reason: '順便把紀錄補上');
+    });
+
+    test('論壇問不到簽到狀態時，沿用自己的紀錄', () {
+      final a = acc(signReminderAt: '09:00', lastSignDate: '2026-09-01');
+      final s = PollSnapshot(
+        reachable: true, loggedIn: true, notice: 0, pm: 0,
+        signedOnForum: null,
+      );
+      expect(decideNotifications(
+        account: a, snapshot: s, today: '2026-09-01', nowHhmm: '09:00',
+      ), isEmpty);
+    });
+
     test('今天已經簽過就不要再提醒', () {
       final a = acc(signReminderAt: '09:00', lastSignDate: '2026-09-01');
       expect(decide(a, snap(), now: '09:00'), isEmpty);
@@ -211,7 +236,7 @@ void main() {
     test('成功要推，並記下日期', () {
       final a = acc(autoSign: true);
       final out = decide(a, snap(), sign: const SubmitOutcome(true, '簽到成功，獲得 5 金幣'));
-      expect(out.single.title, '簽到成功');
+      expect(out.single.title, '[每日簽到] 已完成');
       expect(out.single.body, contains('5 金幣'));
       expect(a.lastSignDate, '2026-09-01');
     });
@@ -219,7 +244,7 @@ void main() {
     test('失敗也要讓使用者知道，但不要記成已簽', () {
       final a = acc(autoSign: true);
       final out = decide(a, snap(), sign: const SubmitOutcome(false, '需要先登入才能簽到'));
-      expect(out.single.title, '簽到失敗');
+      expect(out.single.title, '[每日簽到] 失敗');
       expect(a.lastSignDate, isNull, reason: '沒簽成功就不能記成今天簽過了');
     });
   });

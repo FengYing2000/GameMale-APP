@@ -1,12 +1,11 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 import 'package:gm_api/smilies.dart' as api;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
+import 'net_image.dart';
 
 /// 發文／回覆／編輯共用的工具列：BBCode 快捷鍵 + 表情選擇器
 class ComposerToolbar extends StatelessWidget {
@@ -193,12 +192,10 @@ class _SmileySheetState extends State<_SmileySheet> {
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(4),
-                          child: CachedNetworkImage(
-                            imageUrl: s.url,
-                            httpHeaders: Api.imageHeaders,
+                          child: NetImage(
+                            url: s.url,
                             fit: BoxFit.contain,
-                            errorWidget: (c, _, _) =>
-                                const Icon(LucideIcons.imageOff, size: 16),
+                            errorWidget: const Icon(LucideIcons.imageOff, size: 16),
                           ),
                         ),
                       );

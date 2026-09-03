@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 /// 未讀提示：霓虹紅點，有數字就顯示數字。
 ///
-/// **為什麼不用 Material 的 `Badge`**：那個沒有外暈，看起來就是一顆普通的
-/// 紅色圓點，跟這個 App 的調性不合。
+/// **圖示留在原位**：角標用 `Positioned` 疊在右上角，外層的 `Stack` 不佔
+/// 額外寬度，所以圖示不會被推歪。早期版本為了避免被裁切而把整組放進一個
+/// 加寬的方框，結果圖示整個偏掉。
 ///
-/// **為什麼不用 Stack + 負的 Positioned**：`NavigationBar` 與 `IconButton`
-/// 都會把圖示裁進固定大小的容器，凸出去的部分會被切掉，數字根本看不到。
-/// 這裡改成把圖示連同角標一起畫在一個**稍微放大的方框內**，角標完全落在
-/// 邊界裡面，不管外層怎麼裁都不會被切。
+/// **不畫外框**：描邊跟霓虹光是互斥的兩種語言，加了外框反而讓光暈變髒。
+/// 要跟背景分離就靠光暈本身。
 class RedDot extends StatelessWidget {
   const RedDot({super.key, required this.child, this.count = 0, this.show});
 
@@ -31,30 +30,27 @@ class RedDot extends StatelessWidget {
 
     // 霓虹外暈。深色底下特別明顯，也是這顆點跟一般紅點的差別。
     const glow = [
-      BoxShadow(color: _red, blurRadius: 7, spreadRadius: 1),
-      BoxShadow(color: Color(0x99FF5252), blurRadius: 14, spreadRadius: 2),
+      BoxShadow(color: _red, blurRadius: 8, spreadRadius: 1),
+      BoxShadow(color: Color(0x99FF5252), blurRadius: 16, spreadRadius: 2),
     ];
-    final ring = Theme.of(context).colorScheme.surface;
 
     final Widget marker = label == null
         ? Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
+            width: 9,
+            height: 9,
+            decoration: const BoxDecoration(
               color: _red,
               shape: BoxShape.circle,
-              border: Border.all(color: ring, width: 1.5),
               boxShadow: glow,
             ),
           )
         : Container(
-            constraints: const BoxConstraints(minWidth: 17),
-            height: 17,
-            padding: EdgeInsets.symmetric(horizontal: label.length > 1 ? 4.5 : 0),
+            constraints: const BoxConstraints(minWidth: 16),
+            height: 16,
+            padding: EdgeInsets.symmetric(horizontal: label.length > 1 ? 4 : 0),
             decoration: BoxDecoration(
               color: _red,
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: ring, width: 1.5),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: glow,
             ),
             alignment: Alignment.center,
@@ -62,26 +58,26 @@ class RedDot extends StatelessWidget {
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 10.5,
+                fontSize: 10,
                 height: 1.15,
                 fontWeight: FontWeight.w700,
               ),
             ),
           );
 
-    // 整組畫在同一個稍大的方框裡（外層再怎麼裁都切不到），
-    // **圖示置中**、角標貼右上角。左右各留一樣的空間，圖示才不會偏。
-    final over = label == null ? 6.0 : 18.0;
-    return SizedBox(
-      width: 24 + over * 2,
-      height: 30,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(width: 24, height: 24, child: Center(child: child)),
-          Positioned(top: 0, right: 0, child: marker),
-        ],
-      ),
+    // clipBehavior: none 讓角標可以凸出去；Stack 本身只佔 child 的大小，
+    // 所以圖示位置完全不變。
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        child,
+        Positioned(
+          top: -5,
+          right: label == null ? -3 : -9,
+          child: marker,
+        ),
+      ],
     );
   }
 }

@@ -46,7 +46,7 @@ List<Outgoing> decideNotifications({
     if (account.cookieStatus != 'expired') {
       account.cookieStatus = 'expired';
       out.add(const Outgoing(
-        '登入憑證已失效',
+        '[帳號] 登入憑證已失效',
         '論壇登入狀態已過期，請重新登入以繼續接收通知',
         tag: 'auth',
       ));
@@ -61,7 +61,7 @@ List<Outgoing> decideNotifications({
   // 只有「變多」才通知：讀掉變少不吵、沒變也不重複吵。
   if (account.notifyNotice && snapshot.notice > account.lastNotice) {
     out.add(Outgoing(
-      '論壇提醒',
+      '[論壇提醒]',
       '您有 ${snapshot.notice} 則未讀提醒',
       tag: 'notice',
     ));
@@ -69,12 +69,14 @@ List<Outgoing> decideNotifications({
   if (account.notifyPm && snapshot.pm > account.lastPm) {
     // 直接把訊息本身放進通知：標題是寄件者，內文是訊息預覽。
     // 抓不到內容時退回未讀則數。
+    // 標題＝［分類］寄件者，內文＝訊息本身。iOS 會自己在標題底下補上
+    // 「from GameMale」，所以標題不用再放 App 名字。
     final hasContent = snapshot.latestPmName.isNotEmpty;
     out.add(Outgoing(
-      hasContent ? snapshot.latestPmName : '私訊',
+      hasContent ? '[私人消息] ${snapshot.latestPmName}' : '[私人消息]',
       hasContent && snapshot.latestPmPreview.isNotEmpty
           ? snapshot.latestPmPreview
-          : '您有 ${snapshot.pm} 則未讀私訊',
+          : '您有 ${snapshot.pm} 則未讀消息',
       tag: 'pm',
     ));
   }
@@ -82,13 +84,19 @@ List<Outgoing> decideNotifications({
   account.lastPm = snapshot.pm;
 
   // ── 簽到 ────────────────────────────────────────────────────
-  final signedToday = account.lastSignDate == today;
+  // 以論壇的實際狀態為準。只看 lastSignDate 的話，使用者自己在 App 或
+  // 論壇網頁上簽的我們不知道，就會一直推「尚未簽到」。
+  // 論壇問不到（null）時才退回自己的紀錄。
+  final signedToday =
+      snapshot.signedOnForum ?? (account.lastSignDate == today);
+  // 論壇說已經簽了，就把紀錄補上，之後不用每輪都再問一次也判斷得出來
+  if (snapshot.signedOnForum == true) account.lastSignDate = today;
   if (account.autoSign) {
     // 有開自動簽到：伺服器代簽，推結果
     if (signResult != null) {
       account.lastSignDate = signResult.ok ? today : account.lastSignDate;
       out.add(Outgoing(
-        signResult.ok ? '簽到成功' : '簽到失敗',
+        signResult.ok ? '[每日簽到] 已完成' : '[每日簽到] 失敗',
         signResult.message,
         tag: 'sign',
       ));
@@ -103,7 +111,7 @@ List<Outgoing> decideNotifications({
     // 改成「過了就提醒」，再用 lastRemindDate 保證一天只推一則。
     // HH:mm 補零過，字串比大小等於時間比大小。
     account.lastRemindDate = today;
-    out.add(const Outgoing('簽到提醒', '您今日尚未完成簽到', tag: 'sign'));
+    out.add(const Outgoing('[每日簽到]', '您今日尚未完成簽到', tag: 'sign'));
   }
 
   return out;

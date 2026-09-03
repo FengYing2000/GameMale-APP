@@ -107,6 +107,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     }
   }
 
+  /// 網頁版的訂閱補過一次了沒（補訂閱很慢，只在開機時做）
+  bool _bootedPush = false;
+
   /// 依設定決定要不要掛背景檢查（只有登入了才有意義）
   Future<void> _applyBackgroundBadges() async {
     try {
@@ -117,7 +120,14 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
         // 把網頁重新加到主畫面會拿到全新的儲存空間與新的 service worker，
         // 舊訂閱留在伺服器上、這台卻什麼都沒有——設定看起來是開的，
         // 實際上一則都收不到。每次啟動都補一次，並讓開關反映真實狀態。
-        final on = _session.loggedIn && await WebPush.ensureSubscribed();
+        // 開機時補一次訂閱；之後（登入狀態改變、換語言重建）只做輕量的
+        // 狀態同步。每次都跑完整的 ensureSubscribed 很慢，而且過程中開關
+        // 會先變成關再變回開——看起來就是「自己閃了一下」。
+        final on = _session.loggedIn &&
+            (_bootedPush
+                ? await WebPush.isSubscribed()
+                : await WebPush.ensureSubscribed());
+        _bootedPush = true;
         if (_settings.notifyBackground != on) {
           await _settings.setNotifyBackground(on);
         }
@@ -350,7 +360,7 @@ class _Scaffold extends StatelessWidget {
     (LucideIcons.messagesSquare, LucideIcons.messagesSquare, '首頁'),
     (LucideIcons.compass, LucideIcons.compass, '導讀'),
     (LucideIcons.search, LucideIcons.search, '搜尋'),
-    (LucideIcons.mail, LucideIcons.mail, '訊息'),
+    (LucideIcons.mail, LucideIcons.mail, '消息'),
     (LucideIcons.user, LucideIcons.user, '我的'),
   ];
 
@@ -359,22 +369,25 @@ class _Scaffold extends StatelessWidget {
     final pmCount = context.watch<SessionStore>().pmCount;
     return Scaffold(
       body: shell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: shell.currentIndex,
-        destinations: [
-          for (final t in _tabs)
-            NavigationDestination(
-              // 訊息分頁掛未讀數。
-              // 這裡用 Material 的 Badge 而不是自家的 RedDot：
-              // NavigationBar 會把圖示裁進固定大小的容器，自己用
-              // Stack + Positioned 疊上去會被切掉，看不到數字。
-              icon: _tabIcon(t.$1, t.$3 == '訊息' ? pmCount : 0),
-              selectedIcon: _tabIcon(t.$2, t.$3 == '訊息' ? pmCount : 0),
-              label: tr(t.$3),
-            ),
-        ],
-        // 再點一次目前分頁 = 回到該分頁的最上層
-        onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+      // 網頁版左右各留一點：手機螢幕四角是圓的，最外側分頁的文字
+      // （「首頁」的首、「我的」的的）會被圓角切掉一小塊。
+      // 原生版由系統的安全區處理，不用補。
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.symmetric(horizontal: kIsWeb ? 8 : 0),
+        child: NavigationBar(
+          selectedIndex: shell.currentIndex,
+          destinations: [
+            for (final t in _tabs)
+              NavigationDestination(
+                icon: _tabIcon(t.$1, t.$3 == '消息' ? pmCount : 0),
+                selectedIcon: _tabIcon(t.$2, t.$3 == '消息' ? pmCount : 0),
+                label: tr(t.$3),
+              ),
+          ],
+          // 再點一次目前分頁 = 回到該分頁的最上層
+          onDestinationSelected: (i) =>
+              shell.goBranch(i, initialLocation: i == shell.currentIndex),
+        ),
       ),
     );
   }

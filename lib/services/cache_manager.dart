@@ -8,7 +8,9 @@ import 'cache_size_io.dart' if (dart.library.js_interop) 'cache_size_web.dart';
 /// 網頁版的持久快取是瀏覽器的 HTTP 快取，Dart 量不到也清不動（那是瀏覽器
 /// 的權責）；能清的是 Flutter 記憶體裡那份解碼快取，以及原生的磁碟快取。
 
-/// 目前快取大小（bytes）。網頁版回 null，代表交給瀏覽器、無法量測。
+/// 目前快取大小（bytes）。
+/// 原生版是磁碟上的圖片快取；網頁版是記憶體裡已解碼的圖片快取
+/// （持久快取由瀏覽器管，Dart 量不到）。
 Future<int?> cacheSizeBytes() => diskCacheBytes();
 
 /// 清掉能清的所有圖片快取。
