@@ -20,6 +20,9 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
+/// 論壇本尊的網域。**不要用 kOrigin**——網頁版那個是自己的轉發位址。
+final _forumHost = Uri.parse(kForumOrigin).host;
+
 class _SettingsPageState extends State<SettingsPage> {
   String _version = '—';
 
@@ -104,6 +107,14 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(26, 8, 26, 0),
+            child: Text(
+              tr('設為手動時，帖子裡的圖片會先顯示佔位，點一下才載入。'
+                  '長按任何圖片可以儲存、分享或複製原始連結。'),
+              style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
+            ),
+          ),
           _section(context, tr('增強功能')),
           Card(
             clipBehavior: Clip.antiAlias,
@@ -141,21 +152,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(26, 8, 26, 0),
-            child: Text(
-              tr('這一區放的是論壇網頁版沒有、App 自己加的功能。'),
-              style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(26, 8, 26, 0),
-            child: Text(
-              tr('設為手動時，帖子裡的圖片會先顯示佔位，點一下才載入。'
-                  '長按任何圖片可以儲存、分享或複製原始連結。'),
-              style: TextStyle(fontSize: 12.5, height: 1.6, color: faint(context)),
-            ),
-          ),
           _section(context, tr('帳號')),
           Card(
             clipBehavior: Clip.antiAlias,
@@ -189,16 +185,41 @@ class _SettingsPageState extends State<SettingsPage> {
                     mode: LaunchMode.externalApplication,
                   ),
                 ),
+                const Divider(indent: 14, endIndent: 14),
+                ListTile(
+                  title: Text(tr('原始碼')),
+                  subtitle: Text(
+                    'github.com/FengYing2000/GameMale-APP',
+                    style: TextStyle(fontSize: 12, color: faint(context)),
+                  ),
+                  trailing: Icon(LucideIcons.externalLink, size: 18, color: faint(context)),
+                  onTap: () => launchUrl(
+                    Uri.parse('https://github.com/FengYing2000/GameMale-APP'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(26, 20, 26, 0),
             child: Text(
-              tr('這個 App 直接讀論壇的手機版頁面，不經過任何第三方伺服器，'
-                  '帳密只送往 ') +
-                  kOrigin.replaceFirst('https://', '') +
-                  tr('。'),
+              // 帳密永遠是送到論壇本尊，不能寫成 kOrigin——網頁版的 kOrigin
+              // 是自己的轉發位址，那樣會顯示成「帳密只送往 852111.xyz/gm」。
+              //
+              // 網頁版也不能沿用「不經過任何第三方伺服器」那句：瀏覽器不准
+              // 跨網域直接連論壇，請求確實會經過自己架的轉發。講清楚比較好。
+              kIsWeb
+                  ? tr('瀏覽器不准跨網域直接連論壇，所以網頁版經由 ') +
+                      Uri.base.host +
+                      tr(' 轉發。轉發不保存任何帳號資料，'
+                          '登入狀態由瀏覽器自己保管；帳密最終送往 ') +
+                      _forumHost +
+                      tr('。')
+                  : tr('這個 App 直接讀論壇的手機版頁面，不經過任何第三方伺服器，'
+                          '帳密只送往 ') +
+                      _forumHost +
+                      tr('。'),
               style: TextStyle(fontSize: 12.5, height: 1.7, color: faint(context)),
             ),
           ),

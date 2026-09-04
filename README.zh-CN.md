@@ -294,7 +294,10 @@ iPhone 用 Safari「加到主屏幕」就能当 App 用 —— **不必侧载、
 
 个人自用项目，非官方、与 GameMale 官方无关。
 
-账号密码只会发送到 `www.gamemale.com`，cookie 存在 App 沙箱内，不连任何第三方服务。
+**原生版**：账号密码只会发送到 `www.gamemale.com`，cookie 存在 App 沙箱内，不连任何第三方服务。
+
+**网页版**：浏览器不准跨域直接连论坛，所以请求会经过自建的转发（`852111.xyz`）
+再送到 `www.gamemale.com`。转发不保存任何账号数据，登录 cookie 由浏览器自己保管。
 
 `Info.plist` 开了 `NSAllowsArbitraryLoads` —— 帖子图片来自用户贴的任意外站网址，
 无法列举白名单。这是侧载自用的 App，不上架，故如此取舍。
