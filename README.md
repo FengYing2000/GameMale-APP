@@ -71,6 +71,8 @@ PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字
 | **取消收藏是兩步驟** | 先 GET 拿確認表單（formhash 跟頁面上的不同），再 POST `deletesubmit=true` 才真的刪 |
 | **ajax 回應要抽訊息** | 整包只是一段 `<script>`，直接當文字會把 JavaScript 唸出來 |
 | **圖片有四種來源** | 一般網址、`data:` 內嵌、jsdelivr 的 `.svg` emoji、第三方圖床；各自要不同的處理，否則整片「載入失敗」 |
+| **CanvasKit 不用系統字體** | 網頁版遇到沒載入的字會即時去 gstatic 抓 Noto，抓回來之前整片方格打叉；中文字體要自己內建並在 `runApp` 前 await |
+| **圖片要照顯示尺寸解碼** | 頭像原圖 200px 以上、列表只畫 40px，照原尺寸解碼等於每張多花十幾倍記憶體，捲動時還要把過大的貼圖全傳給 GPU |
 | **Flutter 不解 SVG** | 論壇有人插 noto-emoji 的 `.svg`，內建解碼器畫不出來（原生版也一樣，跟 CORS 無關）；換成同一個 repo 的 `png/128/` 就好，不必為表情拉一個 SVG 套件 |
 | **圖片與連結要分開處理** | 網頁版靠改寫網址走代理，而 `absolute()` 同時用在 `<img src>` 和 `<a href>` 上。把連結也丟進圖片代理，道具、收藏那些端點就會 404——所以圖片改用 `absoluteImage()` |
 | **附件也有三種長相** | 帖尾的 `dl.tattl`、內文中間的 `span#attach_N`、「更多圖片」的 `dl.tattl.attm`（要排除） |

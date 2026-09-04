@@ -28,8 +28,12 @@
        抓 Noto 的備援字型——那段空窗期就會看到「⌧」方框。先建立連線
        可以讓它早一點抓到、縮短方框出現的時間。
        要完全避免得把中文字型打包進去（好幾 MB），不划算。 -->
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <!-- 中文字體自己出，不跟 Google 拿。
+       CanvasKit 不用系統字體，遇到沒載入的字會即時去 gstatic 抓 Noto，
+       抓回來之前畫面就是一整片方格打叉。preload 讓它跟 main.dart.js、
+       canvaskit.wasm 平行下載，所以 Dart 端 await 時通常已經在快取裡了。
+       檔名帶內容雜湊，換字體時改檔名即可。 -->
+  <link rel="preload" href="fonts/gm-cjk-6683468f.ttf" as="fetch" crossorigin>
 
   <title>GameMale</title>
   <link rel="manifest" href="manifest.json">

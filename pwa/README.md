@@ -26,7 +26,7 @@
 ### 本機
 
 ```bash
-flutter build web --release --pwa-strategy=none   # 先產出網頁版
+flutter build web --wasm --release --pwa-strategy=none   # 先產出網頁版
 cd pwa/server && dart run bin/server.dart
 ```
 
@@ -34,6 +34,38 @@ cd pwa/server && dart run bin/server.dart
 
 `--pwa-strategy=none` 是刻意的：Flutter 產的 service worker 會把舊版
 程式碼快取住，部署完看到的還是舊的。
+
+`--wasm` 會同時產出 WasmGC 版（`main.dart.wasm`）與 JS 版
+（`main.dart.js`），`flutter_bootstrap.js` 依瀏覽器自動挑。舊瀏覽器
+自動退回 JS，所以沒有風險。實測 wasm 壓縮後只有 1.5 MB，比 JS 版小。
+
+## 中文字體是自己出的
+
+CanvasKit **不用系統字體**——它只畫得出自己載進去的字體。遇到沒有的字
+時 Flutter 會即時去 `fonts.gstatic.com` 抓 Noto 後備字體，在抓回來之前
+畫面上就是一整片方格打叉。
+
+所以 `web/fonts/gm-cjk-<hash>.ttf` 自己出一份，`main()` 裡 **await 完才
+`runApp`**，第一幀就不會有方格。
+
+怎麼做出來的（`Noto Sans SC` 變數字體 → 固定 400 字重 → 裁掉用不到的區塊）：
+
+```bash
+python -m fontTools.varLib.instancer NotoSansSC[wght].ttf wght=400 -o inst.ttf
+python -m fontTools.subset inst.ttf --output-file=gm-cjk.ttf --no-hinting   --desubroutinize --layout-features='*'   --unicodes='U+0000-024F,U+2000-206F,U+2E80-2EFF,U+3000-303F,U+3040-30FF,U+3100-312F,U+31C0-31EF,U+4E00-9FFF,U+F900-FAFF,U+FE10-FE4F,U+FF00-FFEF,U+2190-21FF,U+2460-24FF,U+25A0-25FF,U+2600-26FF'
+```
+
+幾個實測出來的決定：
+
+- **一定要用 SC 不能用 TC**。`Noto Sans TC` 缺常用簡體字（这应来员说话读写语湾
+  签勋积…），而 `Noto Sans SC` 繁簡全包（30890 個碼位）。論壇兩種字都有。
+- **固定單一字重**。保留字重軸的變數版壓縮後 6.1 MB，固定 400 只要 3.5 MB，
+  粗體交給 Flutter 合成划算。
+- **砍 OpenType 特性沒用**。只留 kern/ccmp/locl 跟全留差不到 0.1 MB。
+- **檔名帶內容雜湊**，伺服器給 `max-age=31536000, immutable`。
+  它壓縮後 4.7 MB，第一幀要等它，讓它變成真正的一次性成本很重要。
+- 放在 `web/` 而**不是 pubspec 的 assets**——這樣只有網頁版帶它，
+  原生的 IPA／APK 完全不受影響（那邊有系統中文字體，本來就不需要）。
 
 ### 部署到香港 VPS
 

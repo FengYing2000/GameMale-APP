@@ -38,12 +38,25 @@ class NetImage extends StatelessWidget {
     final err = errorWidget ?? ph;
     if (url.isEmpty) return err;
 
+    // 只解碼到實際要畫的大小。
+    //
+    // 論壇的頭像原圖可能是 200×200 以上，而列表裡只畫 40px；照原尺寸解碼
+    // 等於每張多花十幾倍的記憶體與時間，捲動時 CanvasKit 還要把那些過大的
+    // 貼圖全部傳給 GPU。一頁二十幾個頭像的差距很有感。
+    //
+    // 乘上螢幕的像素密度，否則高解析度螢幕上會糊掉。
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0;
+    final decodeW = width == null ? null : (width! * dpr).round();
+    final decodeH = height == null ? null : (height! * dpr).round();
+
     if (kIsWeb) {
       return Image.network(
         url,
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: decodeW,
+        cacheHeight: decodeW == null ? decodeH : null,
         // 冷啟動時瀏覽器快取命中就不會閃 placeholder，這裡只處理首次載入
         loadingBuilder: (c, child, progress) =>
             progress == null ? child : ph,
@@ -57,6 +70,8 @@ class NetImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      memCacheWidth: decodeW,
+      memCacheHeight: decodeW == null ? decodeH : null,
       placeholder: (c, _) => ph,
       errorWidget: (c, u, e) => err,
     );

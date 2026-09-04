@@ -115,13 +115,19 @@ Handler _withCacheHeaders(Handler inner) => (Request request) async {
       final res = await inner(request);
       final path = request.url.path;
 
+      // 中文字體檔名帶內容雜湊（gm-cjk-<hash>.ttf），內容改了檔名就會變，
+      // 所以可以給最強的快取。它有 4.7 MB（壓縮後），而且第一幀要等它，
+      // 讓它變成真正的一次性成本很重要。
+      final hashed = path.startsWith('fonts/');
       final immutable = path.startsWith('canvaskit/') ||
           path.startsWith('assets/') ||
           path.startsWith('icons/');
 
       return res.change(headers: {
-        'cache-control': immutable
-            ? 'public, max-age=604800'
-            : 'no-cache, must-revalidate',
+        'cache-control': hashed
+            ? 'public, max-age=31536000, immutable'
+            : immutable
+                ? 'public, max-age=604800'
+                : 'no-cache, must-revalidate',
       });
     };

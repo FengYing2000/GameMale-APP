@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'services/cjk_font_stub.dart'
+    if (dart.library.js_interop) 'services/cjk_font.dart';
+
 /// 品牌色沿用論壇的簽到按鈕綠
 const brand = Color(0xFF70A128);
 const brandLight = Color(0xFF8DB943);
@@ -27,7 +30,9 @@ ThemeData _base(Brightness b, [Color seed = brand]) {
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: bg,
-    fontFamily: '.SF Pro Text',
+    // 網頁版用自己內建的中文字體；原生版留給系統字體（那邊本來就有
+    // 中文，而且跟系統其他 App 一致比較好看）。
+    fontFamily: cjkFontFamily ?? '.SF Pro Text',
     splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface.withValues(alpha: 0.92),
