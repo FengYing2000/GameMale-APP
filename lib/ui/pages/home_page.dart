@@ -35,7 +35,11 @@ class _HomePageState extends State<HomePage> {
   String? _err;
   final _open = <int, bool>{};
 
-  /// 哪些版塊的子版塊被展開了
+  /// 哪些版塊的子版塊被收合了。
+  ///
+  /// **預設是展開**（`?? true`）：子版塊藏起來的話，使用者得先知道那裡有
+  /// 東西才會去點——等於把內容藏在一個看不出來的地方。跟上面版塊分組
+  /// （`_open`）的預設一致。
   final _openSubs = <int, bool>{};
 
   /// fid → 子版塊，來自桌面首頁
@@ -285,13 +289,13 @@ class _HomePageState extends State<HomePage> {
                                 _moderators[data.groups[i].forums[j].fid] ??
                                     data.groups[i].forums[j].moderators,
                             expanded:
-                                _openSubs[data.groups[i].forums[j].fid] ?? false,
+                                _openSubs[data.groups[i].forums[j].fid] ?? true,
                             onToggle: () => setState(() {
                               final fid = data.groups[i].forums[j].fid;
-                              _openSubs[fid] = !(_openSubs[fid] ?? false);
+                              _openSubs[fid] = !(_openSubs[fid] ?? true);
                             }),
                           ),
-                          if (_openSubs[data.groups[i].forums[j].fid] ?? false)
+                          if (_openSubs[data.groups[i].forums[j].fid] ?? true)
                             for (final sub in _subsOf(data.groups[i].forums[j]))
                               _SubForumRow(item: sub),
                           if (j != data.groups[i].forums.length - 1)
