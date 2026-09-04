@@ -191,16 +191,6 @@ class PollSnapshot {
   final Map<String, int> noticeKinds;
 }
 
-/// 提醒分類的顯示名稱
-String noticeKindLabel(String view) => switch (view) {
-      'system' => '系統提醒',
-      'mypost' => '回覆我的',
-      'interactive' => '互動',
-      'manage' => '管理',
-      'app' => '應用',
-      _ => '提醒',
-    };
-
 /// 查一次未讀數，順便判斷還在不在登入狀態。
 ///
 /// **提醒**用頁首的提醒選單，不要用 fetchNotice——後者會把提醒標成已讀，

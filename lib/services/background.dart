@@ -48,28 +48,86 @@ Future<void> checkBadgesInBackground() async {
   }
 
   final b = await api.fetchBadges();
+
+  // 私訊數**不能用頁首那個**。頁首的私訊數是一個「新訊息提示」，使用者
+  // 只要瞄一眼訊息列表，論壇就把它清成 0——可是對話本身還是未讀的。
+  // 只看頁首的話，實際有好幾則沒讀卻永遠推不出通知。每則對話自己的
+  // 未讀數才是真的，跟 App 裡紅點用的是同一個來源。
+  var pm = b.pm;
+  var pmName = '';
+  var pmPreview = '';
+  try {
+    final list = await api.fetchPmList();
+    pm = list.items.fold(0, (sum, i) => sum + i.unread);
+    // 列表本來就依時間排序，第一則未讀的就是最新那則
+    for (final it in list.items) {
+      if (it.unread > 0) {
+        pmName = it.name;
+        pmPreview = it.last;
+        break;
+      }
+    }
+  } catch (_) {
+    // 抓不到就退回頁首那個數字，至少不會完全沒有通知
+  }
+
   final prefs = await SharedPreferences.getInstance();
   final lastNotice = prefs.getInt(_kLastNotice) ?? 0;
   final lastPm = prefs.getInt(_kLastPm) ?? 0;
 
   // 只在「變多」時通知：讀過而變少不用吵，維持原數也不用重複吵
   if (b.notice > lastNotice) {
+    // 講得出「是哪一類」。要顯示提醒的**內容**就得去開提醒頁，而那會把
+    // 該分類標成已讀，紅點會跟著消失。分類名稱從頁首就讀得到，沒有副作用。
     await Notifications.show(
       id: Notifications.idNotice,
-      title: tr('有新提醒'),
-      body: '${tr('你有')} ${b.notice} ${tr('則未讀提醒')}',
+      title: noticeTitle(b.views),
+      body: '${tr('您有')} ${b.notice} ${tr('則未讀提醒')}',
     );
   }
-  if (b.pm > lastPm) {
+  if (pm > lastPm) {
+    // 標題＝［分類］寄件者，內文＝訊息本身，跟網頁版推播同一套格式
+    final n = pmNotification(name: pmName, preview: pmPreview, unread: pm);
     await Notifications.show(
       id: Notifications.idPm,
-      title: tr('有新私訊'),
-      body: '${tr('你有')} ${b.pm} ${tr('則未讀私訊')}',
+      title: n.title,
+      body: n.body,
     );
   }
 
   await prefs.setInt(_kLastNotice, b.notice);
-  await prefs.setInt(_kLastPm, b.pm);
+  await prefs.setInt(_kLastPm, pm);
+}
+
+/// 提醒通知的標題：講得出「是哪一類」。
+///
+/// 要顯示提醒的**內容**就得去開提醒頁，而那會把該分類標成已讀，紅點會
+/// 跟著消失。分類名稱從頁首就讀得到，沒有這個副作用。
+/// 跟網頁版的伺服器推播共用同一組分類名稱（[api.noticeKindLabel]）。
+String noticeTitle(Map<String, int> views) {
+  final kinds = views.entries
+      .where((e) => e.value > 0)
+      .map((e) => tr(api.noticeKindLabel(e.key)))
+      .toList();
+  return kinds.isEmpty ? tr('[論壇提醒]') : '[${kinds.join('、')}]';
+}
+
+/// 私訊通知的標題與內文：標題＝［分類］寄件者，內文＝訊息本身。
+///
+/// iOS 會自己在標題底下補上「from GameMale」，所以標題不用再放 App 名字。
+/// 抓不到內容時退回未讀則數。
+({String title, String body}) pmNotification({
+  required String name,
+  required String preview,
+  required int unread,
+}) {
+  final hasName = name.isNotEmpty;
+  return (
+    title: hasName ? '${tr('[私人消息]')} $name' : tr('[私人消息]'),
+    body: hasName && preview.isNotEmpty
+        ? preview
+        : '${tr('您有')} $unread ${tr('則未讀消息')}',
+  );
 }
 
 /// 前景每次對紅點時也把基準寫回去，免得回到背景又通知一次同樣的東西

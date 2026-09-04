@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:gm_api/discuz.dart' show noticeKindLabel;
+
 import 'accounts.dart';
 import 'forum.dart';
 import 'push_client.dart';
