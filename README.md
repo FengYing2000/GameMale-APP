@@ -1,20 +1,23 @@
 <div align="center">
 
-<img src="assets/icon.png" width="96" alt="GameMale" />
+<img src="assets/icon.png" width="112" alt="GameMale" />
 
-# GameMale for iOS
+# GameMale
 
-**[GameMale](https://www.gamemale.com/) 論壇的原生 iOS 客戶端**
+**[GameMale 論壇](https://www.gamemale.com/) 的手機 App**
 
-以 Flutter 打造 · 直連論壇 · 不經第三方伺服器
+在手機上好好逛論壇 —— 深色模式、簽到、私訊、樓中樓，一個都不少
+
+[![網頁版](https://img.shields.io/badge/網頁版-立即開啟-70A128?style=for-the-badge)](https://852111.xyz)
+[![Android](https://img.shields.io/badge/Android-下載_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-android-手機)
+[![iPhone](https://img.shields.io/badge/iPhone-安裝說明-000000?style=for-the-badge&logo=apple&logoColor=white)](#-iphone)
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-[![iOS](https://img.shields.io/badge/iOS-15.0%2B-000000?logo=apple&logoColor=white)](#產出-ipa)
-[![Android](https://img.shields.io/badge/Android-6.0%2B-3DDC84?logo=android&logoColor=white)](#產出-apkandroid)
-[![Tests](https://img.shields.io/badge/測試-293%20項-4CAF50)](#測試策略)
-[![License](https://img.shields.io/badge/用途-個人自用-lightgrey)](#授權與隱私)
+[![iOS](https://img.shields.io/badge/iOS-15.0%2B-lightgrey?logo=apple&logoColor=white)](#-iphone)
+[![Android](https://img.shields.io/badge/Android-6.0%2B-lightgrey?logo=android&logoColor=white)](#-android-手機)
+[![測試](https://img.shields.io/badge/自動測試-349_項-4CAF50)](docs/DEVELOPING.md)
 
-[繁體中文](README.md) · [简体中文](README.zh-CN.md)
+**繁體中文** · [简体中文](README.zh-CN.md)
 
 </div>
 
@@ -22,289 +25,181 @@
 
 ## 這是什麼
 
-GameMale 官方沒有 App，App Store 上的「论坛助手」是通用型 Discuz 客戶端，體驗不佳。
-這個專案把論壇做成一個真正好用的 iOS App：原生介面、深色模式、繁簡切換、流量控制，
-以及論壇本身的完整功能 —— 簽到、評分、樓中樓、投票、私訊、記錄廣場。
+GameMale 論壇沒有官方 App。用手機瀏覽器逛，字小、圖片吃流量、切換版塊要一直等整頁重載。
 
-> **為什麼不是套殼瀏覽器？**
-> 因為那樣就只是把網頁塞進 App 圖示裡。這個專案解析論壇資料後用原生元件重繪，
-> 才能做到深色模式下文字可讀、圖片依流量策略載入、繁簡即時切換這些網頁版做不到的事。
+這個 App 把論壇的內容抓下來，**用手機介面重新畫一次**。它不是把網頁塞進 App 圖示裡的殼——
+所以才做得到深色模式下文字真的看得清楚、圖片可以按流量決定要不要載、繁簡體隨時切換。
+
+論壇上你會做的事，這裡幾乎都能做：看帖、回覆、發文、簽到、私訊、評分、投票、淘帖、群組。
 
 ---
 
-## 技術取捨
+## 開始使用
 
-### 為什麼是解析 HTML，不是打 API
+三種方式，**選一種就好**。不確定的話用網頁版，最省事。
 
-探測結果很明確 —— 這站的官方 Discuz 手機 API **已被關閉**：
+| | 適合誰 | 要注意 |
+|---|---|---|
+| 🌐 **網頁版** | 所有人，尤其 iPhone | 不用安裝、不會過期、隨時是最新版 |
+| 🤖 **Android** | Android 手機 | 下載一個檔案直接裝，不會過期 |
+| 🍎 **iPhone 原生版** | 想要完全原生的體驗 | 需要電腦操作，**每 7 天要重裝一次** |
 
-```http
-GET /api/mobile/index.php?version=4&module=forumindex
-→ 200 OK，回應長度 0
-```
+### 🌐 網頁版（最推薦）
 
-PHP 確實執行了（會回 `Set-Cookie`），但所有 JSON 模組都回空字串，
-只有 `mynotelist` 漏出老舊的 WAP 模板。
+用 **Safari** 開啟 **[852111.xyz](https://852111.xyz)**，然後加到主畫面：
 
-所以走第二條路：帶 `mobile=2` 取手機版模板（`xinrui_iuni_mobile/touch`），
-再用 `package:html` 解析。手機版模板只有 **37 KB**（桌面版 187 KB），節點結構乾淨。
+1. 點瀏覽器右下角的 **「⋯」**
+2. 選最上面的 **「分享」**
+3. 往下捲，選 **「加入主畫面」**
+4. 回到主畫面，從 GameMale 圖示打開
 
-### 幾個關鍵決定
+加完之後開起來沒有網址列、全螢幕、有自己的圖示，用起來就跟一般 App 一樣。
+第一次開啟會多花幾秒下載中文字體，之後就不用了。
 
-| 決定 | 原因 |
-|---|---|
-| **登入狀態只認登出連結** | 訪客版底部導覽也有 `mycenter=1` 的「我的」，拿它當證據會把訪客判成已登入 |
-| **判定訪客要看到登入入口** | `inajax=1` 的浮層片段兩種標記都沒有，用「缺少登出連結」反推會害使用者一點評分就被登出 |
-| **需要登入要看 `#loginform`** | 訪客瀏覽公開板塊時頁尾一樣有登入連結，用它會把每個板塊都擋掉 |
-| **驗證碼走 `getBytes` + `Image.memory`** | `Image.network` 不會帶 session cookie，拿到的驗證碼跟伺服器記的對不起來 |
-| **發文走桌面端點** | 論壇處理邏輯相同，但外掛（勳章積分）掛在桌面流程上 |
-| **桌面模板要明寫 `mobile=no`** | 只是不帶 `mobile=2` 沒用 —— Discuz 會依 iPhone UA 自動轉手機版 |
-| **POST 的轉址要自己跟** | Dart 的 HttpClient 只自動跟隨 GET/HEAD，POST 收到 302 會拿到空 body |
-| **積分變化要用 ID 定位** | `creditnotice` cookie 第 0 格是總積分，第 1～8 格照積分 ID 擺；照名稱表順序數會整串位移一格 |
-| **已回帖用 `authorid` 反問** | 論壇沒有現成清單，但帶 `authorid=<自己>` 開帖時沒發言過會回「未定义操作」（約 4.7 KB） |
-| **收藏狀態要自己記** | 帖子頁的收藏連結永遠寫著「收藏本帖」，按下去才知道收過沒有，所以把收藏清單抓回本機比對 |
-| **勳章 tip 照結構拆** | 等級和名字之間沒有空白，正則會黏成「Max黑暗之魂系列」；`<b>` 是等級、`<h4>` 其餘是名字 |
-| **「沒有登出連結」不等於登出** | 論壇偶爾回一頁兩種標記都沒有的東西，照舊邏輯會把使用者標成憑證失效、半夜推一則「請重新登入」；要兩邊都拿正面證據，判讀不出來就當這輪沒查到 |
-| **深色底的灰字要明講顏色** | 回 `null` 等於不覆寫，元素上的 `color="#333"` 還是會生效 |
-| **論壇頁面用內建瀏覽器** | 丟給系統瀏覽器那邊沒有登入狀態，所以把 App 的 cookie 灌進 WebView |
-| **論壇內容一律保留原文** | 轉過的標題跟網頁版對不起來，所以簡繁轉換改成帖子頁上逐篇按 |
-| **取消收藏是兩步驟** | 先 GET 拿確認表單（formhash 跟頁面上的不同），再 POST `deletesubmit=true` 才真的刪 |
-| **ajax 回應要抽訊息** | 整包只是一段 `<script>`，直接當文字會把 JavaScript 唸出來 |
-| **圖片有四種來源** | 一般網址、`data:` 內嵌、jsdelivr 的 `.svg` emoji、第三方圖床；各自要不同的處理，否則整片「載入失敗」 |
-| **CanvasKit 不用系統字體** | 網頁版遇到沒載入的字會即時去 gstatic 抓 Noto，抓回來之前整片方格打叉；中文字體要自己內建並在 `runApp` 前 await |
-| **圖片要照顯示尺寸解碼** | 頭像原圖 200px 以上、列表只畫 40px，照原尺寸解碼等於每張多花十幾倍記憶體，捲動時還要把過大的貼圖全傳給 GPU |
-| **Flutter 不解 SVG** | 論壇有人插 noto-emoji 的 `.svg`，內建解碼器畫不出來（原生版也一樣，跟 CORS 無關）；換成同一個 repo 的 `png/128/` 就好，不必為表情拉一個 SVG 套件 |
-| **圖片與連結要分開處理** | 網頁版靠改寫網址走代理，而 `absolute()` 同時用在 `<img src>` 和 `<a href>` 上。把連結也丟進圖片代理，道具、收藏那些端點就會 404——所以圖片改用 `absoluteImage()` |
-| **附件也有三種長相** | 帖尾的 `dl.tattl`、內文中間的 `span#attach_N`、「更多圖片」的 `dl.tattl.attm`（要排除） |
-| **附件內容自己解碼** | 伺服器送 `octet-stream` 又不帶 charset，瀏覽器在繁中系統會猜成 Big5，UTF-8 檔就變亂碼 |
-| **分頁要記住請求的頁數** | 有些列表只給「上一頁／下一頁」，照 DOM 算會永遠停在第 1 頁，還把下一頁的 `page=3` 當成總頁數 |
-| **刪除都是兩步驟** | 先 GET 拿確認表單（formhash 跟頁面上的不同），再 POST 才真的刪；抽成 `confirmAndSubmit` 共用 |
-| **頁首的私訊數會被自己清掉** | 使用者瞄一眼訊息列表，論壇就把頁首那個數字歸零，但對話本身還是未讀——紅點只看頁首就會整批漏掉，要用每則對話自己的未讀數 |
-| **系統文字才跟著介面語言** | 版塊名、積分名、論壇提示用 `sys()` 轉；帖子標題與內文一律原文，要看繁體按帖子頁的翻譯 |
-| **附件的數字 id 不在下載連結裡** | 已購買的連結帶的是 base64 的 `aid`，數字版要從 `span#attach_N` 或購買紀錄連結拿 |
-| **群組是另一套頁面** | `group-<fid>-1.html` 只有桌面模板，用 `/f/<fid>` 進去會顯示「沒有主題」 |
-| **簡繁轉換自訂規則** | OpenCC 的第一候選常常不合語境（`签到`→`籤到`、`295 里`→`295 裡`） |
+> **iPhone 為什麼推薦這個？** 因為原生 App 用免費的開發者憑證簽章，Apple 只給 7 天，
+> 到期就打不開、要重新安裝一次。網頁版沒有這個問題。
+
+### 🤖 Android 手機
+
+到 **[Releases](../../releases)** 下載 `GameMale.apk`，點開安裝即可。
+系統會問要不要允許安裝來源，同意就好。**不會過期。**
+
+### 🍎 iPhone
+
+原生版需要用電腦側載，而且**每 7 天要重簽一次**（Apple 對免費憑證的限制，不是 App 的問題）。
+
+1. 到 **[Releases](../../releases)** 下載 `GameMale.ipa`
+2. 用 [Sideloadly](https://sideloadly.io/) 或 [AltStore](https://altstore.io/) 安裝
+3. 到「設定 → 一般 → VPN 與裝置管理」信任你的開發者憑證
+
+嫌麻煩的話，**用上面的網頁版就好**，功能是一樣的。
 
 ---
 
 ## 功能
 
 <table>
-<tr><td width="90"><b>瀏覽</b></td><td>板塊列表（收藏的版塊／訂閱的專輯／子版塊展開＋圖示／點圖示看版主與簡介）· 主題列表（全部／最新／熱門／熱帖／精華）· 投票與懸賞篩選 · 排序與時間範圍 · 主題分類 · 帖子內頁 · 附件 · 分頁</td></tr>
-<tr><td><b>互動</b></td><td>回覆 · 引用回覆 · 發表主題 · 編輯自己的帖子 · 收藏主題／版塊（黃星切換）· 頂／踩 · 淘帖入專輯 · 使用道具（提升泵／亮色刷）· 舉報 · 評分 · 投票 · 快速跳樓（頂部／首樓／指定樓層）</td></tr>
-<tr><td><b>淘帖</b></td><td>推薦／所有／我的專輯 · 專輯內頁（訂閱／取消）· 加入專輯 · 向作者推薦主題 · 評分評論＋看最新評論 · 標籤搜尋 · 我建的專輯可編輯／刪除／邀請維護</td></tr>
-<tr><td><b>群組</b></td><td>群組首頁（推薦／分類／積分排行）· 群組內頁（群主／積分／等級／發帖）· 加入／退出／收藏 · 成員列表 · 我參與的／我管理的</td></tr>
-<tr><td><b>社群</b></td><td>私訊（氣泡對話）· 通知（兩層分類）· 個人資料（角色組／勳章／管理版塊／已加入群組）· 個人空間七個子頁 · 加好友 · 打招呼 · 記錄廣場（時間／樓中樓回覆／逐則回覆）· 新提醒／新私訊紅點 · 提醒可回招呼／忽略 · 打招呼 14 種動作＋留言</td></tr>
-<tr><td><b>搜尋</b></td><td>帖子 · 日誌 · 相冊 · 群組 · 淘帖 · 用戶 · 本版搜尋 · 單字也能搜 · 高級搜索（全文／作者／主題範圍／特殊主題／時間／排序）</td></tr>
-<tr><td><b>帳號</b></td><td>帳密登入（圖形驗證碼／安全提問）· 註冊問答 · 登出 · 每日簽到（排行榜／補簽卡／每天自動簽到）· 我的收藏（帖子／版塊／群組／日誌／相冊）／主題／回覆 · 回帖紀錄</td></tr>
-<tr><td><b>體驗</b></td><td>深／淺色 · 彩虹旗六色強調色 · RPG 風格提示氣泡 · 繁簡即時切換（換語言整頁重繪）· 流量控制 · 表情選擇器 · 外部連結跳轉提示 · 回帖獎勵橫幅 · 已回帖標記 · Lucide 圖示 · 內建瀏覽器（帶登入狀態）· 圖片長按選單 · 樓中樓 · 固定分頁列（切頁回頂）· 下拉重新整理</td></tr>
+<tr>
+<td width="150"><b>📖 瀏覽</b></td>
+<td>版塊列表（可展開子版塊、點圖示看版主與版規）、主題列表可依<b>最新／熱門／精華</b>切換，也能只看投票或懸賞。帖子內頁支援分頁、附件、<b>樓中樓</b>，還能快速跳到指定樓層。</td>
+</tr>
+<tr>
+<td><b>✍️ 發言</b></td>
+<td>回覆、引用回覆、發表新主題、編輯自己的帖子。內建<b>表情選擇器</b>與 BBCode 快捷鍵，回帖有獎勵時會直接顯示橫幅。已經回過的主題會標「已回」。</td>
+</tr>
+<tr>
+<td><b>⭐ 互動</b></td>
+<td>評分、投票、頂／踩、收藏主題與版塊、使用道具（提升泵／亮色刷）、舉報。</td>
+</tr>
+<tr>
+<td><b>📅 每日簽到</b></td>
+<td>一鍵簽到，看得到<b>排行榜</b>與連續天數。有補簽卡可以補簽。也可以開「每天自動簽到」，每天第一次開 App 就幫你點好。</td>
+</tr>
+<tr>
+<td><b>💬 私訊與提醒</b></td>
+<td>私訊是<b>氣泡對話</b>介面，不是論壇那種列表。新訊息與新提醒會在底部顯示紅點。提醒可以直接回招呼或忽略。</td>
+</tr>
+<tr>
+<td><b>👤 個人空間</b></td>
+<td>個人資料（角色組、勳章、管理的版塊、加入的群組）、記錄廣場、日誌、相冊、好友。可以加好友、打招呼（14 種動作）。</td>
+</tr>
+<tr>
+<td><b>📚 淘帖與群組</b></td>
+<td>專輯的推薦／全部／我的，可訂閱、評分評論、向作者推薦主題、用標籤搜尋。自己建的專輯可以編輯、刪除、邀請維護。群組能加入／退出／收藏，看得到成員與積分排行。</td>
+</tr>
+<tr>
+<td><b>🔍 搜尋</b></td>
+<td>帖子、日誌、相冊、群組、淘帖、用戶都能搜，也能只搜本版。<b>單一個字也搜得到</b>。進階搜尋可指定作者、時間範圍與排序。</td>
+</tr>
+<tr>
+<td><b>🎨 個人化</b></td>
+<td>深色／淺色主題、<b>彩虹旗六色</b>強調色任選、繁簡體即時切換、圖片載入策略（一律載入／只在 Wi-Fi／手動）。長按圖片可以儲存、分享或複製連結。</td>
+</tr>
 </table>
 
-### 訪客與會員
+### 不登入也能用
 
-論壇本身允許訪客瀏覽，App 忠實反映這一點：
+論壇本身允許訪客瀏覽，App 也一樣：**版塊、主題、帖子、記錄廣場、他人資料**不登入就看得到。
 
-- **訪客可看**：板塊、主題、帖子、記錄廣場（隨便看看）、他人資料
-- **需要登入**：回覆、發文、編輯、評分、收藏、簽到、私訊、發布記錄、通知
-
-寫入動作有三道防線：送出結果會辨識登入牆、動手前先問一次、UI 直接藏掉按鈕。
+回覆、發文、評分、收藏、簽到、私訊這些要登入才能做——按鈕會直接隱藏，不會讓你填半天才說不行。
 
 ---
 
-## 架構
+## 隱私
 
-```
-lib/
-├── api/
-│   ├── models.dart      所有資料型別（空安全，UI 拿不到 dynamic）
-│   ├── http.dart        dio + PersistCookieJar，cookie 落地免重登
-│   ├── parse.dart       DOM 工具、內容淨化、登入狀態判定
-│   ├── discuz.dart      主要端點；純解析函式獨立匯出方便測試
-│   ├── search.dart      五種搜尋分類
-│   ├── space.dart       個人空間七個子頁
-│   ├── smilies.dart     表情清單（讀論壇自己的快取檔）
-│   └── register.dart    註冊問答
-├── i18n/
-│   ├── s2t.dart         簡→繁（台灣用語）
-│   └── ui.dart          介面繁→簡
-├── store/               session（登入狀態）· settings（語言／主題／強調色／流量）· history（回帖紀錄）
-└── ui/
-    ├── widgets/         PostBody · ComposerToolbar · Avatar · StateBox · StickyPager …
-    └── pages/           淘帖、記錄、簽到…等頁面
+這是個人自用專案，不是官方 App，**與 GameMale 官方無關**。
 
-tool/
-├── zh_rules.py          簡繁轉換的人工規則 ← 要調整用字改這裡
-├── build_zh_table.py    產生 assets/s2t.json
-├── fetch_fixtures.dart  重抓測試樣本
-├── make-icon.mjs        產生 App 圖示（純 Node）
-└── build-ipa.sh         在任一台 Mac 上產 IPA
-```
+- **不會保存你的密碼。** 登入後只留論壇給的 Cookie，跟你用瀏覽器登入是一樣的東西。
+- **原生版直連論壇**，帳號密碼只送到 `www.gamemale.com`，不經過任何第三方。
+- **網頁版經過一層轉發。** 瀏覽器有跨網域限制，不准網頁直接連論壇，所以請求會先經過
+  `852111.xyz`（本專案自己架的）再送到論壇。**那台伺服器不保存任何帳號資料**——
+  沒有資料庫、沒有你的 Cookie，登入狀態完全在你自己的瀏覽器裡。
+- **沒有任何追蹤、廣告或數據收集。**
 
 ---
 
-## 測試策略
+## 常見問題
 
-論壇隨時可能改版，選擇器一壞畫面就空白。所以測試不是形式，而是**用真實頁面驗證解析器**。
+<details>
+<summary><b>網頁版和原生 App 有什麼差別？</b></summary>
 
-| 檔案 | 內容 | 數量 |
-|---|---|---|
-| `parse_test.dart` | 用真實抓下來的頁面驗證每個選擇器 | 227 |
-| `pages_test.dart` | 每頁 pump 起來 + 離線行為 | 33 |
-| `s2t_test.dart` | 簡繁轉換的每一類判斷 | 21 |
-| `render_test.dart` | 真實帖子 HTML 丟進 PostBody 確認畫得出來 | 12 |
-| `live_test.dart` | 對真實論壇的端對端（需 cookie，CI 自動略過） | 51 |
+功能完全一樣，同一份程式碼編出來的。差別只在：原生版直連論壇、可以離線快取圖片；
+網頁版不用安裝、不會過期、永遠是最新版。iPhone 使用者建議直接用網頁版。
+</details>
+
+<details>
+<summary><b>iPhone 版為什麼 7 天就打不開？</b></summary>
+
+Apple 對免費開發者憑證的限制——用免費帳號簽的 App 只能跑 7 天。這不是 App 的問題，
+所有側載的 App 都一樣。要免除這個限制得付 Apple 每年 99 美金的開發者帳號。
+**用網頁版就沒有這個問題。**
+</details>
+
+<details>
+<summary><b>會不會有推播通知？</b></summary>
+
+沒有，而且是刻意拿掉的。原本做過兩套（原生背景檢查、網頁版的推播伺服器），
+但 iOS 決定何時喚醒 App 的時機完全不可控，實際體驗是「該通知時不通知、半夜亂通知」，
+而網頁版那套還得讓伺服器保存你的論壇 Cookie。權衡後整套移除了——
+**這也是現在能說「伺服器不保存任何帳號資料」的原因。**
+</details>
+
+<details>
+<summary><b>圖片很吃流量怎麼辦？</b></summary>
+
+設定 → 流量 → 帖子圖片載入，可以選「只在 Wi-Fi 載入」或「手動」。
+選手動時圖片會先顯示佔位，點一下才載入。
+</details>
+
+<details>
+<summary><b>介面可以變簡體嗎？</b></summary>
+
+可以，設定裡切換，整個介面會立刻重繪。
+但**帖子內容一律保留作者原本的用字**——轉換過的標題跟論壇上對不起來，找不到帖。
+想看轉換後的內容，在帖子頁上按「翻譯」，那是逐篇的。
+</details>
+
+---
+
+## 給開發者
+
+架構、技術取捨、以及十幾輪實作累積的踩雷筆記在 **[docs/DEVELOPING.md](docs/DEVELOPING.md)**。
+網頁版後端（論壇轉發、圖片代理、中文字體處理）在 **[pwa/README.md](pwa/README.md)**。
+
+一句話版本：Flutter 寫的，論壇官方手機 API 已關閉，所以解析 `?mobile=2` 的手機版 HTML；
+解析層抽成純 Dart 套件 `packages/gm_api`，原生版與網頁版後端共用同一份。
 
 ```bash
-flutter test                        # 293 項離線測試
-flutter analyze                     # 零問題
-```
-
-**論壇改版時：**
-
-```powershell
-$env:GM_COOKIE = "TVj0_2132_auth=...; TVj0_2132_saltkey=..."
-$env:GM_UID = "677863"
-dart run tool/fetch_fixtures.dart   # 重抓樣本
-flutter test                        # 壞掉的選擇器會直接指名
+flutter test                                        # 293 項
+cd packages/gm_api && dart test                     # 28 項
+cd pwa/server && dart test                          # 28 項
 ```
 
 ---
 
-## 開發
+## 授權
 
-需要 Flutter SDK 3.47 以上。
-
-```bash
-flutter pub get
-flutter analyze
-flutter test
-```
-
-> [!IMPORTANT]
-> **Windows 上必須把專案放在純 ASCII 路徑**（例如 `C:\src\gamemale`）。
-> 路徑含中文時 Dart 分析伺服器會崩潰 —— LSP 訊息長度用字元數算、實際傳輸用位元組數，
-> 中文百分比編碼後對不上。這是工具鏈限制，不是設定問題。
-
-### 調整簡繁用字
-
-不需要動程式碼，改 [`tool/zh_rules.py`](tool/zh_rules.py) 即可：
-
-```python
-EXCLUDE       # 完全不轉的字：里 台 范 谷 尸 姜 …
-CHAR          # 一對多時選哪個：签→簽（不是籤）
-DISAMBIGUATE  # 逐字會錯的詞：这里→這裡、头发→頭髮
-TAIWAN        # 台灣用語：软件→軟體、鼠标→滑鼠、链接→連結
-```
-
-```bash
-python tool/build_zh_table.py       # 重新產生 assets/s2t.json
-flutter test test/s2t_test.dart     # 驗證
-```
-
-> 4012 個簡體字裡 3736 個是一對一（`国→國`），沒有判斷空間；
-> 只有 276 個一對多的會轉錯，規則檔只管這些。
-
----
-
-## 產出 IPA
-
-編譯 iOS 一定要 macOS —— 換框架、裝外掛都繞不過去，因為最後一步要連結 iOS SDK、
-跑 `actool` 編素材，那些二進位檔只在 macOS 上發行。
-
-但**不一定要用 GitHub**。
-
-### 方式一：任一台 Mac
-
-```bash
-chmod +x tool/build-ipa.sh
-./tool/build-ipa.sh
-```
-
-腳本會檢查 Xcode、必要時自動裝 Flutter、跑分析與測試、產出 `GameMale.ipa`。
-
-### 方式二：GitHub Actions
-
-推上 `main` 自動建置，或在 Actions 頁手動觸發，完成後從 Artifacts 下載。
-
-```bash
-gh run download <run-id> -n GameMale-unsigned-ipa -D ./out
-```
-
-> [!NOTE]
-> 私有 repo 的 macOS runner 用量以 **10 倍**計。免費額度 2000 分鐘 ≈ 200 分鐘 macOS，
-> 一次建置約 5 分鐘，大約每月 40 次。公開 repo 免費不限量。
-
-### 側載
-
-產出的是**未簽名 IPA**，三種方式擇一：
-
-| 工具 | 適用 | 特點 |
-|---|---|---|
-| **Sideloadly** | Windows | 接手機、拖入 IPA、填 Apple ID |
-| **AltStore / SideStore** | 跨平台 | 可自動續簽，免費帳號到期前自動重簽 |
-| **ESign / TrollStore** | 手機端 | 不用電腦 |
-
-免費 Apple ID 憑證 7 天到期，**重簽用同一個 IPA 即可，不必重編**。
-
----
-
-## 產出 APK（Android）
-
-推上 `main` 會同時跑 `.github/workflows/android.yml`，在 **ubuntu** 上建置：
-
-```bash
-gh run download <run-id> -n GameMale-apk -D ./out
-```
-
-比 iOS 省事的地方：
-
-| | iOS | Android |
-|---|---|---|
-| CI 分鐘數 | macOS，**10 倍**計 | ubuntu，**1 倍** |
-| 安裝 | 未簽名 IPA，要側載工具重簽 | APK 直接裝 |
-| 有效期 | 免費憑證 **7 天**到期要重簽 | **不會過期** |
-
-APK 用 Flutter 自動產生的 debug 金鑰簽章 —— 側載裝得起來，但**不能上架 Google Play**。
-
----
-
-## 網頁版（另一條路，已上線）
-
-> **共用資料層**：論壇解析抽成 `packages/gm_api`（純 Dart，不依賴 Flutter），與網頁版後端共用；平台專屬的 cookie 儲存與資產讀取由 `lib/platform_bindings.dart` 注入。
-
-同一份程式碼 `flutter build web` 之後掛在自己的網域上（<https://852111.xyz>），
-iPhone 用 Safari「加到主畫面」就能當 App 用 —— **不必側載、不必每 7 天重簽**，
-這正是側載 IPA 治不好的毛病。原生版不受影響，兩者並存。
-
-後端只做三件事：掛靜態檔、`/gm` 論壇轉發（繞過 CORS）、`/gmimg` 圖片代理。
-**伺服器上沒有任何帳號資料**，登入狀態完全在瀏覽器裡。
-
-細節見 [pwa/README.md](pwa/README.md)。
-
-## 目前沒做的部分
-
-- **發文上傳圖片／附件** — Discuz 的 `swfupload` 是 multipart 端點，沒有實機無法驗證
-- **下載附件** — 點了交給瀏覽器；App 沙箱存不了任意檔案，付費附件也要在論壇頁面上完成交易
-- **註冊最後一步** — 答題通過後的帳號／信箱／驗證碼表單交給瀏覽器。論壇目前關閉註冊，這條路徑無法驗證，寧可不寫沒把握的程式碼
-- **通知** — 曾經做過兩套（原生的背景輪詢＋本地通知、網頁版的自寫 Web Push＋伺服器輪詢），實際用下來價值不足以抵銷代價（半夜誤報、送達時機由系統決定、伺服器得保存論壇 cookie），整套已移除。這是個純瀏覽的 App
-
----
-
-## 授權與隱私
-
-個人自用專案，非官方、與 GameMale 官方無關。
-
-**原生版**：帳號密碼只會送到 `www.gamemale.com`，cookie 存在 App 沙箱內，不連任何第三方服務。
-
-**網頁版**：瀏覽器不准跨網域直接連論壇，所以請求會經過自己架的轉發（`852111.xyz`）
-再送到 `www.gamemale.com`。轉發不保存任何帳號資料，登入 cookie 由瀏覽器自己保管。
-
-`Info.plist` 開了 `NSAllowsArbitraryLoads` —— 帖子圖片來自使用者貼的任意外站網址，
-無法列舉白名單。這是側載自用的 App，不上架，故如此取捨。
-
-網頁版的圖片代理（`/gmimg`）同理不能只開白名單，但放開主機之後補了兩道界線：
-**只回 `image/*` 的回應**，以及**擋掉會打到內網的位址**（迴環、私有段、`169.254.169.254`
-那類雲端 metadata），否則等於免費送人一個萬用代理與 SSRF 跳板。
-
-簡繁對照資料衍生自 [OpenCC](https://github.com/BYVoid/OpenCC)（Apache-2.0）的字元對應表，
+個人自用專案。簡繁對照資料衍生自 [OpenCC](https://github.com/BYVoid/OpenCC)（Apache-2.0），
 用字判斷與台灣詞彙為本專案自訂。
+
+App 圖示與論壇內容的版權屬於 GameMale 及各自的作者。
