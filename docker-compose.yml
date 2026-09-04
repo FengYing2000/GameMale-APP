@@ -1,11 +1,14 @@
-# GameMale PWA 後端。
+# GameMale 網頁版後端。
 #
 # 這個檔案放在專案根目錄而不是 pwa/ 底下，是因為 build context 必須是根目錄
-# ——伺服器透過 path 依賴共用 packages/gm_api（跟 Flutter App 同一套論壇解析），
-# 那個資料夾在 pwa/ 外面。放這裡也讓 Dockge 在 /opt/stacks/<名字>/ 直接看得到，
-# 伺服器上的目錄結構跟這個 repo 一模一樣，不會有「本機一套、線上一套」的問題。
+# ——伺服器透過 path 依賴共用 packages/gm_api，那個資料夾在 pwa/ 外面。
+# 放這裡也讓 Dockge 在 /opt/stacks/<名字>/ 直接看得到，伺服器上的目錄結構
+# 跟這個 repo 一模一樣，不會有「本機一套、線上一套」的問題。
 #
 # 跟站上其他服務一致：不綁主機埠，加入共用的 web 網路，由 Caddy 用容器名代理。
+#
+# **沒有任何機密要設**：伺服器不保存帳號、不保存 cookie、不發通知。
+# 登入狀態完全由瀏覽器自己保管（同源之後 cookie 就歸它管）。
 services:
   gm-push:
     build:
@@ -13,22 +16,6 @@ services:
       dockerfile: pwa/Dockerfile
     container_name: gm-push
     restart: unless-stopped
-    environment:
-      # 用 pwa/server/bin/vapid_keygen.dart 產一次，存進 .env 就別再換：
-      # 換金鑰會讓所有既有訂閱失效，每台裝置都要重新授權通知
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?先在 .env 設 VAPID_PRIVATE_KEY}
-      # push service 出問題時他們會照這個聯絡你
-      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@xingkong.tw}
-      # 加密論壇 cookie 用（pwa/server/bin/secret_keygen.dart 產一次）。
-      # 換掉會讓所有人的登入解不開，都得重新登入
-      SECRET_KEY: ${SECRET_KEY:?先在 .env 設 SECRET_KEY}
-      # 多久查一次論壇
-      POLL_MINUTES: ${POLL_MINUTES:-5}
-      # 推播通知的總開關。設成 false 就完全不輪詢論壇、不收訂閱、不送通知，
-      # 網頁版也不會再顯示通知相關的介面。要開回來改這一個值就好。
-      PUSH_ENABLED: ${PUSH_ENABLED:-true}
-    volumes:
-      - ./pwa/data:/data
     networks:
       - web
 

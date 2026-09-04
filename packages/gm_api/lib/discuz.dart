@@ -1443,19 +1443,6 @@ const noticeTypes = <String, List<NoticeTab>>{
 /// - 新聽眾：`prompt_follower_N`
 ///
 /// `#myprompt` 帶 class `yes` 代表「有新的東西」，當作保底。
-/// 提醒分類的顯示名稱。
-///
-/// 原生版的本地通知與網頁版的伺服器推播都要用同一組字，
-/// 放在共用層才不會兩邊各寫一份然後慢慢長歪。
-String noticeKindLabel(String view) => switch (view) {
-      'system' => '系統提醒',
-      'mypost' => '回覆我的',
-      'interactive' => '互動',
-      'manage' => '管理',
-      'app' => '應用',
-      _ => '提醒',
-    };
-
 Future<({int notice, int pm, Map<String, int> views})> fetchBadges() async {
   try {
     final doc = toDoc(await Api.instance.get('forum.php', desktop: true));

@@ -12,7 +12,6 @@ dependencies:
   # 不必用別的語言重寫一遍。
   gm_api:
     path: ../../packages/gm_api
-  pointycastle: ^4.0.0
   http: ^1.2.0
   shelf: ^1.4.2
   shelf_router: ^1.1.4

@@ -2,10 +2,6 @@
     <!-- Flutter 只會把 INTERNET 加進 debug/profile 的 manifest，
          release APK 少了這行會完全連不上論壇，一定要自己補。 -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- 背景輪詢提醒／私訊要在開機後也能排程 -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <!-- Android 13 以上要使用者同意才能發通知 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- 長按存圖（gal）在 Android 9 以下要寫入外部儲存 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"/>

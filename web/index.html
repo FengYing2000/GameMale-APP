@@ -7,7 +7,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="GameMale 論壇">
 
-  <!-- 加到主畫面之後才會以獨立 App 的樣子開啟；iOS 也只讓主畫面 App 收推播 -->
+  <!-- 加到主畫面之後才會以獨立 App 的樣子開啟（沒有網址列、全螢幕） -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- 不是 black-translucent：那會讓內容鑽到狀態列底下 -->
@@ -58,92 +58,18 @@
   <div id="boot"><div class="r"></div><div>載入中…</div></div>
 
   <script>
-  // ── Web Push 橋接 ──────────────────────────────────────────
-  // Flutter 網頁版沒辦法用 flutter_local_notifications（那是原生外掛），
-  // 推播得走瀏覽器自己的 Push API。Dart 端透過 window.gmPush.* 呼叫這裡。
-  (function () {
-    let registration = null;
-
-    async function ready() {
-      if (registration) return registration;
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
-      registration = await navigator.serviceWorker.register('push-sw.js');
-      await navigator.serviceWorker.ready;
-      return registration;
-    }
-
-    function toBytes(base64) {
-      const padded = (base64 + '='.repeat((4 - base64.length % 4) % 4))
-        .replace(/-/g, '+').replace(/_/g, '/');
-      return Uint8Array.from([...atob(padded)].map((c) => c.charCodeAt(0)));
-    }
-
-    window.gmPush = {
-      // 這台裝置有沒有本事收推播（iOS 一定要加到主畫面）
-      supported: function () {
-        const standalone = window.navigator.standalone === true ||
-          window.matchMedia('(display-mode: standalone)').matches;
-        const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-        // ⚠️ 順序很重要：iOS 的 Safari 分頁裡**根本沒有 PushManager**
-        // （要加到主畫面才會有）。先檢查 PushManager 的話，分頁裡一律
-        // 回 'unsupported'，「加到主畫面」的引導就永遠不會跳出來。
-        // 所以先判斷「iOS 而且還沒加到主畫面」。
-        if (iOS && !standalone) return 'need-install';
-
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-          return 'unsupported';
-        }
-        return 'ok';
-      },
-
-      status: function () {
-        return ('Notification' in window) ? Notification.permission : 'unsupported';
-      },
-
-      // 回傳訂閱的 JSON 字串；失敗回傳 'error:訊息'。
-      // 權限一定要在使用者手勢裡要，所以這支只能由按鈕觸發。
-      enable: async function () {
-        try {
-          const reg = await ready();
-          if (!reg) return 'error:這個瀏覽器不支援推播';
-          const perm = await Notification.requestPermission();
-          if (perm !== 'granted') return 'error:沒有授權通知';
-
-          const cfg = await (await fetch('api/config', { credentials: 'same-origin' })).json();
-          let sub = await reg.pushManager.getSubscription();
-          if (!sub) {
-            sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: toBytes(cfg.vapidPublicKey),
-            });
-          }
-          return JSON.stringify(sub.toJSON());
-        } catch (e) {
-          return 'error:' + (e && e.message ? e.message : e);
-        }
-      },
-
-      // 這台裝置目前的訂閱（沒有就回空字串）
-      currentSubscription: async function () {
-        try {
-          const reg = await ready();
-          const sub = reg && await reg.pushManager.getSubscription();
-          return sub ? JSON.stringify(sub.toJSON()) : '';
-        } catch (e) { return ''; }
-      },
-
-      disable: async function () {
-        try {
-          const reg = await ready();
-          const sub = reg && await reg.pushManager.getSubscription();
-          if (sub) { await sub.unsubscribe(); return sub.endpoint; }
-          return '';
-        } catch (e) { return ''; }
-      },
-    };
-  })();
+  // ── 「加到主畫面」的判斷 ────────────────────────────────────
+  // 只有這一件事需要問瀏覽器：現在是不是還在分頁裡看。
+  // 加到主畫面之後沒有網址列、全螢幕、有自己的圖示。
+  window.gmInstall = {
+    needed: function () {
+      var standalone = window.navigator.standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+      var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      return iOS && !standalone;
+    },
+  };
   </script>
 
   <script src="flutter_bootstrap.js" async></script>

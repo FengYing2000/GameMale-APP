@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 
 import 'package:gm_api/parse.dart' as parse;
 import 'package:gm_api/discuz.dart' as api;
-import 'services/background.dart';
 import 'package:gm_api/s2t.dart';
 import 'package:gm_api/http.dart';
 import 'store/favorites.dart';
@@ -45,8 +44,6 @@ import 'ui/pages/tools_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
-import 'services/web_push_stub.dart'
-    if (dart.library.js_interop) 'services/web_push.dart';
 import 'ui/widgets/red_dot.dart';
 
 class GameMaleApp extends StatefulWidget {
@@ -87,8 +84,6 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     try {
       final b = await api.fetchBadges();
       _session.setBadges(notice: b.notice, pm: b.pm);
-      // 前景已經看到的數字寫成基準，背景才不會為同一批再通知一次
-      await syncBadgeBaseline(notice: b.notice, pm: b.pm);
     } on Exception {
       // 抓不到就維持原狀
     }
@@ -107,51 +102,6 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     }
   }
 
-  /// 網頁版的訂閱補過一次了沒（補訂閱很慢，只在開機時做）
-  bool _bootedPush = false;
-
-  /// 依設定決定要不要掛背景檢查（只有登入了才有意義）
-  Future<void> _applyBackgroundBadges() async {
-    try {
-      if (kIsWeb) {
-        // 先問伺服器推播是不是開著。這決定設定頁要不要顯示通知開關，
-        // 所以要在下面同步狀態之前拿到。
-        if (!_bootedPush) await WebPush.loadServerConfig();
-        if (!WebPush.serverEnabled) {
-          _bootedPush = true;
-          if (_settings.notifyBackground) {
-            await _settings.setNotifyBackground(false);
-          }
-          return;
-        }
-        // 網頁版的背景檢查是伺服器在做，這裡要顧的是「這台裝置還在不在
-        // 伺服器的名單上」。
-        //
-        // 把網頁重新加到主畫面會拿到全新的儲存空間與新的 service worker，
-        // 舊訂閱留在伺服器上、這台卻什麼都沒有——設定看起來是開的，
-        // 實際上一則都收不到。每次啟動都補一次，並讓開關反映真實狀態。
-        // 開機時補一次訂閱；之後（登入狀態改變、換語言重建）只做輕量的
-        // 狀態同步。每次都跑完整的 ensureSubscribed 很慢，而且過程中開關
-        // 會先變成關再變回開——看起來就是「自己閃了一下」。
-        final on = _session.loggedIn &&
-            (_bootedPush
-                ? await WebPush.isSubscribed()
-                : await WebPush.ensureSubscribed());
-        _bootedPush = true;
-        if (_settings.notifyBackground != on) {
-          await _settings.setNotifyBackground(on);
-        }
-        return;
-      }
-      if (_settings.notifyBackground && _session.loggedIn) {
-        await enableBackgroundBadges();
-      } else {
-        await disableBackgroundBadges();
-      }
-    } on Exception {
-      // 排不上就算了，不影響 App 其他部分
-    }
-  }
 
   Future<void> _boot() async {
     await S2T.instance.load();
@@ -166,10 +116,6 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     await _session.restore();
     // 登入狀態確定之後才問得到紅點
     _refreshBadges();
-    _applyBackgroundBadges();
-
-    // 網頁版的引導改由首頁自己跳（那裡的 context 才可靠，見 home_page）。
-    _session.addListener(_applyBackgroundBadges);
   }
 
   /// 語言設定改變時，解析層要跟著換，並重建畫面讓既有內容重新轉換

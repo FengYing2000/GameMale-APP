@@ -1,5 +1,4 @@
 import '../../i18n/ui.dart';
-import '../widgets/web_onboarding.dart';
 import '../widgets/install_banner.dart';
 import '../widgets/red_dot.dart';
 import '../widgets/require_login.dart';
@@ -66,35 +65,18 @@ class _HomePageState extends State<HomePage> {
     }
     // 版塊名走 sys()，語言換了要重抓才會跟著變
     if (_rev != rev || _langTick != lang) {
-      final wasRev = _rev;
       _rev = rev;
       _langTick = lang;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _load();
       });
-      // 剛登入完才問要不要開通知——網頁版綁定通知需要論壇的登入狀態，
-      // 沒登入時問了也只會失敗。以前要重開 App 才會跳，就是因為引導
-      // 只在 initState 跑過一次。
-      if (wasRev != rev) _onboardLater();
     }
-  }
-
-  /// 延遲一下再跳引導，讓使用者先看到畫面
-  void _onboardLater() {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-      if (!mounted) return;
-      await maybeShowWebOnboarding(context,
-          loggedIn: context.read<SessionStore>().loggedIn);
-    });
   }
 
   @override
   void initState() {
     super.initState();
     _load();
-    // 網頁版的引導從這裡跳（首頁一定有可用的 Scaffold context）
-    _onboardLater();
   }
 
   Future<void> _load() async {

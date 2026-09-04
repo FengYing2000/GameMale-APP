@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../i18n/ui.dart';
-import '../../services/web_push_stub.dart'
-    if (dart.library.js_interop) '../../services/web_push.dart';
+import '../../services/install_hint_stub.dart'
+    if (dart.library.js_interop) '../../services/install_hint.dart';
 
 /// 「加到主畫面」的引導。
 ///
@@ -25,7 +25,7 @@ class _InstallBannerState extends State<InstallBanner> {
   bool _open = false;
   bool _hidden = false;
 
-  bool get _needed => kIsWeb && !_hidden && WebPush.needsInstall;
+  bool get _needed => kIsWeb && !_hidden && needsInstall;
 
   @override
   Widget build(BuildContext context) {
@@ -63,10 +63,7 @@ class _InstallBannerState extends State<InstallBanner> {
               ),
               const SizedBox(height: 4),
               Text(
-                // 推播關掉時就別再拿推播當理由——加到主畫面本身還是有用的
-                WebPush.serverEnabled
-                    ? tr('開起來就跟一般 App 一樣，而且才收得到新提醒與私訊的推播')
-                    : tr('開起來就跟一般 App 一樣：沒有網址列、全螢幕、有自己的圖示'),
+                tr('開起來就跟一般 App 一樣：沒有網址列、全螢幕、有自己的圖示'),
                 style: TextStyle(
                     fontSize: 13, color: scheme.onPrimaryContainer),
               ),

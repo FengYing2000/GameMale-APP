@@ -12,8 +12,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // flutter_local_notifications 一定要開，不開會直接 checkReleaseAarMetadata 失敗
-        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -36,14 +34,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-}
-
-dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    // 開了 desugaring 之後 Flutter 在 Android 12L 以上有機會啟動就閃退，
-    // 官方建議補這兩個 window 套件擋掉
-    implementation("androidx.window:window:1.0.0")
-    implementation("androidx.window:window-java:1.0.0")
 }
 
 kotlin {
