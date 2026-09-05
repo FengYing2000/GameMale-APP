@@ -283,3 +283,21 @@ UA 也對齊了）。實測**還是 403**——票是真的，但 Cloudflare 也
 WebView 的傳輸之後就浮現了。現在讓它丟例外，三個呼叫處本來就都接住並保留
 原本的數字。
 
+## 走 WebView 傳輸時，圖片也要一起走
+
+圖片本來是 Flutter 自己的 HTTP 堆疊在抓（`Image.network` /
+`CachedNetworkImage`），**完全繞過傳輸層**。所以只把 `get`／`post` 導到
+WebView 的話，症狀是「文字讀得到、圖片整片載入失敗」——子版塊圖示、頭像、
+帖子裡的圖全都不見。
+
+`BrowserFetch.fetchBytes` 在頁面裡把 blob 轉成 data URL 再經 JS 通道帶回來
+（通道只能傳字串），Dart 端解 base64。會膨脹三分之一，所以 `NetImage` 自己
+記一份小的記憶體快取——同一張頭像在列表裡會出現很多次。
+
+## 發請求前要確定頁面停在論壇上
+
+`_ensureOnForum`。少了它有兩種症狀：停在挑戰頁時 fetch 拿回的是挑戰 HTML；
+而挑戰頁解題過程中會自己重新導向，把進行中的 fetch 一起取消——Safari 回報
+「TypeError: Load failed」，看起來像網路斷了，其實只是在錯的時機發了請求。
+那個錯誤不是 `CloudflareException`，所以也不會觸發自動重試，使用者得手動按。
+

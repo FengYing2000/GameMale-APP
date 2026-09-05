@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -102,6 +103,30 @@ class BrowserFetch {
     await settled.future.timeout(const Duration(seconds: 12), onTimeout: () {});
   }
 
+  /// 發請求前先確定頁面**真的停在論壇上**。
+  ///
+  /// 少了這步會出現兩種症狀：停在挑戰頁時 fetch 拿回的是挑戰 HTML；
+  /// 而挑戰頁解題過程中會自己重新導向，把進行中的 fetch 一起取消掉——
+  /// Safari 回報的是「TypeError: Load failed」，看起來像網路斷了，
+  /// 其實只是我們在錯的時機發了請求。
+  Future<void> _ensureOnForum(WebViewController c) async {
+    if (await _isForum(c)) return;
+
+    // 使用者可能已經在可見的驗證頁解掉了——兩邊共用同一份 cookie store，
+    // 重載就會拿到真的論壇頁
+    if (_stuck) {
+      _stuck = false;
+      await c.reload();
+    }
+
+    for (var i = 0; i < 6; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (await _isForum(c)) return;
+    }
+    _stuck = true;
+    throw const CloudflareException(_needSolve);
+  }
+
   /// 目前頁面是不是真的論壇（而不是挑戰頁或錯誤頁）
   Future<bool> _isForum(WebViewController c) async {
     try {
@@ -141,6 +166,21 @@ class BrowserFetch {
 
   /// 用 WebView 抓一個網址。[form] 有值時送 POST（表單編碼，跟論壇一致）。
   Future<String> fetch(String url, {Map<String, String>? form}) async {
+    final body = await _run(url, form: form, jsFunction: '__gmFetch');
+    // 這個隱形的 WebView 自己也可能被挑戰。拿回挑戰頁的 HTML 去餵解析器
+    // 只會得到一片空白，所以要認出來、交給呼叫端去請使用者解一次。
+    if (looksLikeChallenge(body)) {
+      _stuck = true;
+      throw const CloudflareException(_needSolve);
+    }
+    return body;
+  }
+
+  Future<String> _run(
+    String url, {
+    Map<String, String>? form,
+    required String jsFunction,
+  }) async {
     await _ensureReady();
     final c = ready.value;
     if (c == null) throw const DiscuzException('瀏覽器傳輸沒有就緒');
@@ -150,39 +190,25 @@ class BrowserFetch {
     _pending[id] = completer;
 
     try {
-      // 上次停在挑戰頁的話先重新載入——使用者可能已經在可見的驗證頁解掉了，
-      // 兩邊共用同一份 cookie store，重載就會拿到真的論壇頁。
-      if (_stuck) {
-        _stuck = false;
-        await c.reload();
-        await Future<void>.delayed(const Duration(seconds: 3));
-      }
+      await _ensureOnForum(c);
       // 每次都重新注入：頁面一導覽 JS 環境就沒了，而挑戰頁本身就會導覽。
       // 這段很短，重覆執行的成本可以忽略。
       await c.runJavaScript(_injectedJs);
       await c.runJavaScript(
-        'window.__gmFetch(${json.encode({'id': id, 'url': url, 'form': form, 'channel': _channel})})',
+        'window.$jsFunction(${json.encode({'id': id, 'url': url, 'form': form, 'channel': _channel})})',
       );
     } catch (e) {
       _pending.remove(id);
       rethrow;
     }
 
-    final body = await completer.future.timeout(
+    return completer.future.timeout(
       const Duration(seconds: 45),
       onTimeout: () {
         _pending.remove(id);
         throw const DiscuzException('瀏覽器取得逾時');
       },
     );
-
-    // 這個隱形的 WebView 自己也可能被挑戰。拿回挑戰頁的 HTML 去餵解析器
-    // 只會得到一片空白，所以要認出來、交給呼叫端去請使用者解一次。
-    if (looksLikeChallenge(body)) {
-      _stuck = true;
-      throw const CloudflareException(_needSolve);
-    }
-    return body;
   }
 
   static const _needSolve = '需要先通過論壇的安全驗證';
@@ -203,6 +229,23 @@ class BrowserFetch {
       html.contains('cf-browser-verification') ||
       html.contains('_cf_chl_opt');
 
+  /// 用 WebView 抓一張圖。
+  ///
+  /// 圖片走的是 Flutter 自己的 HTTP 堆疊（`Image.network` /
+  /// `CachedNetworkImage`），完全繞過這裡——所以 Cloudflare 擋著時，
+  /// 文字內容進得來、圖片卻整片載入失敗（子版塊圖示、帖子圖片都是）。
+  ///
+  /// JS 通道只能傳字串，所以在頁面裡把 blob 轉成 data URL 再帶回來，
+  /// 這邊解 base64。會膨脹三分之一，但這只是 Cloudflare 擋著時的後備。
+  Future<Uint8List> fetchBytes(String url) async {
+    final raw = await _run(url, jsFunction: '__gmBytes');
+    final i = raw.indexOf(',');
+    if (!raw.startsWith('data:') || i < 0) {
+      throw const DiscuzException('圖片取得失敗');
+    }
+    return base64Decode(raw.substring(i + 1));
+  }
+
   static const _injectedJs = '''
 window.__gmFetch = function (a) {
   var opt = { credentials: 'include', redirect: 'follow' };
@@ -218,6 +261,27 @@ window.__gmFetch = function (a) {
     .then(function (t) {
       window[a.channel].postMessage(
         JSON.stringify({ id: a.id, ok: true, body: t }));
+    })
+    .catch(function (e) {
+      window[a.channel].postMessage(
+        JSON.stringify({ id: a.id, ok: false, error: String(e) }));
+    });
+};
+
+window.__gmBytes = function (a) {
+  fetch(a.url, { credentials: 'include', redirect: 'follow' })
+    .then(function (r) { return r.blob(); })
+    .then(function (b) {
+      return new Promise(function (res, rej) {
+        var fr = new FileReader();
+        fr.onload = function () { res(fr.result); };
+        fr.onerror = function () { rej(new Error('read failed')); };
+        fr.readAsDataURL(b);
+      });
+    })
+    .then(function (d) {
+      window[a.channel].postMessage(
+        JSON.stringify({ id: a.id, ok: true, body: d }));
     })
     .catch(function (e) {
       window[a.channel].postMessage(

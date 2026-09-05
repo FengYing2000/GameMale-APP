@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:gm_api/http.dart';
+
+import '../../services/browser_fetch_stub.dart'
+    if (dart.library.io) '../../services/browser_fetch.dart';
 
 /// 論壇圖片的載入器，一套介面兩種實作。
 ///
@@ -49,6 +54,22 @@ class NetImage extends StatelessWidget {
     final decodeW = width == null ? null : (width! * dpr).round();
     final decodeH = height == null ? null : (height! * dpr).round();
 
+    // Cloudflare 擋著時，圖片也必須走 WebView。
+    //
+    // 圖片本來是 Flutter 自己的 HTTP 堆疊在抓（Image.network /
+    // CachedNetworkImage），完全繞過傳輸層——所以會出現「文字讀得到、
+    // 圖片整片載入失敗」：子版塊圖示、頭像、帖子裡的圖全都不見。
+    if (!kIsWeb && Api.usingBrowser) {
+      return _BrowserImage(
+        url: url,
+        width: width,
+        height: height,
+        fit: fit,
+        placeholder: ph,
+        errorWidget: err,
+      );
+    }
+
     if (kIsWeb) {
       return Image.network(
         url,
@@ -58,8 +79,7 @@ class NetImage extends StatelessWidget {
         cacheWidth: decodeW,
         cacheHeight: decodeW == null ? decodeH : null,
         // 冷啟動時瀏覽器快取命中就不會閃 placeholder，這裡只處理首次載入
-        loadingBuilder: (c, child, progress) =>
-            progress == null ? child : ph,
+        loadingBuilder: (c, child, progress) => progress == null ? child : ph,
         errorBuilder: (c, e, s) => err,
       );
     }
@@ -74,6 +94,87 @@ class NetImage extends StatelessWidget {
       memCacheHeight: decodeW == null ? decodeH : null,
       placeholder: (c, _) => ph,
       errorWidget: (c, u, e) => err,
+    );
+  }
+}
+
+/// Cloudflare 擋著時用的圖片載入器：位元組由 WebView 取回來。
+///
+/// 自己記一份記憶體快取——同一張頭像在列表裡會出現很多次，每次都繞一趟
+/// 瀏覽器＋base64 太貴。上限刻意設小，這只是被擋期間的過渡狀態。
+class _BrowserImage extends StatefulWidget {
+  const _BrowserImage({
+    required this.url,
+    required this.width,
+    required this.height,
+    required this.fit,
+    required this.placeholder,
+    required this.errorWidget,
+  });
+
+  final String url;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Widget placeholder;
+  final Widget errorWidget;
+
+  static final _cache = <String, Uint8List>{};
+  static const _maxEntries = 120;
+
+  @override
+  State<_BrowserImage> createState() => _BrowserImageState();
+}
+
+class _BrowserImageState extends State<_BrowserImage> {
+  Uint8List? _bytes;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_BrowserImage old) {
+    super.didUpdateWidget(old);
+    if (old.url != widget.url) {
+      _bytes = null;
+      _failed = false;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final hit = _BrowserImage._cache[widget.url];
+    if (hit != null) {
+      setState(() => _bytes = hit);
+      return;
+    }
+    try {
+      final b = await BrowserFetch.instance.fetchBytes(widget.url);
+      if (_BrowserImage._cache.length >= _BrowserImage._maxEntries) {
+        _BrowserImage._cache.remove(_BrowserImage._cache.keys.first);
+      }
+      _BrowserImage._cache[widget.url] = b;
+      if (mounted) setState(() => _bytes = b);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) return widget.errorWidget;
+    final b = _bytes;
+    if (b == null) return widget.placeholder;
+    return Image.memory(
+      b,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      errorBuilder: (_, _, _) => widget.errorWidget,
     );
   }
 }

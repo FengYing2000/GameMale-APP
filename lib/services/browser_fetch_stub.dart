@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 /// 網頁版沒有內嵌 WebView（它本身就在瀏覽器裡），而且就算有也沒用：
@@ -11,6 +13,9 @@ class BrowserFetch {
       throw UnsupportedError('網頁版沒有瀏覽器傳輸');
 
   void warmUp() {}
+
+  Future<Uint8List> fetchBytes(String url) async =>
+      throw UnsupportedError('網頁版沒有瀏覽器傳輸');
 
   Widget host() => const SizedBox.shrink();
 }
