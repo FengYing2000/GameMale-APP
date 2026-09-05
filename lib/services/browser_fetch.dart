@@ -28,13 +28,43 @@ class BrowserFetch {
   /// 給宿主 widget 用：控制器建好之後才能把 WebView 掛上畫面
   final ready = ValueNotifier<WebViewController?>(null);
 
+  /// 驗證頁正在顯示這顆 WebView。
+  ///
+  /// **全 App 只有一顆 WebView**：發請求的和給使用者解驗證的是同一個。
+  /// 兩顆的話，使用者在看得見的那顆解完，隱形的那顆還停在挑戰頁上——
+  /// 而它是透明的，連「我是人類」都點不到，於是永遠解不開。
+  ///
+  /// 一個 controller 同時只能掛在一個 WebViewWidget 上，所以驗證頁顯示時
+  /// 常駐的宿主要讓位。
+  final presenting = ValueNotifier<bool>(false);
+
+  WebViewController? get controller => ready.value;
+
+  Completer<void>? _settled;
+
+  /// 驗證頁會暫時接管導覽處理（它要自己等「頁面變成論壇」那一刻），
+  /// 離開時把平常那份裝回去。
+  void restoreDelegate() {
+    final c = ready.value;
+    if (c == null) return;
+    c.setNavigationDelegate(
+      NavigationDelegate(
+        onPageFinished: (_) async {
+          final settled = _settled;
+          if (settled == null || settled.isCompleted) return;
+          if (await _isForum(c)) settled.complete();
+        },
+        onWebResourceError: (_) {
+          final settled = _settled;
+          if (settled != null && !settled.isCompleted) settled.complete();
+        },
+      ),
+    );
+  }
+
   Future<void>? _booting;
   final _pending = <int, Completer<String>>{};
   int _seq = 0;
-
-  /// 上次看到的頁面是不是挑戰頁。是的話下次取用前要先重新載入——
-  /// 使用者在可見的驗證頁解完之後，這個隱形的還停在舊的挑戰頁上。
-  bool _stuck = false;
 
   /// 先把 WebView 暖起來，不等它完成。
   ///
@@ -71,6 +101,7 @@ class BrowserFetch {
       ..setUserAgent(Api.userAgent)
       ..addJavaScriptChannel(_channel, onMessageReceived: _onMessage);
 
+    _settled = settled;
     c.setNavigationDelegate(
       NavigationDelegate(
         // ⚠️ 不能在第一個 onPageFinished 就當作就緒。
@@ -80,10 +111,7 @@ class BrowserFetch {
         onPageFinished: (_) async {
           if (settled.isCompleted) return;
           if (await _isForum(c)) {
-            _stuck = false;
             settled.complete();
-          } else {
-            _stuck = true;
           }
         },
         onWebResourceError: (_) {
@@ -97,10 +125,14 @@ class BrowserFetch {
     ready.value = c;
     await c.loadRequest(Uri.parse('$kForumOrigin/forum.php?mobile=2'));
 
-    // 給挑戰自己解的時間。Cloudflare 的自動挑戰通常幾秒內就過，
-    // 等太久只會讓使用者對著空白轉圈圈——解不掉就早點讓 fetch 拿回挑戰頁，
-    // 由上層把可見的驗證頁叫出來（在那裡他看得到進度，也點得到按鈕）。
-    await settled.future.timeout(const Duration(seconds: 12), onTimeout: () {});
+    // **刻意不在這裡等頁面載完。**
+    //
+    // 等的話第一個請求就要跟著卡住十幾秒，使用者對著空白轉圈圈——實機
+    // 回報的就是這個。是不是挑戰交給 _ensureOnForum 判斷，一發現就馬上
+    // 把驗證頁叫出來。
+    //
+    // 提早叫出來是零成本的：驗證頁顯示的就是這同一顆 WebView，如果其實
+    // 只是還在載入，載完的瞬間它會偵測到論壇並自己關閉。
   }
 
   /// 發請求前先確定頁面**真的停在論壇上**。
@@ -112,18 +144,13 @@ class BrowserFetch {
   Future<void> _ensureOnForum(WebViewController c) async {
     if (await _isForum(c)) return;
 
-    // 使用者可能已經在可見的驗證頁解掉了——兩邊共用同一份 cookie store，
-    // 重載就會拿到真的論壇頁
-    if (_stuck) {
-      _stuck = false;
-      await c.reload();
-    }
-
-    for (var i = 0; i < 6; i++) {
-      await Future<void>.delayed(const Duration(seconds: 2));
+    // 只給很短的寬限。真的是挑戰的話早點叫出驗證頁讓使用者看著它解，
+    // 比讓他對著空白轉圈圈好得多；而如果只是還在載入，驗證頁會在載完的
+    // 瞬間自己關掉，等於沒有代價。
+    for (var i = 0; i < 3; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
       if (await _isForum(c)) return;
     }
-    _stuck = true;
     throw const CloudflareException(_needSolve);
   }
 
@@ -169,10 +196,7 @@ class BrowserFetch {
     final body = await _run(url, form: form, jsFunction: '__gmFetch');
     // 這個隱形的 WebView 自己也可能被挑戰。拿回挑戰頁的 HTML 去餵解析器
     // 只會得到一片空白，所以要認出來、交給呼叫端去請使用者解一次。
-    if (looksLikeChallenge(body)) {
-      _stuck = true;
-      throw const CloudflareException(_needSolve);
-    }
+    if (looksLikeChallenge(body)) throw const CloudflareException(_needSolve);
     return body;
   }
 
@@ -298,19 +322,26 @@ window.__gmBytes = function (a) {
   /// 用 `Opacity(0)` 而不是 1×1 或 `Offstage`：Cloudflare 的挑戰會量視窗
   /// 尺寸當指紋的一部分，1×1 的瀏覽器很可疑，而且真要點「我是人類」時
   /// 也沒地方可點。透明度 0 的話版面照排、JS 照跑，只是看不見。
-  Widget host() => ValueListenableBuilder<WebViewController?>(
-    valueListenable: ready,
-    builder: (_, c, _) => c == null
+  Widget host() => ValueListenableBuilder<bool>(
+    valueListenable: presenting,
+    builder: (_, showing, _) => showing
+        // 驗證頁正拿著這顆 WebView，這裡要讓位——
+        // 一個 controller 同時只能掛在一個 WebViewWidget 上
         ? const SizedBox.shrink()
-        : IgnorePointer(
-            child: Opacity(
-              opacity: 0,
-              child: SizedBox(
-                width: 360,
-                height: 640,
-                child: WebViewWidget(controller: c),
-              ),
-            ),
+        : ValueListenableBuilder<WebViewController?>(
+            valueListenable: ready,
+            builder: (_, c, _) => c == null
+                ? const SizedBox.shrink()
+                : IgnorePointer(
+                    child: Opacity(
+                      opacity: 0,
+                      child: SizedBox(
+                        width: 360,
+                        height: 640,
+                        child: WebViewWidget(controller: c),
+                      ),
+                    ),
+                  ),
           ),
   );
 }

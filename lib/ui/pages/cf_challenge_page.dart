@@ -5,20 +5,20 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:gm_api/http.dart';
 
 import '../../i18n/ui.dart';
+import '../../services/browser_fetch_stub.dart'
+    if (dart.library.io) '../../services/browser_fetch.dart';
 import '../../theme.dart';
 
 /// 論壇的 Cloudflare 安全驗證。
 ///
-/// **為什麼一定要用 WebView**：Cloudflare 的挑戰要真的執行 JavaScript
-/// 才解得開，App 用的 HTTP 客戶端做不到——它只會一直拿到 403。
-/// 解開之後 Cloudflare 會發一個 `cf_clearance` cookie，把它拿回來灌進
-/// App 的連線，後面的請求就過得去了。
+/// **這裡顯示的就是平常在背後發請求的那顆 WebView**，不是另外開一個。
 ///
-/// **UA 必須跟 App 一致**（`Api.userAgent`）：`cf_clearance` 綁 IP ＋
-/// User-Agent，WebView 用預設 UA 解出來的那張票，App 拿去用不算數。
+/// 開兩顆會壞掉：使用者在看得見的那顆解完，背後那顆還停在挑戰頁上——
+/// 而它是透明的，連「我是人類」都點不到，於是永遠解不開。實機上的症狀是
+/// 按了「我已完成」卻跳出「需要先通過論壇的安全驗證」。
 ///
-/// 這只在原生版有意義。網頁版的請求是從伺服器發出的，而票綁的是**解題那台
-/// 機器的 IP**，使用者在自己瀏覽器上解的拿到伺服器上沒用。
+/// 一個 controller 同時只能掛在一個 WebViewWidget 上，所以進來時要請
+/// 常駐的宿主讓位（`presenting`），離開時再還回去。
 class CfChallengePage extends StatefulWidget {
   const CfChallengePage({super.key});
 
@@ -31,6 +31,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
   bool _done = false;
   bool _checking = false;
 
+  /// 按過「我已完成」但其實還沒過——用來提示，而不是硬關掉這一頁
+  bool _notYet = false;
+
   @override
   void initState() {
     super.initState();
@@ -38,29 +41,28 @@ class _CfChallengePageState extends State<CfChallengePage> {
   }
 
   Future<void> _boot() async {
-    final jar = WebViewCookieManager();
-    // 先把現有的登入 cookie 灌進去，免得驗證完變成未登入狀態
-    for (final c in await Api.instance.allCookies()) {
-      await jar.setCookie(
-        WebViewCookie(
-          name: c.name,
-          value: c.value,
-          domain: Uri.parse(kForumOrigin).host,
-        ),
-      );
+    // 還沒建立過就先讓它建起來（例如直連時就撞到挑戰）
+    BrowserFetch.instance.warmUp();
+    BrowserFetch.instance.presenting.value = true;
+
+    // 控制器可能還在建，等它出現
+    for (var i = 0; i < 20 && mounted; i++) {
+      final c = BrowserFetch.instance.controller;
+      if (c != null) {
+        setState(() => _controller = c);
+        _watch(c);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
     }
-    if (!mounted) return;
+  }
 
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      // ⚠️ 一定要跟 Api 用同一個 UA，見類別說明
-      ..setUserAgent(Api.userAgent)
-      ..setNavigationDelegate(
-        NavigationDelegate(onPageFinished: (_) => _check()),
-      )
-      ..loadRequest(Uri.parse('$kForumOrigin/forum.php?mobile=2'));
-
-    setState(() => _controller = controller);
+  /// 挑戰過關之後 Cloudflare 會自己導回論壇，這裡等那一刻
+  void _watch(WebViewController c) {
+    c.setNavigationDelegate(
+      NavigationDelegate(onPageFinished: (_) => _check()),
+    );
+    _check();
   }
 
   /// 判斷「解開了沒」要看**畫面上真的是論壇了**，不能看 cookie 存不存在。
@@ -68,7 +70,7 @@ class _CfChallengePageState extends State<CfChallengePage> {
   /// 踩過這個坑：上一次解出來的 `cf_clearance` 還留在 cookie store 裡，
   /// 於是這頁一打開就以為已經成功、立刻自己關掉——使用者看到的是驗證頁
   /// 一閃而過，然後什麼都沒解決。票還在不代表它還有效。
-  static const _probeJs = '''
+  static const _probeJs = """
 (function () {
   var h = document.documentElement ? document.documentElement.innerHTML : '';
   if (h.indexOf('challenge-platform') >= 0 || h.indexOf('_cf_chl_opt') >= 0) {
@@ -76,7 +78,17 @@ class _CfChallengePageState extends State<CfChallengePage> {
   }
   return document.querySelector('#hd, #nv, .bm, #ft, #postlist') ? 'forum' : 'other';
 })()
-''';
+""";
+
+  Future<bool> _isForum(WebViewController c) async {
+    try {
+      final r = await c.runJavaScriptReturningResult(_probeJs);
+      // 平台之間回傳格式不一致（有的帶引號），統一拆掉再比
+      return r.toString().replaceAll('"', '') == 'forum';
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<void> _check({bool manual = false}) async {
     if (_done || _checking) return;
@@ -84,16 +96,14 @@ class _CfChallengePageState extends State<CfChallengePage> {
     if (c == null) return;
     _checking = true;
     try {
-      if (!manual) {
-        final r = await c.runJavaScriptReturningResult(_probeJs);
-        // 平台之間回傳格式不一致（有的帶引號），統一拆掉再比
-        if (r.toString().replaceAll('"', '') != 'forum') return;
+      if (!await _isForum(c)) {
+        // 手動按了才提示；自動探測失敗就安靜地繼續等
+        if (manual && mounted) setState(() => _notYet = true);
+        return;
       }
       await _harvest();
       _done = true;
       if (mounted) Navigator.of(context).pop(true);
-    } catch (_) {
-      // 探測失敗就讓使用者自己按「我已完成」，不要卡在這頁
     } finally {
       _checking = false;
     }
@@ -101,11 +111,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
 
   /// 順手把 cookie 撈回 App。
   ///
-  /// 主要的通行還是靠 WebView 自己發請求（見 `services/browser_fetch.dart`），
-  /// 但論壇解除驗證後會切回直連，那時這份 cookie 就派得上用場。
-  ///
-  /// `cf_clearance` 是 HttpOnly，`document.cookie` 讀不到，只能走平台的
-  /// cookie store —— `WebViewCookieManager.getCookies` 兩邊都通。
+  /// 主要的通行靠這顆 WebView 自己發請求，但論壇解除驗證後會切回直連，
+  /// 那時這份 cookie 就派得上用場。`cf_clearance` 是 HttpOnly，
+  /// `document.cookie` 讀不到，只能走平台的 cookie store。
   Future<void> _harvest() async {
     try {
       final cookies = await WebViewCookieManager().getCookies(
@@ -121,7 +129,16 @@ class _CfChallengePageState extends State<CfChallengePage> {
   }
 
   @override
+  void dispose() {
+    // 把 WebView 還給常駐的宿主，並恢復它平常的導覽處理
+    BrowserFetch.instance.presenting.value = false;
+    BrowserFetch.instance.restoreDelegate();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(tr('論壇安全驗證')),
@@ -141,16 +158,20 @@ class _CfChallengePageState extends State<CfChallengePage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: _notYet
+                ? scheme.errorContainer
+                : scheme.surfaceContainerHighest,
             child: Text(
-              tr(
-                '論壇開啟了 Cloudflare 安全驗證。這一頁通過之後 App 就能正常使用，'
-                '通常只要等幾秒，有時要點一下「我是人類」。',
-              ),
+              _notYet
+                  ? tr('看起來還沒通過，請完成上面的驗證。通過之後這一頁會自己關閉。')
+                  : tr(
+                      '論壇開啟了 Cloudflare 安全驗證。通過之後這一頁會自己關閉，'
+                      '通常只要等幾秒，有時要點一下「我是人類」。',
+                    ),
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
-                color: subtle(context),
+                color: _notYet ? scheme.onErrorContainer : subtle(context),
               ),
             ),
           ),
