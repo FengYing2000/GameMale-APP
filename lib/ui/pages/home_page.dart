@@ -42,6 +42,9 @@ class _HomePageState extends State<HomePage> {
   /// （`_open`）的預設一致。
   final _openSubs = <int, bool>{};
 
+  /// 在線會員，跟子版塊同一次桌面首頁抓取
+  OnlineInfo _online = const OnlineInfo();
+
   /// fid → 子版塊，來自桌面首頁
   Map<int, List<SubForum>> _subforums = const {};
 
@@ -168,9 +171,12 @@ class _HomePageState extends State<HomePage> {
       final map = await api.fetchIndexSubforums();
       final mods = await api.fetchIndexModerators();
       if (!mounted) return;
+      final online = await api.fetchIndexOnline();
+      if (!mounted) return;
       setState(() {
         if (map.isNotEmpty) _subforums = map;
         if (mods.isNotEmpty) _moderators = mods;
+        _online = online;
       });
     } on DiscuzException {
       // 抓不到就用手機版列到的那些
@@ -305,9 +311,104 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
               ],
+              if (!_online.isEmpty) _OnlineCard(info: _online),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 在線會員。**預設收起**——線上常常三百多人，攤開會把首頁灌爆。
+class _OnlineCard extends StatefulWidget {
+  const _OnlineCard({required this.info});
+  final OnlineInfo info;
+
+  @override
+  State<_OnlineCard> createState() => _OnlineCardState();
+}
+
+class _OnlineCardState extends State<_OnlineCard> {
+  bool _open = false;
+
+  /// 論壇用小圖示的顏色區分身分，這裡用主題色重現
+  Color _colorOf(String group, ColorScheme scheme) => switch (group) {
+        'admin' => const Color(0xFFE05A4E),
+        'supermod' => const Color(0xFF3E8ED0),
+        'moderator' => const Color(0xFF48A868),
+        _ => scheme.onSurfaceVariant,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final info = widget.info;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: Icon(LucideIcons.users, color: scheme.primary),
+            title: Text(
+              '${tr('在線會員')} ${info.total}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              [
+                '${tr('會員')} ${info.members}'
+                    '${info.invisible > 0 ? '（${tr('隱身')} ${info.invisible}）' : ''}',
+                '${tr('訪客')} ${info.guests}',
+              ].join(' · '),
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: Icon(
+              _open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+              size: 18,
+              color: faint(context),
+            ),
+            onTap: info.users.isEmpty
+                ? null
+                : () => setState(() => _open = !_open),
+          ),
+          if (_open) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final u in info.users)
+                    ActionChip(
+                      label: Text(
+                        u.name,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: _colorOf(u.group, scheme),
+                        ),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onPressed: () => context.push('/u/${u.uid}'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (info.record > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                '${tr('最高紀錄')} ${info.record}'
+                '${info.recordDate.isEmpty ? '' : '（${info.recordDate}）'}',
+                style: TextStyle(fontSize: 11.5, color: faint(context)),
+              ),
+            ),
+        ],
       ),
     );
   }

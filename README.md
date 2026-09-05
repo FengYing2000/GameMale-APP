@@ -15,7 +15,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-lightgrey?logo=apple&logoColor=white)](#-iphone)
 [![Android](https://img.shields.io/badge/Android-6.0%2B-lightgrey?logo=android&logoColor=white)](#-android-手機)
-[![測試](https://img.shields.io/badge/自動測試-362_項-4CAF50)](docs/DEVELOPING.md)
+[![測試](https://img.shields.io/badge/自動測試-368_項-4CAF50)](docs/DEVELOPING.md)
 
 **繁體中文** · [简体中文](README.zh-CN.md)
 
@@ -81,7 +81,7 @@ GameMale 論壇沒有官方 App。用手機瀏覽器逛，字小、圖片吃流�
 <table>
 <tr>
 <td width="150"><b>📖 瀏覽</b></td>
-<td>版塊列表（可展開子版塊、點圖示看版主與版規）、主題列表可依<b>最新／熱門／精華</b>切換，也能只看投票或懸賞。帖子內頁支援分頁、附件、<b>樓中樓</b>，還能快速跳到指定樓層。</td>
+<td>版塊列表（可展開子版塊、點圖示看版主與版規）、主題列表可依<b>最新／熱門／精華</b>切換，也能只看投票或懸賞。帖子內頁支援分頁、附件、<b>樓中樓</b>，還能快速跳到指定樓層。首頁底部有<b>在線會員</b>，點名字可直接看他的資料。</td>
 </tr>
 <tr>
 <td><b>✍️ 發言</b></td>
@@ -205,7 +205,7 @@ Apple 對免費開發者憑證的限制——用免費帳號簽的 App 只能跑
 
 ```bash
 flutter test                                        # 299 項
-cd packages/gm_api && dart test                     # 35 項
+cd packages/gm_api && dart test                     # 41 項
 cd pwa/server && dart test                          # 28 項
 ```
 

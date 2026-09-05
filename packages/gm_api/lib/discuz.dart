@@ -113,11 +113,13 @@ IndexData parseIndex(dom.Document doc) {
 /// 桌面模板才完整。gzip 後約 35 KB，一個 App 生命週期抓一次就好。
 Map<int, List<SubForum>>? _subforumCache;
 Map<int, List<String>>? _moderatorCache;
+OnlineInfo? _onlineCache;
 
 /// 語言切換後，之前用舊語言 sys() 過的首頁快取要作廢，重抓才會跟著變
 void clearIndexCache() {
   _subforumCache = null;
   _moderatorCache = null;
+  _onlineCache = null;
 }
 
 Future<Map<int, List<SubForum>>> fetchIndexSubforums({bool force = false}) async {
@@ -126,7 +128,64 @@ Future<Map<int, List<SubForum>>> fetchIndexSubforums({bool force = false}) async
   final map = parseIndexSubforums(doc);
   if (map.isNotEmpty) _subforumCache = map;
   _moderatorCache = parseIndexModerators(doc);
+  _onlineCache = parseIndexOnline(doc);
   return map;
+}
+
+/// 首頁的在線會員。**跟子版塊共用同一次桌面首頁抓取**——那一頁本來就會抓，
+/// 多解析這一塊不用多送任何請求。
+Future<OnlineInfo> fetchIndexOnline({bool force = false}) async {
+  if (!force && _onlineCache != null) return _onlineCache!;
+  await fetchIndexSubforums(force: force);
+  return _onlineCache ?? const OnlineInfo();
+}
+
+/// 解析 `#online` 區塊。
+///
+/// 統計數字刻意用正則從整段文字撈，不照 `<strong>` 的出現順序取——
+/// 沒有隱身會員時論壇不會輸出那一段，照順序取會整排錯位。
+OnlineInfo parseIndexOnline(dom.Document doc) {
+  final box = doc.querySelector('#online');
+  if (box == null) return const OnlineInfo();
+
+  final stat = box.querySelector('.bm_h .xs1')?.text ?? '';
+  int pick(String pattern) =>
+      int.tryParse(RegExp(pattern).firstMatch(stat)?.group(1) ?? '') ?? 0;
+
+  final users = <OnlineUser>[];
+  final seen = <int>{};
+  for (final li in box.querySelectorAll('#onlinelist dd li')) {
+    final a = li.querySelector('a[href*="space-uid-"]');
+    if (a == null) continue;
+    final uid = int.tryParse(
+        RegExp(r'space-uid-(\d+)').firstMatch(attr(a, 'href'))?.group(1) ?? '');
+    final name = a.text.trim();
+    if (uid == null || name.isEmpty) continue;
+    // 同一個人開多個工作階段時論壇會列兩次，去重免得看起來像我們的 bug
+    if (!seen.add(uid)) continue;
+
+    final icon = attr(li.querySelector('img'), 'src');
+    final group = RegExp(r'online_(\w+)\.gif').firstMatch(icon)?.group(1);
+
+    users.add(OnlineUser(
+      uid: uid,
+      name: name,
+      group: group ?? 'member',
+      // title 是「时间: 22:21」，冒號有全形也有半形
+      time: attr(li, 'title').replaceFirst(RegExp(r'^[^:：]*[:：]\s*'), ''),
+    ));
+  }
+
+  return OnlineInfo(
+    total: pick(r'(\d+)\s*人在[线線]'),
+    members: pick(r'(\d+)\s*[会會][员員]'),
+    invisible: pick(r'(\d+)\s*[隐隱]身'),
+    guests: pick(r'(\d+)\s*位?[游遊]客'),
+    record: pick(r'最高[记記][录錄]是\s*(\d+)'),
+    recordDate:
+        RegExp(r'[于於]\s*([\d-]+)').firstMatch(stat)?.group(1) ?? '',
+    users: users,
+  );
 }
 
 /// 首頁各版塊的版主。跟子版塊共用同一次桌面首頁抓取

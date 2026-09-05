@@ -537,6 +537,55 @@ class PmListResult {
 }
 
 /// 論壇回應 4xx/5xx 或連不上時丟這個，UI 直接顯示 message
+/// 首頁的「在線會員」。
+class OnlineInfo {
+  const OnlineInfo({
+    this.total = 0,
+    this.members = 0,
+    this.invisible = 0,
+    this.guests = 0,
+    this.record = 0,
+    this.recordDate = '',
+    this.users = const [],
+  });
+
+  /// 目前線上總人數
+  final int total;
+
+  /// 其中的會員數（含隱身）
+  final int members;
+  final int invisible;
+  final int guests;
+
+  /// 歷史最高同時在線，以及那一天
+  final int record;
+  final String recordDate;
+
+  /// 看得到的會員（隱身的不會出現在名單裡）
+  final List<OnlineUser> users;
+
+  bool get isEmpty => total == 0 && users.isEmpty;
+}
+
+class OnlineUser {
+  const OnlineUser({
+    required this.uid,
+    required this.name,
+    this.group = 'member',
+    this.time = '',
+  });
+
+  final int uid;
+  final String name;
+
+  /// `admin` / `supermod` / `moderator` / `member`，取自圖示檔名。
+  /// 論壇用不同顏色的小圖示區分身分，這裡保留原意讓介面自己配色。
+  final String group;
+
+  /// 最後活動時間（論壇只給時分）
+  final String time;
+}
+
 class DiscuzException implements Exception {
   final String message;
   final int status;
