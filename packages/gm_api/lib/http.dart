@@ -183,7 +183,8 @@ class Api {
     await init();
     final target = desktop ? desktopUrl(path) : mobileUrl(path);
 
-    if (_preferBrowser && browserFetch != null) {
+    // 走瀏覽器期間定期回頭探一次直連，論壇關掉驗證就自己切回來
+    if (_preferBrowser && browserFetch != null && !_shouldProbeDirect) {
       final body = await _viaBrowser(target);
       if (followInterstitial) {
         final next = _interstitialTarget(body);
@@ -199,10 +200,12 @@ class Api {
       );
       try {
         _guardResponse(res);
+        // 直連成功——論壇把驗證關掉了，切回快的那條
+        if (_preferBrowser) resetTransport();
       } on CloudflareException {
         // 有瀏覽器傳輸就改走它——那是一定過得去的路。
         if (browserFetch != null) {
-          _preferBrowser = true;
+          _useBrowser();
           return await get(path,
               followInterstitial: followInterstitial, desktop: desktop);
         }
@@ -280,7 +283,7 @@ class Api {
         _guardResponse(res);
       } on CloudflareException {
         if (browserFetch != null) {
-          _preferBrowser = true;
+          _useBrowser();
           return await _viaBrowser(desktop ? desktopUrl(path) : mobileUrl(path),
               form: data.map((k, v) => MapEntry(k, '$v')));
         }
@@ -401,8 +404,32 @@ class Api {
   /// 撞過一次挑戰之後就固定走瀏覽器，不必每個請求都先吃一個 403。
   static bool _preferBrowser = false;
 
-  /// 論壇關掉驗證後要能回到直連——直連比 WebView 快得多。
-  static void resetTransport() => _preferBrowser = false;
+  /// 什麼時候切去走瀏覽器的。用來決定何時該回頭探一次直連。
+  static DateTime? _browserSince;
+
+  /// 隔多久回頭試一次直連。
+  ///
+  /// 論壇的驗證通常是臨時擋攻擊，關掉之後應該**自己**切回直連——
+  /// 直連比繞 WebView 快得多，不該讓使用者一直付那個代價。
+  /// 探測的成本只是偶爾多一個 403。
+  static const _probeDirectAfter = Duration(minutes: 10);
+
+  static bool get _shouldProbeDirect {
+    final since = _browserSince;
+    return since != null &&
+        DateTime.now().difference(since) > _probeDirectAfter;
+  }
+
+  /// 手動切回直連（測試用；正常情況會自己探測）
+  static void resetTransport() {
+    _preferBrowser = false;
+    _browserSince = null;
+  }
+
+  static void _useBrowser() {
+    _preferBrowser = true;
+    _browserSince = DateTime.now();
+  }
 
   Future<String> _viaBrowser(String relative,
       {Map<String, String>? form, bool allowChallenge = true}) async {
