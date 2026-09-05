@@ -35,6 +35,14 @@ class BrowserFetch {
   /// 使用者在可見的驗證頁解完之後，這個隱形的還停在舊的挑戰頁上。
   bool _stuck = false;
 
+  /// 先把 WebView 暖起來，不等它完成。
+  ///
+  /// 上次啟動就在走瀏覽器的話，App 一開就呼叫這支——不然使用者會對著
+  /// 轉圈圈等它從零開始載入論壇（實機上就是這個症狀）。
+  void warmUp() {
+    _ensureReady().catchError((_) {});
+  }
+
   Future<void> _ensureReady() {
     if (ready.value != null) return Future.value();
     return _booting ??= _boot();
@@ -88,9 +96,10 @@ class BrowserFetch {
     ready.value = c;
     await c.loadRequest(Uri.parse('$kForumOrigin/forum.php?mobile=2'));
 
-    // 給挑戰自己解的時間；解不掉就讓 fetch 拿回挑戰頁，
-    // 由上層叫出可見的驗證頁請使用者處理。
-    await settled.future.timeout(const Duration(seconds: 30), onTimeout: () {});
+    // 給挑戰自己解的時間。Cloudflare 的自動挑戰通常幾秒內就過，
+    // 等太久只會讓使用者對著空白轉圈圈——解不掉就早點讓 fetch 拿回挑戰頁，
+    // 由上層把可見的驗證頁叫出來（在那裡他看得到進度，也點得到按鈕）。
+    await settled.future.timeout(const Duration(seconds: 12), onTimeout: () {});
   }
 
   /// 目前頁面是不是真的論壇（而不是挑戰頁或錯誤頁）
@@ -121,7 +130,9 @@ class BrowserFetch {
       if (data['ok'] == true) {
         c.complete(data['body'] as String? ?? '');
       } else {
-        c.completeError(DiscuzException('${data['error'] ?? '瀏覽器取得失敗'}'));
+        // JS 的錯誤字串直接丟給使用者會變成「TypeError: Load failed」
+        // 這種看不懂的東西，換成人話。
+        c.completeError(DiscuzException(_friendly('${data['error'] ?? ''}')));
       }
     } catch (_) {
       // 壞掉的訊息就讓那個請求自己逾時，不要影響其他還在等的
@@ -175,6 +186,13 @@ class BrowserFetch {
   }
 
   static const _needSolve = '需要先通過論壇的安全驗證';
+
+  static String _friendly(String jsError) {
+    if (jsError.contains('Load failed') || jsError.contains('NetworkError')) {
+      return '連線中斷，請重試';
+    }
+    return jsError.isEmpty ? '取得內容失敗' : '取得內容失敗：$jsError';
+  }
 
   /// 這段 HTML 是不是 Cloudflare 的挑戰頁。
   ///

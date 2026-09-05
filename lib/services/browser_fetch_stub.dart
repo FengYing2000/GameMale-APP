@@ -10,5 +10,7 @@ class BrowserFetch {
   Future<String> fetch(String url, {Map<String, String>? form}) async =>
       throw UnsupportedError('網頁版沒有瀏覽器傳輸');
 
+  void warmUp() {}
+
   Widget host() => const SizedBox.shrink();
 }

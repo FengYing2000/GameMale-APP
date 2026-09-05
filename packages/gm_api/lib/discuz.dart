@@ -1443,13 +1443,14 @@ const noticeTypes = <String, List<NoticeTab>>{
 /// - 新聽眾：`prompt_follower_N`
 ///
 /// `#myprompt` 帶 class `yes` 代表「有新的東西」，當作保底。
+/// 讀頁首的未讀數。**抓不到就丟例外，不要回 0。**
+///
+/// 回 0 的話呼叫端分不出「真的沒有未讀」和「這次沒抓到」，於是一次失敗
+/// 就把已經顯示的紅點蓋掉——實機上看到的就是「通知亮起來又瞬間消失」。
+/// 三個呼叫處都已經接住 DiscuzException 並保留原本的數字。
 Future<({int notice, int pm, Map<String, int> views})> fetchBadges() async {
-  try {
-    final doc = toDoc(await Api.instance.get('forum.php', desktop: true));
-    return parsePromptCounts(doc);
-  } on DiscuzException {
-    return (notice: 0, pm: 0, views: const <String, int>{});
-  }
+  final doc = toDoc(await Api.instance.get('forum.php', desktop: true));
+  return parsePromptCounts(doc);
 }
 
 int _classSuffix(dom.Element? el, String prefix) {

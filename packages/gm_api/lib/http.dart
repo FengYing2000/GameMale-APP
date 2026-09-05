@@ -420,15 +420,29 @@ class Api {
         DateTime.now().difference(since) > _probeDirectAfter;
   }
 
+  /// 現在是不是走瀏覽器。App 端存起來，下次啟動就能先把 WebView 暖好，
+  /// 不必讓使用者對著轉圈圈等它從零開始載入論壇。
+  static bool get usingBrowser => _preferBrowser;
+
+  /// 傳輸方式改變時通知 App（存偏好、預熱用）
+  static void Function(bool usingBrowser)? onTransportChanged;
+
+  /// 上次啟動就在走瀏覽器的話，開頭直接指定，省掉先吃一個 403 的來回。
+  static void forceBrowser() => _useBrowser();
+
   /// 手動切回直連（測試用；正常情況會自己探測）
   static void resetTransport() {
+    if (!_preferBrowser) return;
     _preferBrowser = false;
     _browserSince = null;
+    onTransportChanged?.call(false);
   }
 
   static void _useBrowser() {
+    final was = _preferBrowser;
     _preferBrowser = true;
     _browserSince = DateTime.now();
+    if (!was) onTransportChanged?.call(true);
   }
 
   Future<String> _viaBrowser(String relative,

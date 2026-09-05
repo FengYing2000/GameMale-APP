@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gm_api/parse.dart' as parse;
 import 'package:gm_api/discuz.dart' as api;
@@ -116,6 +117,10 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     // 撞到挑戰時改由 WebView 發請求。實測光把 cf_clearance 搬給 HTTP
     // 客戶端不夠——Cloudflare 也看 TLS 指紋，拿票的必須真的是瀏覽器。
     Api.browserFetch = BrowserFetch.instance.fetch;
+    Api.onTransportChanged = (usingBrowser) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kCfActive, usingBrowser);
+    };
     Api.onCloudflare = () async {
       final nav = rootNavigatorKey.currentState;
       if (nav == null) return false;
@@ -127,8 +132,26 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     };
   }
 
+  /// 上次啟動就被 Cloudflare 擋著的話，一開 App 就把 WebView 暖起來。
+  ///
+  /// 少了這步，第一個請求要先吃一個 403、再從零載入論壇頁、再等挑戰解掉，
+  /// 使用者對著轉圈圈等十幾秒才看得到東西（實機回報的就是這個）。
+  Future<void> _warmUpTransport() async {
+    if (kIsWeb) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_kCfActive) ?? false) {
+        Api.forceBrowser();
+        BrowserFetch.instance.warmUp();
+      }
+    } catch (_) {
+      // 讀不到偏好就照原本的流程走，只是會慢一點
+    }
+  }
+
   Future<void> _boot() async {
     _installCloudflareHandler();
+    await _warmUpTransport();
     await S2T.instance.load();
     await UiLang.instance.load();
     await _settings.load();
@@ -213,6 +236,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
 
 /// 根 Navigator。網頁版的首次引導要在任何頁面之上跳出來，
 /// 所以需要一個不依賴當下畫面的 context。
+/// 上次是不是被 Cloudflare 擋著。存起來只為了下次啟動能先暖機。
+const _kCfActive = 'gm.cf.active';
+
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// 底部分頁的圖示，未讀數 > 0 時掛上霓虹數字
