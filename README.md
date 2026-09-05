@@ -15,7 +15,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-lightgrey?logo=apple&logoColor=white)](#-iphone)
 [![Android](https://img.shields.io/badge/Android-6.0%2B-lightgrey?logo=android&logoColor=white)](#-android-手機)
-[![測試](https://img.shields.io/badge/自動測試-349_項-4CAF50)](docs/DEVELOPING.md)
+[![測試](https://img.shields.io/badge/自動測試-356_項-4CAF50)](docs/DEVELOPING.md)
 
 **繁體中文** · [简体中文](README.zh-CN.md)
 
@@ -165,6 +165,20 @@ Apple 對免費開發者憑證的限制——用免費帳號簽的 App 只能跑
 </details>
 
 <details>
+<summary><b>出現「論壇開啟了 Cloudflare 安全驗證」怎麼辦？</b></summary>
+
+論壇有時會開啟 Cloudflare 的機器人防護，這時任何 App 都連不上，要用真的
+瀏覽器通過一次驗證才行。
+
+**原生版**會自動跳出一頁驗證，通過之後就恢復正常（通常等幾秒，有時要點
+一下「我是人類」）。
+
+**網頁版沒辦法自動處理。** 因為它的請求是從伺服器發出的，而 Cloudflare 發的
+通行證綁定「解驗證那台機器的網路位址」——你在自己手機上通過的，伺服器那邊
+不算數。這種時候只能改用 App 版，或等論壇關閉驗證。
+</details>
+
+<details>
 <summary><b>圖片很吃流量怎麼辦？</b></summary>
 
 設定 → 流量 → 帖子圖片載入，可以選「只在 Wi-Fi 載入」或「手動」。
@@ -191,7 +205,7 @@ Apple 對免費開發者憑證的限制——用免費帳號簽的 App 只能跑
 
 ```bash
 flutter test                                        # 293 項
-cd packages/gm_api && dart test                     # 28 項
+cd packages/gm_api && dart test                     # 35 項
 cd pwa/server && dart test                          # 28 項
 ```
 

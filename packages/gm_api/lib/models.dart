@@ -545,6 +545,15 @@ class DiscuzException implements Exception {
   String toString() => message;
 }
 
+/// 論壇擋在 Cloudflare 的安全驗證後面。
+///
+/// 跟一般的 403 不同：這不是權限問題，重試一百次也一樣。要**真的瀏覽器
+/// 執行 JavaScript** 解一次挑戰，拿到 `cf_clearance` 之後才過得去。
+/// 分成獨立型別是為了讓介面能給出「開啟驗證」而不是無用的「重試」。
+class CloudflareException extends DiscuzException {
+  const CloudflareException(String message) : super(message, 403);
+}
+
 /// 發文後論壇給的積分變化（勳章觸發也走同一套）
 class CreditChange {
   final String name;

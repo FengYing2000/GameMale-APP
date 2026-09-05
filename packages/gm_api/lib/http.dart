@@ -54,6 +54,18 @@ bool _isProxyableAssetHost(String url) {
 const String _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
+/// 撞到 Cloudflare 挑戰時要說什麼。
+///
+/// 兩個平台的處境不一樣，講一樣的話會害人白忙：
+/// * **原生版**解得掉——App 會開一頁 WebView 讓使用者過驗證。
+/// * **網頁版**解不掉。它的請求是從伺服器發出的，而 `cf_clearance` 綁的是
+///   解題那台機器的 IP；使用者在自己瀏覽器上解一百次，伺服器那邊還是被擋。
+///   所以只能老實說「等論壇關掉」，不要叫他去解。
+const String _cfMessage = kIsWebPlatform
+    ? '論壇開啟了 Cloudflare 安全驗證，網頁版暫時無法連線。'
+        '請改用 App 版，或等論壇關閉驗證。'
+    : '論壇開啟了 Cloudflare 安全驗證，需要通過一次才能繼續';
+
 /// 論壇連線層。
 ///
 /// 和 Capacitor 版最大的差別：iOS 那邊 cookie 由系統的 URLSession 保管，
@@ -165,14 +177,26 @@ class Api {
 
   /// desktop=true 取桌面模板（個人資料的擴展角色組、勳章等只有桌面版才有）
   Future<String> get(String path,
-      {bool followInterstitial = true, bool desktop = false}) async {
+      {bool followInterstitial = true,
+      bool desktop = false,
+      bool allowChallenge = true}) async {
     await init();
     try {
       final res = await _dio.get<String>(
         desktop ? desktopUrl(path) : mobileUrl(path),
         options: Options(responseType: ResponseType.plain),
       );
-      _guard(res.statusCode);
+      try {
+        _guardResponse(res);
+      } on CloudflareException {
+        // 解一次驗證再重試。`allowChallenge: false` 防止解完還是被擋時
+        // 無限遞迴——那種情況就讓例外傳上去，讓使用者看到訊息。
+        if (!allowChallenge || !await _solveCloudflare()) rethrow;
+        return await get(path,
+            followInterstitial: followInterstitial,
+            desktop: desktop,
+            allowChallenge: false);
+      }
       final body = res.data ?? '';
 
       // 有些模組沒有手機版，論壇會先丟一頁「您访问的页面无手机页面」，
@@ -214,7 +238,7 @@ class Api {
   /// desktop=true 時不加 mobile=2 —— 發文走桌面端點，
   /// 論壇的處理邏輯一樣，但外掛（勳章積分）掛在桌面流程上。
   Future<String> post(String path, Map<String, dynamic> form,
-      {bool desktop = false}) async {
+      {bool desktop = false, bool allowChallenge = true}) async {
     await init();
     final data = <String, dynamic>{};
     form.forEach((k, v) {
@@ -229,7 +253,13 @@ class Api {
           contentType: Headers.formUrlEncodedContentType,
         ),
       );
-      _guard(res.statusCode);
+      try {
+        _guardResponse(res);
+      } on CloudflareException {
+        if (!allowChallenge || !await _solveCloudflare()) rethrow;
+        return await post(path, form,
+            desktop: desktop, allowChallenge: false);
+      }
       return await _afterPost(res, desktop: desktop);
     } on DioException catch (e) {
       throw DiscuzException('送出失敗：${_reason(e)}');
@@ -264,7 +294,7 @@ class Api {
           contentType: Headers.formUrlEncodedContentType,
         ),
       );
-      _guard(res.statusCode);
+      _guardResponse(res);
       return await _afterPost(res, desktop: desktop);
     } on DioException catch (e) {
       throw DiscuzException('送出失敗：${_reason(e)}');
@@ -279,7 +309,7 @@ class Api {
         mobileUrl(path),
         options: Options(responseType: ResponseType.bytes),
       );
-      _guard(res.statusCode);
+      _guardResponse(res);
       return Uint8List.fromList(res.data ?? const []);
     } on DioException catch (e) {
       throw DiscuzException('圖片載入失敗：${_reason(e)}');
@@ -297,7 +327,7 @@ class Api {
           headers: imageHeaders,
         ),
       );
-      _guard(res.statusCode);
+      _guardResponse(res);
       return Uint8List.fromList(res.data ?? const []);
     } on DioException catch (e) {
       throw DiscuzException('下載失敗：${_reason(e)}');
@@ -318,6 +348,26 @@ class Api {
   /// 讀出名稱以某段字尾結束的 cookie（Discuz 的 cookie 都有站台專屬前綴）
   /// 內建瀏覽器要用同一組 UA，不然論壇會給不一樣的模板
   static String get userAgent => _ua;
+
+  /// 撞到 Cloudflare 挑戰時要做什麼。
+  ///
+  /// gm_api 是純 Dart 的、碰不到 UI，所以由 App 端注入——實作是開一個
+  /// WebView 讓使用者解一次驗證，再把 `cf_clearance` 灌回這條連線。
+  /// 回 `true` 表示解完了、可以重試。
+  ///
+  /// 網頁版不會設這個：它的請求是從伺服器發出的，而 `cf_clearance` 綁的是
+  /// **解題那台機器的 IP**，使用者在自己瀏覽器上解的拿到伺服器上沒用。
+  static Future<bool> Function()? onCloudflare;
+
+  /// 同時有好幾個請求撞到挑戰時，只開一次 UI，其餘等同一個結果。
+  /// 少了這道，切到新頁面會同時彈出好幾個驗證視窗。
+  static Future<bool>? _solving;
+
+  static Future<bool> _solveCloudflare() {
+    final handler = onCloudflare;
+    if (handler == null) return Future.value(false);
+    return _solving ??= handler().whenComplete(() => _solving = null);
+  }
 
   /// 論壇的外掛頁面全都只有桌面模板。iPhone UA 會被自動導去
   /// 「無手機頁面」提示，所以網址一定要明帶 mobile=no
@@ -384,10 +434,35 @@ class Api {
     await _jar.saveFromResponse(Uri.parse(kOrigin), cookies);
   }
 
-  void _guard(int? status) {
+  /// Cloudflare 的挑戰頁回的也是 403，所以不能只看狀態碼——
+  /// 那會跟「沒有權限」混在一起，然後給使用者一個沒用的「重試」。
+  void _guardResponse(Response<dynamic> res) {
+    if (isCloudflareChallenge(res)) throw const CloudflareException(_cfMessage);
+    final status = res.statusCode;
     if (status != null && status >= 400) {
       throw DiscuzException('伺服器回應 $status', status);
     }
+  }
+
+  /// 這個回應是不是 Cloudflare 的挑戰頁。
+  ///
+  /// `cf-mitigated: challenge` 是最準的訊號（實測論壇開啟時就是回這個）。
+  /// 但那個標頭不保證一直都在，所以再比對挑戰頁的內文特徵當後備。
+  static bool isCloudflareChallenge(Response<dynamic> res) {
+    final code = res.statusCode ?? 0;
+    if (code != 403 && code != 503) return false;
+
+    final mitigated = res.headers.value('cf-mitigated');
+    if (mitigated != null && mitigated.contains('challenge')) return true;
+
+    final server = res.headers.value('server') ?? '';
+    if (!server.toLowerCase().contains('cloudflare')) return false;
+
+    final body = res.data is String ? res.data as String : '';
+    return body.contains('challenge-platform') ||
+        body.contains('cf-browser-verification') ||
+        body.contains('_cf_chl_opt') ||
+        body.contains('Just a moment');
   }
 
   String _reason(DioException e) {

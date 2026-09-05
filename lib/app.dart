@@ -14,6 +14,7 @@ import 'store/replied.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
+import 'ui/pages/cf_challenge_page.dart';
 import 'ui/pages/doing_page.dart';
 import 'ui/pages/edit_post_page.dart';
 import 'ui/pages/forum_page.dart';
@@ -103,7 +104,26 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   }
 
 
+  /// 撞到 Cloudflare 挑戰時，開一頁 WebView 讓使用者解一次，
+  /// 解完把 `cf_clearance` 灌回連線層並自動重試原本的請求。
+  ///
+  /// **只有原生版**：網頁版的請求是從伺服器發出的，而那張票綁的是解題那台
+  /// 機器的 IP——使用者在自己瀏覽器上解的，拿到伺服器上不算數。
+  void _installCloudflareHandler() {
+    if (kIsWeb) return;
+    Api.onCloudflare = () async {
+      final nav = rootNavigatorKey.currentState;
+      if (nav == null) return false;
+      final ok = await nav.push<bool>(MaterialPageRoute(
+        builder: (_) => const CfChallengePage(),
+        fullscreenDialog: true,
+      ));
+      return ok == true;
+    };
+  }
+
   Future<void> _boot() async {
+    _installCloudflareHandler();
     await S2T.instance.load();
     await UiLang.instance.load();
     await _settings.load();

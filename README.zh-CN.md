@@ -15,7 +15,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-lightgrey?logo=apple&logoColor=white)](#-iphone)
 [![Android](https://img.shields.io/badge/Android-6.0%2B-lightgrey?logo=android&logoColor=white)](#-android-手机)
-[![测试](https://img.shields.io/badge/自动测试-349_项-4CAF50)](docs/DEVELOPING.md)
+[![测试](https://img.shields.io/badge/自动测试-356_项-4CAF50)](docs/DEVELOPING.md)
 
 [繁體中文](README.md) · **简体中文**
 
@@ -165,6 +165,20 @@ Apple 对免费开发者证书的限制——用免费账号签的 App 只能跑
 </details>
 
 <details>
+<summary><b>出现「论坛开启了 Cloudflare 安全验证」怎么办？</b></summary>
+
+论坛有时会开启 Cloudflare 的机器人防护，这时任何 App 都连不上，要用真的
+浏览器通过一次验证才行。
+
+**原生版**会自动弹出一页验证，通过之后就恢复正常（通常等几秒，有时要点
+一下「我是人类」）。
+
+**网页版没办法自动处理。** 因为它的请求是从服务器发出的，而 Cloudflare 发的
+通行证绑定「解验证那台机器的网络地址」——你在自己手机上通过的，服务器那边
+不算数。这种时候只能改用 App 版，或等论坛关闭验证。
+</details>
+
+<details>
 <summary><b>图片很吃流量怎么办？</b></summary>
 
 设置 → 流量 → 帖子图片加载，可以选「只在 Wi-Fi 加载」或「手动」。
@@ -191,7 +205,7 @@ Apple 对免费开发者证书的限制——用免费账号签的 App 只能跑
 
 ```bash
 flutter test                                        # 293 项
-cd packages/gm_api && dart test                     # 28 项
+cd packages/gm_api && dart test                     # 35 项
 cd pwa/server && dart test                          # 28 项
 ```
 
