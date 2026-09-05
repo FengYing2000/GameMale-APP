@@ -181,16 +181,33 @@ class Api {
       bool desktop = false,
       bool allowChallenge = true}) async {
     await init();
+    final target = desktop ? desktopUrl(path) : mobileUrl(path);
+
+    if (_preferBrowser && browserFetch != null) {
+      final body = await _viaBrowser(target);
+      if (followInterstitial) {
+        final next = _interstitialTarget(body);
+        if (next != null) return await get(next, followInterstitial: false);
+      }
+      return body;
+    }
+
     try {
       final res = await _dio.get<String>(
-        desktop ? desktopUrl(path) : mobileUrl(path),
+        target,
         options: Options(responseType: ResponseType.plain),
       );
       try {
         _guardResponse(res);
       } on CloudflareException {
-        // 解一次驗證再重試。`allowChallenge: false` 防止解完還是被擋時
-        // 無限遞迴——那種情況就讓例外傳上去，讓使用者看到訊息。
+        // 有瀏覽器傳輸就改走它——那是一定過得去的路。
+        if (browserFetch != null) {
+          _preferBrowser = true;
+          return await get(path,
+              followInterstitial: followInterstitial, desktop: desktop);
+        }
+        // 沒有的話（網頁版）只能請使用者自己解一次，`allowChallenge: false`
+        // 防止解完還是被擋時無限遞迴。
         if (!allowChallenge || !await _solveCloudflare()) rethrow;
         return await get(path,
             followInterstitial: followInterstitial,
@@ -244,6 +261,12 @@ class Api {
     form.forEach((k, v) {
       if (v != null) data[k] = v.toString();
     });
+
+    if (_preferBrowser && browserFetch != null) {
+      return await _viaBrowser(desktop ? desktopUrl(path) : mobileUrl(path),
+          form: data.map((k, v) => MapEntry(k, '$v')));
+    }
+
     try {
       final res = await _dio.post<String>(
         desktop ? desktopUrl(path) : mobileUrl(path),
@@ -256,6 +279,11 @@ class Api {
       try {
         _guardResponse(res);
       } on CloudflareException {
+        if (browserFetch != null) {
+          _preferBrowser = true;
+          return await _viaBrowser(desktop ? desktopUrl(path) : mobileUrl(path),
+              form: data.map((k, v) => MapEntry(k, '$v')));
+        }
         if (!allowChallenge || !await _solveCloudflare()) rethrow;
         return await post(path, form,
             desktop: desktop, allowChallenge: false);
@@ -359,14 +387,60 @@ class Api {
   /// **解題那台機器的 IP**，使用者在自己瀏覽器上解的拿到伺服器上沒用。
   static Future<bool> Function()? onCloudflare;
 
+  /// 用**真瀏覽器**抓網址的後備傳輸。
+  ///
+  /// 實測 Cloudflare 不認由 HTTP 客戶端重放的 `cf_clearance`（票是真的，
+  /// 但拿票的不是瀏覽器，TLS 指紋對不上）。所以光把 cookie 搬過來不夠，
+  /// 要連請求本身都由 WebView 發出——在論壇頁面裡跑 `fetch()`，同源、
+  /// 自動帶齊 cookie，CF 看到的就是不折不扣的瀏覽器。
+  ///
+  /// 由 App 端注入（gm_api 是純 Dart 的，碰不到 WebView）。
+  static Future<String> Function(String url, {Map<String, String>? form})?
+      browserFetch;
+
+  /// 撞過一次挑戰之後就固定走瀏覽器，不必每個請求都先吃一個 403。
+  static bool _preferBrowser = false;
+
+  /// 論壇關掉驗證後要能回到直連——直連比 WebView 快得多。
+  static void resetTransport() => _preferBrowser = false;
+
+  Future<String> _viaBrowser(String relative,
+      {Map<String, String>? form, bool allowChallenge = true}) async {
+    final url = relative.startsWith('http') ? relative : '$kOrigin$relative';
+    try {
+      return await browserFetch!(url, form: form);
+    } on CloudflareException {
+      // 連 WebView 自己都被擋住了——請使用者看著解一次。解完的
+      // cf_clearance 跟隱形的那個 WebView 是同一份 cookie store，
+      // 所以解完就能繼續。只重試一次，避免解不掉時無限迴圈。
+      if (!allowChallenge || !await _solveCloudflare()) rethrow;
+      return await _viaBrowser(url, form: form, allowChallenge: false);
+    }
+  }
+
   /// 同時有好幾個請求撞到挑戰時，只開一次 UI，其餘等同一個結果。
   /// 少了這道，切到新頁面會同時彈出好幾個驗證視窗。
   static Future<bool>? _solving;
 
+  /// 上次解完挑戰的時間。
+  ///
+  /// 剛解完卻還是被擋，代表這條路本身走不通（Cloudflare 不認由 HTTP
+  /// 客戶端重放的 `cf_clearance`）。這時再彈視窗只會變成無限迴圈——
+  /// 使用者解一次、關掉、下一個請求又彈一次，畫面永遠是空的。
+  static DateTime? _lastSolved;
+
   static Future<bool> _solveCloudflare() {
     final handler = onCloudflare;
     if (handler == null) return Future.value(false);
-    return _solving ??= handler().whenComplete(() => _solving = null);
+    final last = _lastSolved;
+    if (last != null &&
+        DateTime.now().difference(last) < const Duration(minutes: 2)) {
+      return Future.value(false);
+    }
+    return _solving ??= handler().then((ok) {
+      if (ok) _lastSolved = DateTime.now();
+      return ok;
+    }).whenComplete(() => _solving = null);
   }
 
   /// 論壇的外掛頁面全都只有桌面模板。iPhone UA 會被自動導去

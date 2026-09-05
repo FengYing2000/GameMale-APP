@@ -15,7 +15,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-15.0%2B-lightgrey?logo=apple&logoColor=white)](#-iphone)
 [![Android](https://img.shields.io/badge/Android-6.0%2B-lightgrey?logo=android&logoColor=white)](#-android-手机)
-[![测试](https://img.shields.io/badge/自动测试-356_项-4CAF50)](docs/DEVELOPING.md)
+[![测试](https://img.shields.io/badge/自动测试-362_项-4CAF50)](docs/DEVELOPING.md)
 
 [繁體中文](README.md) · **简体中文**
 
@@ -204,7 +204,7 @@ Apple 对免费开发者证书的限制——用免费账号签的 App 只能跑
 解析层抽成纯 Dart 包 `packages/gm_api`，原生版与网页版后端共用同一份。
 
 ```bash
-flutter test                                        # 293 项
+flutter test                                        # 299 项
 cd packages/gm_api && dart test                     # 35 项
 cd pwa/server && dart test                          # 28 项
 ```

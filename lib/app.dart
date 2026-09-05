@@ -14,6 +14,8 @@ import 'store/replied.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
+import 'services/browser_fetch_stub.dart'
+    if (dart.library.io) 'services/browser_fetch.dart';
 import 'ui/pages/cf_challenge_page.dart';
 import 'ui/pages/doing_page.dart';
 import 'ui/pages/edit_post_page.dart';
@@ -111,6 +113,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   /// 機器的 IP——使用者在自己瀏覽器上解的，拿到伺服器上不算數。
   void _installCloudflareHandler() {
     if (kIsWeb) return;
+    // 撞到挑戰時改由 WebView 發請求。實測光把 cf_clearance 搬給 HTTP
+    // 客戶端不夠——Cloudflare 也看 TLS 指紋，拿票的必須真的是瀏覽器。
+    Api.browserFetch = BrowserFetch.instance.fetch;
     Api.onCloudflare = () async {
       final nav = rootNavigatorKey.currentState;
       if (nav == null) return false;
@@ -191,6 +196,15 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
           darkTheme: darkThemeOf(settings.accent.seed),
           themeMode: settings.themeMode,
           routerConfig: _router,
+          // Cloudflare 擋著時，論壇請求會改由一個常駐的隱形 WebView 發出。
+          // 它**必須真的在畫面上**（1×1）——iOS 的 WKWebView 不在 widget
+          // 樹裡時 JavaScript 會被節流甚至完全不跑。
+          builder: (context, child) => Stack(
+            children: [
+              ?child,
+              if (!kIsWeb) BrowserFetch.instance.host(),
+            ],
+          ),
         ),
       ),
     );

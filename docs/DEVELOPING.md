@@ -233,3 +233,34 @@ APK 用 Flutter 自動產生的 debug 金鑰簽章 —— 側載裝得起來，�
 ＋伺服器輪詢，兩套都拿掉了。原因是送達時機由系統決定、不可控，而網頁版那套還得讓
 伺服器保存論壇 cookie。實作仍在 git history 裡，要復原找得到。
 
+---
+
+## Cloudflare 擋在論壇前面時
+
+論壇 2026-09-05 開了全站 Managed Challenge：每個路徑（連靜態圖片）都回
+403 `cf-mitigated: challenge`，換 UA 沒用。
+
+**試過但不夠的作法**：把 WebView 解出來的 `cf_clearance` 撈回 Dart 的
+cookie jar（`WebViewCookieManager.getCookies` 兩個平台都讀得到 HttpOnly，
+UA 也對齊了）。實測**還是 403**——票是真的，但 Cloudflare 也看 TLS 指紋，
+拿票的必須真的是瀏覽器。症狀是驗證頁一直重複彈出。
+
+**現在的作法**：連請求本身都交給 WebView。`lib/services/browser_fetch.dart`
+維持一個常駐的 1×1 隱形 WebView，停在論壇頁面上，用 `fetch()` 發同源請求，
+結果經 JavaScript channel 回 Dart，再餵給原本的解析器。
+
+幾個必要條件：
+- WebView **必須真的在 widget 樹裡**。iOS 的 WKWebView 不在畫面上時
+  JavaScript 會被節流甚至完全不跑。掛在 `MaterialApp.builder` 的 Stack 裡，
+  1×1、`IgnorePointer`。做 0×0 有些版本根本不初始化。
+- 注入的 `window.__gmFetch` **每次呼叫前都要重新注入**：頁面一導覽 JS 環境
+  就沒了，而挑戰頁本身就會導覽。
+- 走 WebView 時**拿不到狀態碼與標頭**（`fetch()` 只回文字），所以「這是不是
+  挑戰頁」只能比對內文特徵，見 `BrowserFetch.looksLikeChallenge`。
+- 撞過一次挑戰就固定走瀏覽器（`_preferBrowser`），不必每個請求都先吃一個
+  403；論壇關掉驗證後用 `Api.resetTransport()` 回到直連（直連快得多）。
+
+**網頁版救不了**：它的請求是從伺服器發出的，而 `cf_clearance` 綁的是解題
+那台機器的 IP。使用者在自己瀏覽器上解的，拿到伺服器上不算數。網頁版因此
+顯示不同的訊息，老實說「暫時無法連線」，不叫使用者去白忙。
+
