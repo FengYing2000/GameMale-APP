@@ -420,3 +420,19 @@ Cloudflare 擋著的那段期間，畫面上的圖片會全部失敗，而**失�
 十分鐘。只把 WebView 暖起來就好，讓第一個請求自己去撞：沒被擋就直連，
 被擋了也只多一次幾百毫秒的來回。
 
+## 資料層只能丟 DiscuzException
+
+每個頁面都是 `on DiscuzException catch` ——別的型別會直接穿過去，`finally`
+把 loading 關掉但錯誤訊息沒設，畫面就停在「沒資料、沒錯誤、沒轉圈」的
+**全白狀態**。使用者看不出發生什麼事，回報時我們也拿不到任何線索。
+
+所以 `Api.get`／`post` 最後要有一層 `catch (e)` 把非預期的例外包成
+DiscuzException。修在這一層，所有頁面都受惠，不必逐頁改。
+
+## 驗證頁只能撈 Cloudflare 的 cookie
+
+`_harvest` 一股腔把 WebView 的所有 cookie 灌回 App 的話，只要 WebView 當下
+是未登入狀態（例如它自己載入時還沒拿到 App 的 cookie），就會用訪客憑證
+**蓋掉 App 原本登入好的那份**——使用者莫名其妙變成「尚未登入」。
+只取 `cf_` / `__cf` 開頭的。
+

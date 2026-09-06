@@ -59,7 +59,8 @@ class BrowserFetch {
   Future<WebViewController> _viewFor(String url) async {
     final origin = Uri.tryParse(url)?.origin ?? kForumOrigin;
     final main = ready.value;
-    if (origin == kForumOrigin || main == null) return main!;
+    if (main == null) throw const DiscuzException('瀏覽器傳輸沒有就緒');
+    if (origin == kForumOrigin) return main;
 
     final existing = _byOrigin[origin];
     if (existing != null) return existing;

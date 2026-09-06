@@ -133,9 +133,17 @@ class _CfChallengePageState extends State<CfChallengePage> {
       final cookies = await WebViewCookieManager().getCookies(
         domain: Uri.parse(kForumOrigin),
       );
-      if (cookies.isEmpty) return;
+      // **只拿 Cloudflare 的通行證，不要碰論壇的登入 cookie。**
+      //
+      // 一股腦全灌回去的話，只要 WebView 當下是未登入狀態（例如它自己
+      // 載入時還沒拿到 App 的 cookie），就會用訪客的憑證蓋掉 App 原本
+      // 登入好的那份——使用者莫名其妙變成「尚未登入」。
+      final cf = cookies
+          .where((c) => c.name.startsWith('cf_') || c.name.startsWith('__cf'))
+          .toList();
+      if (cf.isEmpty) return;
       await Api.instance.seedCookies(
-        cookies.map((c) => '${c.name}=${c.value}').join('; '),
+        cf.map((c) => '${c.name}=${c.value}').join('; '),
       );
     } catch (_) {
       // 撈不到不影響主要流程

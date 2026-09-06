@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:gm_api/http.dart';
+import 'package:gm_api/models.dart';
 import 'package:test/test.dart';
 
 /// 論壇 2026-09-05 開了全站 Cloudflare 挑戰。挑戰頁回的是 403，
@@ -83,6 +84,17 @@ void main() {
             body: '有人在帖子裡貼了 challenge-platform 這個字')),
         isFalse,
       );
+    });
+  });
+
+  group('資料層只能丟 DiscuzException', () {
+    test('CloudflareException 是 DiscuzException 的子型別', () {
+      // 呼叫端一律只接 DiscuzException。別種型別會直接穿過去，讓畫面停在
+      // 「沒資料、沒錯誤、沒轉圈」的全白狀態——使用者看不出發生什麼事，
+      // 我們也拿不到線索。
+      const e = CloudflareException('測試');
+      expect(e, isA<DiscuzException>());
+      expect(e.status, 403);
     });
   });
 }

@@ -229,6 +229,13 @@ class Api {
       return body;
     } on DioException catch (e) {
       throw DiscuzException('網路連線失敗：${_reason(e)}');
+    } on DiscuzException {
+      rethrow;
+    } catch (e) {
+      // **這一層是必要的**：呼叫端一律只接 DiscuzException，別種型別會直接
+      // 穿過去，讓畫面停在「沒資料、沒錯誤、沒轉圈」的全白狀態——使用者
+      // 完全看不出發生什麼事，我們也拿不到任何線索。
+      throw DiscuzException('讀取失敗：$e');
     }
   }
 
@@ -294,6 +301,10 @@ class Api {
       return await _afterPost(res, desktop: desktop);
     } on DioException catch (e) {
       throw DiscuzException('送出失敗：${_reason(e)}');
+    } on DiscuzException {
+      rethrow;
+    } catch (e) {
+      throw DiscuzException('送出失敗：$e');
     }
   }
 
