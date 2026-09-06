@@ -40,6 +40,44 @@ class BrowserFetch {
 
   WebViewController? get controller => ready.value;
 
+  /// 圖片子網域專用的 WebView。
+  ///
+  /// **為什麼需要**：版塊圖示、勳章、帖子裡的圖都放在 `img.gamemale.com`，
+  /// 跟論壇本體不同來源。從停在 `www` 的頁面 `fetch()` 過去是跨來源請求，
+  /// 而那個網域不送 CORS 標頭，直接被瀏覽器擋掉——實機症狀是「頭像有、
+  /// 其他圖全滅」（頭像在 www 底下，同源所以會動）。
+  ///
+  /// 那個子網域同樣被 Cloudflare 擋著，所以也不能改用一般的 HTTP 客戶端。
+  /// 只能再開一顆停在該來源的 WebView，讓請求變成同源。
+  /// 這顆不給使用者看——圖片是靜態資源，Cloudflare 通常會自己放行。
+  final _byOrigin = <String, WebViewController>{};
+
+  /// 開了幾個額外來源。宿主靠它知道要重建、把新的 WebView 掛上畫面。
+  final origins = ValueNotifier<int>(0);
+
+  /// 挑一顆跟目標網址**同來源**的 WebView，沒有就開一顆。
+  Future<WebViewController> _viewFor(String url) async {
+    final origin = Uri.tryParse(url)?.origin ?? kForumOrigin;
+    final main = ready.value;
+    if (origin == kForumOrigin || main == null) return main!;
+
+    final existing = _byOrigin[origin];
+    if (existing != null) return existing;
+
+    final c = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(Api.userAgent)
+      ..addJavaScriptChannel(_channel, onMessageReceived: _onMessage);
+    _byOrigin[origin] = c;
+    origins.value++; // 掛上畫面，JS 才跑得動
+
+    // 載入該來源的任一頁面，把文件的 origin 定在那裡，之後 fetch 才同源。
+    // 被 Cloudflare 擋的話這裡拿到的是挑戰頁，真瀏覽器通常會自己解掉。
+    await c.loadRequest(Uri.parse('$origin/'));
+    await Future<void>.delayed(const Duration(seconds: 3));
+    return c;
+  }
+
   Completer<void>? _settled;
 
   /// 驗證頁會暫時接管導覽處理（它要自己等「頁面變成論壇」那一刻），
@@ -141,16 +179,35 @@ class BrowserFetch {
   /// 而挑戰頁解題過程中會自己重新導向，把進行中的 fetch 一起取消掉——
   /// Safari 回報的是「TypeError: Load failed」，看起來像網路斷了，
   /// 其實只是我們在錯的時機發了請求。
+  /// 上次確認過「頁面是論壇」的時間。
+  ///
+  /// 首頁一次會有二十幾張圖同時要抓，每張都各自探測一次的話，等於對同一顆
+  /// WebView 併發丟出幾十次 JS 求值。只要其中一次在高負載下回傳不如預期，
+  /// 那張圖就被判成還在挑戰頁而失敗——實機症狀是文字讀得到、圖片全滅。
+  /// 短時間內共用同一個結論就好。
+  DateTime? _forumOkAt;
+  static const _probeCache = Duration(seconds: 8);
+
   Future<void> _ensureOnForum(WebViewController c) async {
-    if (await _isForum(c)) return;
+    final ok = _forumOkAt;
+    if (ok != null && DateTime.now().difference(ok) < _probeCache) return;
+
+    if (await _isForum(c)) {
+      _forumOkAt = DateTime.now();
+      return;
+    }
 
     // 只給很短的寬限。真的是挑戰的話早點叫出驗證頁讓使用者看著它解，
     // 比讓他對著空白轉圈圈好得多；而如果只是還在載入，驗證頁會在載完的
     // 瞬間自己關掉，等於沒有代價。
     for (var i = 0; i < 3; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
-      if (await _isForum(c)) return;
+      if (await _isForum(c)) {
+        _forumOkAt = DateTime.now();
+        return;
+      }
     }
+    _forumOkAt = null;
     throw const CloudflareException(_needSolve);
   }
 
@@ -211,21 +268,62 @@ class BrowserFetch {
     return body;
   }
 
+  /// 同時最多幾個請求在 WebView 裡跑。
+  ///
+  /// 一頁幾十張圖全部併發的話，瀏覽器本身的同源連線數會排隊，JS 通道也會
+  /// 塞住，反而整批逾時。排隊反而比較快，也比較不會誤判。
+  static const _maxInFlight = 4;
+  int _inFlight = 0;
+  final _queue = <Completer<void>>[];
+
+  Future<void> _acquire() async {
+    if (_inFlight < _maxInFlight) {
+      _inFlight++;
+      return;
+    }
+    final wait = Completer<void>();
+    _queue.add(wait);
+    await wait.future;
+  }
+
+  void _release() {
+    if (_queue.isNotEmpty) {
+      _queue.removeAt(0).complete();
+    } else {
+      _inFlight--;
+    }
+  }
+
   Future<String> _run(
     String url, {
     Map<String, String>? form,
     required String jsFunction,
   }) async {
     await _ensureReady();
-    final c = ready.value;
-    if (c == null) throw const DiscuzException('瀏覽器傳輸沒有就緒');
+    await _acquire();
+    try {
+      return await _send(url, form: form, jsFunction: jsFunction);
+    } finally {
+      _release();
+    }
+  }
+
+  Future<String> _send(
+    String url, {
+    Map<String, String>? form,
+    required String jsFunction,
+  }) async {
+    if (ready.value == null) throw const DiscuzException('瀏覽器傳輸沒有就緒');
+    final c = await _viewFor(url);
+    final isMain = identical(c, ready.value);
 
     final id = ++_seq;
     final completer = Completer<String>();
     _pending[id] = completer;
 
     try {
-      await _ensureOnForum(c);
+      // 只有論壇本體那顆要確認停在論壇上；圖片子網域那顆載的就是圖片來源
+      if (isMain) await _ensureOnForum(c);
       // 每次都重新注入：頁面一導覽 JS 環境就沒了，而挑戰頁本身就會導覽。
       // 這段很短，重覆執行的成本可以忽略。
       await c.runJavaScript(_injectedJs);
@@ -253,6 +351,23 @@ class BrowserFetch {
       return '連線中斷，請重試';
     }
     return jsError.isEmpty ? '取得內容失敗' : '取得內容失敗：$jsError';
+  }
+
+  /// App 從背景回來時呼叫。
+  ///
+  /// 掛在背景太久，iOS 會把 WebView 的內容清掉或讓 Cloudflare 的通行證過期，
+  /// 回來之後頁面已經不是論壇了。不重新載入的話每個請求都會失敗，而且因為
+  /// 那不是「新的挑戰」，驗證頁也不會跳出來——實機症狀是只能重開 App。
+  Future<void> onResume() async {
+    _forumOkAt = null;
+    final c = ready.value;
+    if (c == null) return;
+    if (await _isForum(c)) return;
+    try {
+      await c.reload();
+    } catch (_) {
+      // 重載失敗就讓下一個請求走正常的挑戰流程
+    }
   }
 
   /// 這段 HTML 是不是 Cloudflare 的挑戰頁。
@@ -337,26 +452,39 @@ window.__gmBytes = function (a) {
   /// 用 `Opacity(0)` 而不是 1×1 或 `Offstage`：Cloudflare 的挑戰會量視窗
   /// 尺寸當指紋的一部分，1×1 的瀏覽器很可疑，而且真要點「我是人類」時
   /// 也沒地方可點。透明度 0 的話版面照排、JS 照跑，只是看不見。
+  /// 掛在畫面上的宿主。
+  ///
+  /// **必須真的在 widget 樹裡**——iOS 的 WKWebView 不在畫面上時
+  /// JavaScript 會被節流甚至完全不跑。
+  ///
+  /// 用 `Opacity(0)` 而不是 1×1 或 `Offstage`：Cloudflare 的挑戰會量視窗
+  /// 尺寸當指紋的一部分，1×1 的瀏覽器很可疑，而且真要點「我是人類」時
+  /// 也沒地方可點。透明度 0 的話版面照排、JS 照跑，只是看不見。
   Widget host() => ValueListenableBuilder<bool>(
     valueListenable: presenting,
-    builder: (_, showing, _) => showing
-        // 驗證頁正拿著這顆 WebView，這裡要讓位——
-        // 一個 controller 同時只能掛在一個 WebViewWidget 上
-        ? const SizedBox.shrink()
-        : ValueListenableBuilder<WebViewController?>(
-            valueListenable: ready,
-            builder: (_, c, _) => c == null
-                ? const SizedBox.shrink()
-                : IgnorePointer(
-                    child: Opacity(
-                      opacity: 0,
-                      child: SizedBox(
-                        width: 360,
-                        height: 640,
-                        child: WebViewWidget(controller: c),
-                      ),
-                    ),
-                  ),
-          ),
+    builder: (_, showing, _) => ValueListenableBuilder<int>(
+      valueListenable: origins,
+      builder: (_, _, _) => Stack(
+        children: [
+          // 驗證頁正拿著主 WebView 時這裡要讓位——
+          // 一個 controller 同時只能掛在一個 WebViewWidget 上
+          if (!showing) _hidden(ready.value),
+          for (final c in _byOrigin.values) _hidden(c),
+        ],
+      ),
+    ),
   );
+
+  Widget _hidden(WebViewController? c) => c == null
+      ? const SizedBox.shrink()
+      : IgnorePointer(
+          child: Opacity(
+            opacity: 0,
+            child: SizedBox(
+              width: 360,
+              height: 640,
+              child: WebViewWidget(controller: c),
+            ),
+          ),
+        );
 }

@@ -19,6 +19,8 @@ class BrowserFetch {
   WebViewController? get controller => null;
   void restoreDelegate() {}
 
+  Future<void> onResume() async {}
+
   static const probeJs = '';
 
   Future<Uint8List> fetchBytes(String url) async =>

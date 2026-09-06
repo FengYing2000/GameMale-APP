@@ -474,8 +474,11 @@ class Api {
     final handler = onCloudflare;
     if (handler == null) return Future.value(false);
     final last = _lastSolved;
+    // 20 秒足以擋掉「同一批請求連環觸發」的風暴。原本設兩分鐘是為了擋
+    // 偵測寫錯造成的無限迴圈，那個修好之後這裡不該再擋這麼久——
+    // App 從背景回來、通行證過期時會需要馬上叫出驗證頁。
     if (last != null &&
-        DateTime.now().difference(last) < const Duration(minutes: 2)) {
+        DateTime.now().difference(last) < const Duration(seconds: 20)) {
       return Future.value(false);
     }
     return _solving ??= handler().then((ok) {

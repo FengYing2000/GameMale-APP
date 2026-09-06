@@ -1,4 +1,5 @@
 import 'i18n/ui.dart';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -10,6 +11,7 @@ import 'package:gm_api/parse.dart' as parse;
 import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/s2t.dart';
 import 'package:gm_api/http.dart';
+
 import 'store/favorites.dart';
 import 'store/replied.dart';
 import 'store/session.dart';
@@ -80,7 +82,13 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   /// 從背景切回前景就重新對一次紅點 —— 提醒常常是在 App 沒開的時候來的
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshBadges();
+    if (state == AppLifecycleState.resumed) {
+      // 掛在背景太久，iOS 會把 WebView 的內容清掉、Cloudflare 的通行證也會
+      // 過期。不重新確認的話每個請求都失敗，而且因為那不是「新的挑戰」，
+      // 驗證頁也不會跳出來——實機症狀是只能重開 App。
+      if (!kIsWeb) BrowserFetch.instance.onResume();
+      _refreshBadges();
+    }
   }
 
   /// 紅點只讀頁首的提醒選單，不會把提醒標成已讀
@@ -100,13 +108,11 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     // 訊息分頁才會出現，而那時候他早就看到了，等於沒有提示的作用。
     try {
       final list = await api.fetchPmList();
-      _session
-          .setPmUnreadCount(list.items.fold(0, (sum, i) => sum + i.unread));
+      _session.setPmUnreadCount(list.items.fold(0, (sum, i) => sum + i.unread));
     } on Exception {
       // 抓不到就沿用頁首那個數字
     }
   }
-
 
   /// 撞到 Cloudflare 挑戰時，開一頁 WebView 讓使用者解一次，
   /// 解完把 `cf_clearance` 灌回連線層並自動重試原本的請求。
@@ -127,10 +133,12 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     Api.onCloudflare = () async {
       final nav = rootNavigatorKey.currentState;
       if (nav == null) return false;
-      final ok = await nav.push<bool>(MaterialPageRoute(
-        builder: (_) => const CfChallengePage(),
-        fullscreenDialog: true,
-      ));
+      final ok = await nav.push<bool>(
+        MaterialPageRoute(
+          builder: (_) => const CfChallengePage(),
+          fullscreenDialog: true,
+        ),
+      );
       return ok == true;
     };
   }
@@ -177,9 +185,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     final want = _settings.toTraditional;
     final changed = UiLang.instance.simplified == want;
     parse.convertToTraditional = false;
-    parse.uiTraditional = want;   // 系統文字跟著介面語言
+    parse.uiTraditional = want; // 系統文字跟著介面語言
     S2T.instance.useTaiwanWords = true;
-    UiLang.instance.simplified = !want;      // 介面文字
+    UiLang.instance.simplified = !want; // 介面文字
     // 首頁子版塊／版主是用舊語言 sys() 過並快取的，換語言要丟掉重抓
     api.clearIndexCache();
     if (changed && mounted) setState(() {});
@@ -227,10 +235,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
           // 它**必須真的在畫面上**（1×1）——iOS 的 WKWebView 不在 widget
           // 樹裡時 JavaScript 會被節流甚至完全不跑。
           builder: (context, child) => Stack(
-            children: [
-              ?child,
-              if (!kIsWeb) BrowserFetch.instance.host(),
-            ],
+            children: [?child, if (!kIsWeb) BrowserFetch.instance.host()],
           ),
         ),
       ),
@@ -265,7 +270,10 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
     },
     routes: [
       GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
-      GoRoute(path: '/f/:fid/post', builder: (c, s) => NewThreadPage(fid: _int(s, 'fid'))),
+      GoRoute(
+        path: '/f/:fid/post',
+        builder: (c, s) => NewThreadPage(fid: _int(s, 'fid')),
+      ),
       GoRoute(
         path: '/f/:fid/search',
         builder: (c, s) => SearchPage(
@@ -274,10 +282,16 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
           initialQuery: s.uri.queryParameters['q'] ?? '',
         ),
       ),
-      GoRoute(path: '/f/:fid', builder: (c, s) => ForumPage(fid: _int(s, 'fid'))),
+      GoRoute(
+        path: '/f/:fid',
+        builder: (c, s) => ForumPage(fid: _int(s, 'fid')),
+      ),
       GoRoute(path: '/settings/tools', builder: (c, s) => const ToolsPage()),
       GoRoute(path: '/blogs', builder: (c, s) => const BlogListPageView()),
-      GoRoute(path: '/collections', builder: (c, s) => const CollectionListPage()),
+      GoRoute(
+        path: '/collections',
+        builder: (c, s) => const CollectionListPage(),
+      ),
       GoRoute(
         path: '/collection/:ctid',
         builder: (c, s) => CollectionViewPage(ctid: _int(s, 'ctid')),
@@ -292,7 +306,10 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
           name: s.uri.queryParameters['name'] ?? '',
         ),
       ),
-      GoRoute(path: '/g/:fid', builder: (c, s) => GroupPage(fid: _int(s, 'fid'))),
+      GoRoute(
+        path: '/g/:fid',
+        builder: (c, s) => GroupPage(fid: _int(s, 'fid')),
+      ),
       GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
       GoRoute(
         path: '/web',
@@ -333,8 +350,7 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
         path: '/t/:tid',
         builder: (c, s) => ThreadPage(
           tid: _int(s, 'tid'),
-          initialPage:
-              int.tryParse(s.uri.queryParameters['page'] ?? '') ?? 1,
+          initialPage: int.tryParse(s.uri.queryParameters['page'] ?? '') ?? 1,
           focusPid: int.tryParse(s.uri.queryParameters['pid'] ?? ''),
         ),
       ),
@@ -346,11 +362,18 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
           name: s.uri.queryParameters['name'] ?? '',
         ),
       ),
-      GoRoute(path: '/u/:uid', builder: (c, s) => ProfilePage(uid: _int(s, 'uid'))),
-      GoRoute(path: '/space/:uid', builder: (c, s) => SpacePage(uid: _int(s, 'uid'))),
+      GoRoute(
+        path: '/u/:uid',
+        builder: (c, s) => ProfilePage(uid: _int(s, 'uid')),
+      ),
+      GoRoute(
+        path: '/space/:uid',
+        builder: (c, s) => SpacePage(uid: _int(s, 'uid')),
+      ),
       GoRoute(
         path: '/my/:type',
-        builder: (c, s) => MyListPage(type: s.pathParameters['type'] ?? 'thread'),
+        builder: (c, s) =>
+            MyListPage(type: s.pathParameters['type'] ?? 'thread'),
       ),
       GoRoute(path: '/sign', builder: (c, s) => const SignPage()),
       GoRoute(path: '/doing', builder: (c, s) => const DoingPageView()),
@@ -358,18 +381,35 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => _Scaffold(shell: shell),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/', builder: (c, s) => const HomePage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/guide', builder: (c, s) => const GuidePage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/search', builder: (c, s) => const SearchPage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/msg', builder: (c, s) => const MessagesPage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/me', builder: (c, s) => const MePage())]),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/', builder: (c, s) => const HomePage())],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/guide', builder: (c, s) => const GuidePage()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/search', builder: (c, s) => const SearchPage()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/msg', builder: (c, s) => const MessagesPage()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/me', builder: (c, s) => const MePage())],
+          ),
         ],
       ),
     ],
   );
 }
 
-int _int(GoRouterState s, String key) => int.tryParse(s.pathParameters[key] ?? '') ?? 0;
+int _int(GoRouterState s, String key) =>
+    int.tryParse(s.pathParameters[key] ?? '') ?? 0;
 
 class _Scaffold extends StatelessWidget {
   const _Scaffold({required this.shell});
