@@ -68,21 +68,13 @@ class _CfChallengePageState extends State<CfChallengePage> {
   /// 判斷「解開了沒」要看**畫面上真的是論壇了**，不能看 cookie 存不存在。
   ///
   /// 踩過這個坑：上一次解出來的 `cf_clearance` 還留在 cookie store 裡，
-  /// 於是這頁一打開就以為已經成功、立刻自己關掉——使用者看到的是驗證頁
-  /// 一閃而過，然後什麼都沒解決。票還在不代表它還有效。
-  static const _probeJs = """
-(function () {
-  var h = document.documentElement ? document.documentElement.innerHTML : '';
-  if (h.indexOf('challenge-platform') >= 0 || h.indexOf('_cf_chl_opt') >= 0) {
-    return 'challenge';
-  }
-  return document.querySelector('#hd, #nv, .bm, #ft, #postlist') ? 'forum' : 'other';
-})()
-""";
-
+  /// 於是這頁一打開就以為已經成功、立刻自己關掉。票還在不代表它還有效。
+  ///
+  /// 探測邏輯跟傳輸層共用（`BrowserFetch.probeJs`）——分開寫會長歪，
+  /// 而且那支踩過的兩個坑（桌面選擇器、CF 注入腳本）很難重新想起來。
   Future<bool> _isForum(WebViewController c) async {
     try {
-      final r = await c.runJavaScriptReturningResult(_probeJs);
+      final r = await c.runJavaScriptReturningResult(BrowserFetch.probeJs);
       // 平台之間回傳格式不一致（有的帶引號），統一拆掉再比
       return r.toString().replaceAll('"', '') == 'forum';
     } catch (_) {

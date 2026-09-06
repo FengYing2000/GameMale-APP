@@ -157,20 +157,31 @@ class BrowserFetch {
   /// 目前頁面是不是真的論壇（而不是挑戰頁或錯誤頁）
   Future<bool> _isForum(WebViewController c) async {
     try {
-      final r = await c.runJavaScriptReturningResult(_probeJs);
+      final r = await c.runJavaScriptReturningResult(probeJs);
       return r.toString().replaceAll('"', '') == 'forum';
     } catch (_) {
       return false;
     }
   }
 
-  static const _probeJs = '''
+  /// 探測目前頁面：`challenge`（攔截頁）／`forum`（論壇）／`other`。
+  ///
+  /// 驗證頁也用同一支，兩邊分開寫會慢慢長歪。
+  ///
+  /// **兩個踩過的坑：**
+  /// 1. 不能拿 `challenge-platform` 當挑戰頁的依據。Cloudflare 開啟
+  ///    JS Detections 時會把 `/cdn-cgi/challenge-platform/scripts/jsd/main.js`
+  ///    注入到**每一個正常頁面**——拿它判斷會把整個論壇都當成挑戰頁。
+  ///    `_cf_chl_opt` 才是攔截頁專屬的。
+  /// 2. 不能用 `#hd`／`#nv`／`.bm`／`#ft` 認論壇，**那些是桌面版的選擇器**，
+  ///    手機模板一個都沒有（實測樣本裡全是 0），所以永遠判不出 forum。
+  ///    手機版頁面裡一定有大量指向 forum.php／home.php 的連結。
+  static const probeJs = '''
 (function () {
   var h = document.documentElement ? document.documentElement.innerHTML : '';
-  if (h.indexOf('challenge-platform') >= 0 || h.indexOf('_cf_chl_opt') >= 0) {
-    return 'challenge';
-  }
-  return document.querySelector('#hd, #nv, .bm, #ft, #postlist') ? 'forum' : 'other';
+  if (h.indexOf('_cf_chl_opt') >= 0) return 'challenge';
+  return document.querySelector(
+      'a[href*="forum.php"], a[href*="home.php"], #postlist') ? 'forum' : 'other';
 })()
 ''';
 
@@ -248,10 +259,14 @@ class BrowserFetch {
   ///
   /// 走 WebView 時拿不到狀態碼與標頭（`fetch()` 只回文字），
   /// 只能比對挑戰頁的內文特徵。
+  /// 這段 HTML 是不是 Cloudflare 的攔截頁。
+  ///
+  /// **不能比對 `challenge-platform`**：Cloudflare 開啟 JS Detections 時會把
+  /// 那支腳本注入到每一個正常頁面，比對它會讓每一頁論壇內容都被當成挑戰，
+  /// 於是驗證頁不斷跳出、解了也沒用——實機上就是這個症狀。
+  /// `_cf_chl_opt` 是攔截頁才有的設定物件。
   static bool looksLikeChallenge(String html) =>
-      html.contains('cdn-cgi/challenge-platform') ||
-      html.contains('cf-browser-verification') ||
-      html.contains('_cf_chl_opt');
+      html.contains('_cf_chl_opt') || html.contains('cf-browser-verification');
 
   /// 用 WebView 抓一張圖。
   ///

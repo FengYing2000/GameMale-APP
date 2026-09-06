@@ -257,6 +257,13 @@ UA 也對齊了）。實測**還是 403**——票是真的，但 Cloudflare 也
   就沒了，而挑戰頁本身就會導覽。
 - 走 WebView 時**拿不到狀態碼與標頭**（`fetch()` 只回文字），所以「這是不是
   挑戰頁」只能比對內文特徵，見 `BrowserFetch.looksLikeChallenge`。
+- **不能拿 `challenge-platform` 當攔截頁的依據。** Cloudflare 開啟 JS Detections
+  之後會把 `/cdn-cgi/challenge-platform/scripts/jsd/main.js` 注入到**每一個
+  正常頁面**。拿它判斷的話，每一頁論壇內容都會被當成攔截頁——症狀是驗證頁
+  不斷跳出、使用者解了也沒用。攔截頁專屬的標記是 `_cf_chl_opt`。
+- **不能用 `#hd`／`#nv`／`.bm`／`#ft` 認論壇頁面。** 那些是**桌面版** Discuz 的
+  結構，手機模板一個都沒有（實測樣本裡全是 0），所以那支探測永遠判不出
+  `forum`。手機版頁面裡一定有大量指向 `forum.php`／`home.php` 的連結，用那個。
 - **判斷「挑戰解開了沒」不能看 `cf_clearance` 在不在**。上一次解出來的票會
   留在 cookie store 裡，於是驗證頁一打開就以為成功、立刻自己關掉——使用者
   看到的是驗證頁一閃而過。要探測**畫面上真的是論壇了**。

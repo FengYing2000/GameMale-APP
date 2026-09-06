@@ -19,6 +19,8 @@ class BrowserFetch {
   WebViewController? get controller => null;
   void restoreDelegate() {}
 
+  static const probeJs = '';
+
   Future<Uint8List> fetchBytes(String url) async =>
       throw UnsupportedError('網頁版沒有瀏覽器傳輸');
 
