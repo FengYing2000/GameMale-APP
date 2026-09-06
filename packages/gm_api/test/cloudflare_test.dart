@@ -97,4 +97,44 @@ void main() {
       expect(e.status, 403);
     });
   });
+
+  group('新的 Turnstile 攔截頁（論壇 2026-09-06 換的）', () {
+    // ⚠️ 它跟 Cloudflare 自己的攔截頁完全不同：**回 200**、沒有
+    // cf-mitigated 標頭、也沒有 _cf_chl_opt。只認舊標記的話會把攔截頁
+    // 當成正常內容解析，結果是空的版塊列表加「未登入」——整頁空白。
+    const html = '<!DOCTYPE html><html><head><title>请稍候...</title>'
+        '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>'
+        '<script src="source/plugin/dev8133_cloudflare/static/js/axios.min.js"></script>'
+        '</head><body><div id="cf-turnstile"></div></body></html>';
+
+    test('內文認得出來', () {
+      expect(isChallengeHtml(html), isTrue);
+    });
+
+    test('狀態碼是 200 也要認得——這正是它難認的地方', () {
+      expect(
+        Api.isCloudflareChallenge(_res(200, body: html)),
+        isFalse,
+        reason: '那支只看狀態碼與 CF 標頭，本來就認不出這種',
+      );
+      // 所以 get() 另外比對內文，見 isChallengeHtml
+    });
+
+    test('舊的攔截頁標記還是要認', () {
+      expect(isChallengeHtml('window._cf_chl_opt={cvId:"3"}'), isTrue);
+      expect(isChallengeHtml('<div class="cf-browser-verification">'), isTrue);
+    });
+
+    test('正常的論壇頁面不能被誤判', () {
+      expect(
+        isChallengeHtml('<div id="postlist"><a href="forum.php?mod=viewthread">帖子</a></div>'),
+        isFalse,
+      );
+      // Cloudflare 對正常頁面注入的偵測腳本不算攔截
+      expect(
+        isChallengeHtml('<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>'),
+        isFalse,
+      );
+    });
+  });
 }

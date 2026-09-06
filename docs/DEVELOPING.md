@@ -436,3 +436,20 @@ DiscuzException。修在這一層，所有頁面都受惠，不必逐頁改。
 **蓋掉 App 原本登入好的那份**——使用者莫名其妙變成「尚未登入」。
 只取 `cf_` / `__cf` 開頭的。
 
+## 論壇換成 Turnstile 外掛（2026-09-06）
+
+論壇改用 Discuz 外掛 `source/plugin/dev8133_cloudflare/` 自己渲染 Cloudflare
+Turnstile，**跟 Cloudflare 原生的攔截頁完全不同**：
+
+| | Cloudflare 原生 | Turnstile 外掛 |
+|---|---|---|
+| 狀態碼 | 403 / 503 | **200** |
+| `cf-mitigated` 標頭 | 有 | **沒有** |
+| `_cf_chl_opt` | 有 | **沒有** |
+| 特徵 | `challenge-platform` | `challenges.cloudflare.com/turnstile`、外掛路徑 |
+
+只認舊標記的話，攔截頁會被當成正常內容解析——得到空的版塊列表加「未登入」，
+使用者看到的是**整頁空白**。所以偵測不能只看狀態碼，一定要比對內文
+（`isChallengeHtml`，定義在 gm_api，資料層與 WebView 傳輸層共用同一份；
+各寫一份的話論壇換一次驗證方式就會漏掉一邊）。
+

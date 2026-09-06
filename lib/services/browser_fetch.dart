@@ -237,7 +237,13 @@ class BrowserFetch {
   static const probeJs = '''
 (function () {
   var h = document.documentElement ? document.documentElement.innerHTML : '';
-  if (h.indexOf('_cf_chl_opt') >= 0) return 'challenge';
+  // 攔截頁的特徵。新的 Turnstile 外掛回 200 而且沒有 Cloudflare 的標記，
+  // 只能靠這幾個字串認；舊的也一起留著。
+  if (h.indexOf('challenges.cloudflare.com/turnstile') >= 0 ||
+      h.indexOf('dev8133_cloudflare') >= 0 ||
+      h.indexOf('_cf_chl_opt') >= 0) {
+    return 'challenge';
+  }
   return document.querySelector(
       'a[href*="forum.php"], a[href*="home.php"], #postlist') ? 'forum' : 'other';
 })()
@@ -385,8 +391,9 @@ class BrowserFetch {
   /// 那支腳本注入到每一個正常頁面，比對它會讓每一頁論壇內容都被當成挑戰，
   /// 於是驗證頁不斷跳出、解了也沒用——實機上就是這個症狀。
   /// `_cf_chl_opt` 是攔截頁才有的設定物件。
-  static bool looksLikeChallenge(String html) =>
-      html.contains('_cf_chl_opt') || html.contains('cf-browser-verification');
+  /// 判斷交給共用層（`gm_api` 的 `isChallengeHtml`）——資料層與這裡各寫
+  /// 一份的話，論壇換一次驗證方式就要修兩個地方，而且一定會漏掉一個。
+  static bool looksLikeChallenge(String html) => isChallengeHtml(html);
 
   /// 用 WebView 抓一張圖。
   ///

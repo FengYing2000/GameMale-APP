@@ -66,6 +66,21 @@ const String _cfMessage = kIsWebPlatform
         '請改用 App 版，或等論壇關閉驗證。'
     : '論壇開啟了 Cloudflare 安全驗證，需要通過一次才能繼續';
 
+/// 這段 HTML 是不是「請先通過驗證」的攔截頁。
+///
+/// **不能只看狀態碼。** 論壇 2026-09-06 換成了 Turnstile 的 Discuz 外掛
+/// （`source/plugin/dev8133_cloudflare/`），它跟 Cloudflare 自己的攔截頁
+/// 完全不同：**回的是 200**、沒有 `cf-mitigated` 標頭、也沒有 `_cf_chl_opt`。
+/// 只認舊標記的話會把攔截頁當成正常內容解析，結果是空的版塊列表加
+/// 「未登入」——實機上就是整頁空白。
+///
+/// 舊的兩種標記一起留著：論壇隨時可能切回 Cloudflare 原生的攔截。
+bool isChallengeHtml(String html) =>
+    html.contains('challenges.cloudflare.com/turnstile') ||
+    html.contains('dev8133_cloudflare') ||
+    html.contains('_cf_chl_opt') ||
+    html.contains('cf-browser-verification');
+
 /// 論壇連線層。
 ///
 /// 和 Capacitor 版最大的差別：iOS 那邊 cookie 由系統的 URLSession 保管，
@@ -567,6 +582,11 @@ class Api {
   /// 那會跟「沒有權限」混在一起，然後給使用者一個沒用的「重試」。
   void _guardResponse(Response<dynamic> res) {
     if (isCloudflareChallenge(res)) throw const CloudflareException(_cfMessage);
+    // 新的 Turnstile 外掛回的是 200，狀態碼看不出來，只能比對內文
+    final body = res.data is String ? res.data as String : '';
+    if (body.isNotEmpty && isChallengeHtml(body)) {
+      throw const CloudflareException(_cfMessage);
+    }
     final status = res.statusCode;
     if (status != null && status >= 400) {
       throw DiscuzException('伺服器回應 $status', status);
