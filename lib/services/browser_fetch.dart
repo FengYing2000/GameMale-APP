@@ -362,7 +362,11 @@ class BrowserFetch {
     _forumOkAt = null;
     final c = ready.value;
     if (c == null) return;
-    if (await _isForum(c)) return;
+    // **無條件重載，不要先探測。**
+    //
+    // 背景很久之後，WebView 上還留著背景前渲染好的舊論壇頁面——DOM 裡有
+    // 論壇連結，探測會說「是論壇」，於是我們以為一切正常。但那頁的連線
+    // 早就過期了，真的發請求還是失敗。舊畫面看起來對，不代表它還能用。
     try {
       await c.reload();
     } catch (_) {
@@ -392,13 +396,83 @@ class BrowserFetch {
   /// JS 通道只能傳字串，所以在頁面裡把 blob 轉成 data URL 再帶回來，
   /// 這邊解 base64。會膨脹三分之一，但這只是 Cloudflare 擋著時的後備。
   Future<Uint8List> fetchBytes(String url) async {
-    final raw = await _run(url, jsFunction: '__gmBytes');
+    try {
+      return _decodeDataUrl(await _run(url, jsFunction: '__gmBytes'));
+    } catch (_) {
+      // 帖子裡的圖是 www 的 `forum.php?mod=image&aid=…`，它會 302 轉到
+      // img 子網域。`fetch` 跟著跨來源的轉址時會被 CORS 擋掉，而且拿不到
+      // 轉址目標——但**導覽可以**：讓 WebView 直接開那個網址，跟完轉址後
+      // 文件的 origin 就落在圖片那一邊，這時再 fetch(location.href) 就同源了。
+      return _fetchByNavigating(url);
+    }
+  }
+
+  Uint8List _decodeDataUrl(String raw) {
     final i = raw.indexOf(',');
     if (!raw.startsWith('data:') || i < 0) {
       throw const DiscuzException('圖片取得失敗');
     }
     return base64Decode(raw.substring(i + 1));
   }
+
+  /// 一次只讓一張圖用導覽的方式抓——它會把 WebView 整個帶走，不能並行。
+  Future<void>? _navLock;
+
+  Future<Uint8List> _fetchByNavigating(String url) async {
+    while (_navLock != null) {
+      await _navLock;
+    }
+    final done = Completer<void>();
+    _navLock = done.future;
+    try {
+      return await _navigateAndRead(url);
+    } finally {
+      done.complete();
+      _navLock = null;
+    }
+  }
+
+  Future<Uint8List> _navigateAndRead(String url) async {
+    final origin = Uri.tryParse(url)?.origin ?? kForumOrigin;
+    // 借圖片那顆來跑，不要動到停在論壇上的主 WebView
+    final c = await _viewFor(origin == kForumOrigin ? '$_imageOrigin/' : url);
+
+    final loaded = Completer<void>();
+    c.setNavigationDelegate(
+      NavigationDelegate(
+        onPageFinished: (_) {
+          if (!loaded.isCompleted) loaded.complete();
+        },
+        onWebResourceError: (_) {
+          if (!loaded.isCompleted) loaded.complete();
+        },
+      ),
+    );
+    await c.loadRequest(Uri.parse(url));
+    await loaded.future.timeout(const Duration(seconds: 25), onTimeout: () {});
+
+    final id = ++_seq;
+    final completer = Completer<String>();
+    _pending[id] = completer;
+    await c.runJavaScript(_injectedJs);
+    // 用 location.href：跟完轉址之後那才是真正的圖片網址，而且同源
+    await c.runJavaScript(
+      'window.__gmBytes({id:$id,url:location.href,'
+      'channel:"$_channel"})',
+    );
+
+    final raw = await completer.future.timeout(
+      const Duration(seconds: 25),
+      onTimeout: () {
+        _pending.remove(id);
+        throw const DiscuzException('圖片取得逾時');
+      },
+    );
+    return _decodeDataUrl(raw);
+  }
+
+  /// 論壇把圖片放在這個子網域
+  static const _imageOrigin = 'https://img.gamemale.com';
 
   static const _injectedJs = '''
 window.__gmFetch = function (a) {

@@ -52,6 +52,17 @@ class _CfChallengePageState extends State<CfChallengePage> {
       final c = BrowserFetch.instance.controller;
       if (c != null) {
         setState(() => _controller = c);
+        // **先重載再判斷。**
+        //
+        // 這一頁被叫出來，就代表剛剛有請求失敗了。但 WebView 上可能還留著
+        // 背景前渲染好的舊論壇頁面——不重載的話探測會說「是論壇」，這一頁
+        // 立刻自己關掉，使用者只看到閃一下，而請求依然失敗。
+        // 更糟的是那次假成功會啟動冷卻，害他按重試也叫不出這一頁。
+        try {
+          await c.reload();
+        } catch (_) {
+          // 重載失敗就照舊判斷，至少不會卡在這裡
+        }
         _watch(c);
         return;
       }
