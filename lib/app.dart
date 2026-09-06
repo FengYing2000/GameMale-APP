@@ -15,6 +15,7 @@ import 'store/replied.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
 import 'theme.dart';
+import 'services/transport_state.dart';
 import 'services/browser_fetch_stub.dart'
     if (dart.library.io) 'services/browser_fetch.dart';
 import 'ui/pages/cf_challenge_page.dart';
@@ -118,6 +119,8 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     // 客戶端不夠——Cloudflare 也看 TLS 指紋，拿票的必須真的是瀏覽器。
     Api.browserFetch = BrowserFetch.instance.fetch;
     Api.onTransportChanged = (usingBrowser) async {
+      // 圖片元件在監聽這個——切換的瞬間要讓它們一起重建改走瀏覽器
+      usingBrowserTransport.value = usingBrowser;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kCfActive, usingBrowser);
     };
@@ -142,6 +145,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool(_kCfActive) ?? false) {
         Api.forceBrowser();
+        usingBrowserTransport.value = true;
         BrowserFetch.instance.warmUp();
       }
     } catch (_) {

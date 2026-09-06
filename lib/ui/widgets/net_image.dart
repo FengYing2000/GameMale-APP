@@ -8,6 +8,7 @@ import 'package:gm_api/http.dart';
 
 import '../../services/browser_fetch_stub.dart'
     if (dart.library.io) '../../services/browser_fetch.dart';
+import '../../services/transport_state.dart';
 
 /// 論壇圖片的載入器，一套介面兩種實作。
 ///
@@ -59,17 +60,7 @@ class NetImage extends StatelessWidget {
     // 圖片本來是 Flutter 自己的 HTTP 堆疊在抓（Image.network /
     // CachedNetworkImage），完全繞過傳輸層——所以會出現「文字讀得到、
     // 圖片整片載入失敗」：子版塊圖示、頭像、帖子裡的圖全都不見。
-    if (!kIsWeb && Api.usingBrowser) {
-      return _BrowserImage(
-        url: url,
-        width: width,
-        height: height,
-        fit: fit,
-        placeholder: ph,
-        errorWidget: err,
-      );
-    }
-
+    // 網頁版：用瀏覽器原生載入（會跟 301 轉址，快取交給瀏覽器）
     if (kIsWeb) {
       return Image.network(
         url,
@@ -84,16 +75,33 @@ class NetImage extends StatelessWidget {
       );
     }
 
-    return CachedNetworkImage(
-      imageUrl: url,
-      httpHeaders: Api.imageHeaders,
-      width: width,
-      height: height,
-      fit: fit,
-      memCacheWidth: decodeW,
-      memCacheHeight: decodeW == null ? decodeH : null,
-      placeholder: (c, _) => ph,
-      errorWidget: (c, u, e) => err,
+    // 原生版有兩條路，看 Cloudflare 有沒有擋著。
+    //
+    // **要監聽而不是只讀一次**：傳輸切換的瞬間所有圖片得一起重建，否則
+    // App 剛啟動時先建好的那批（那時還沒撞到 403、走的是直連）會永遠停在
+    // 載入失敗——實機症狀就是「文字讀得到、圖片全部載不出來」。
+    return ValueListenableBuilder<bool>(
+      valueListenable: usingBrowserTransport,
+      builder: (_, viaBrowser, _) => viaBrowser
+          ? _BrowserImage(
+              url: url,
+              width: width,
+              height: height,
+              fit: fit,
+              placeholder: ph,
+              errorWidget: err,
+            )
+          : CachedNetworkImage(
+              imageUrl: url,
+              httpHeaders: Api.imageHeaders,
+              width: width,
+              height: height,
+              fit: fit,
+              memCacheWidth: decodeW,
+              memCacheHeight: decodeW == null ? decodeH : null,
+              placeholder: (c, _) => ph,
+              errorWidget: (c, u, e) => err,
+            ),
     );
   }
 }

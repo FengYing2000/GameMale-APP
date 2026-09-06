@@ -316,3 +316,19 @@ WebView 的話，症狀是「文字讀得到、圖片整片載入失敗」——
 「TypeError: Load failed」，看起來像網路斷了，其實只是在錯的時機發了請求。
 那個錯誤不是 `CloudflareException`，所以也不會觸發自動重試，使用者得手動按。
 
+## 傳輸切換要讓圖片一起重建
+
+圖片元件在 build 當下讀「現在走不走瀏覽器」。App 剛啟動時那個值是 false
+（還沒撞到 403），首頁的圖片就全走了直連、失敗，而且**沒有任何東西會讓
+它們重建**——等文字請求把傳輸切成瀏覽器時，圖片早就掛掉了。症狀是
+「文字讀得到、圖片全部載入失敗」。
+
+所以狀態要放在 `services/transport_state.dart` 的 `ValueNotifier`，
+`NetImage` 用 `ValueListenableBuilder` 監聽，切換的瞬間全部一起重建。
+
+## 驗證頁不能只靠導覽事件
+
+傳輸層和驗證頁搶同一顆 WebView，兩邊都會 `setNavigationDelegate`，後設的
+蓋掉先設的，`onPageFinished` 就收不到了。症狀是驗證通過後那一頁不會自己關，
+非得手動按「我已完成」。用 1.5 秒的輪詢兜底。
+

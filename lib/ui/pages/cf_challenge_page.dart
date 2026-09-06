@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -58,11 +60,20 @@ class _CfChallengePageState extends State<CfChallengePage> {
   }
 
   /// 挑戰過關之後 Cloudflare 會自己導回論壇，這裡等那一刻
+  Timer? _poll;
+
+  /// 挑戰過關之後 Cloudflare 會自己導回論壇，這裡等那一刻。
+  ///
+  /// **導覽事件不能當唯一依據**：傳輸層自己也會設導覽處理，兩邊搶同一顆
+  /// WebView 時後設的會蓋掉先設的，事件就收不到了——實機症狀是驗證通過後
+  /// 這一頁不會自己關，非得手動按「我已完成」。
+  /// 所以同時用輪詢兜底，成本只是每一秒半跑一次很短的 JS。
   void _watch(WebViewController c) {
     c.setNavigationDelegate(
       NavigationDelegate(onPageFinished: (_) => _check()),
     );
     _check();
+    _poll = Timer.periodic(const Duration(milliseconds: 1500), (_) => _check());
   }
 
   /// 判斷「解開了沒」要看**畫面上真的是論壇了**，不能看 cookie 存不存在。
@@ -122,6 +133,7 @@ class _CfChallengePageState extends State<CfChallengePage> {
 
   @override
   void dispose() {
+    _poll?.cancel();
     // 把 WebView 還給常駐的宿主，並恢復它平常的導覽處理
     BrowserFetch.instance.presenting.value = false;
     BrowserFetch.instance.restoreDelegate();
