@@ -38,6 +38,16 @@ class NetImage extends StatelessWidget {
   final Widget? placeholder;
   final Widget? errorWidget;
 
+  /// 這個網址需不需要繞瀏覽器。
+  ///
+  /// **只有論壇自己的網域需要**。Cloudflare 擋的是 gamemale.com（含
+  /// img 子網域），第三方圖床和 jsDelivr 的表情圖根本沒被擋——把它們也
+  /// 塞進瀏覽器傳輸只會白白多開一顆 WebView、多繞一圈，還更容易失敗。
+  static bool needsBrowserFor(String url) {
+    final host = Uri.tryParse(url)?.host ?? '';
+    return host == 'gamemale.com' || host.endsWith('.gamemale.com');
+  }
+
   @override
   Widget build(BuildContext context) {
     final ph = placeholder ?? const SizedBox.shrink();
@@ -82,7 +92,7 @@ class NetImage extends StatelessWidget {
     // 載入失敗——實機症狀就是「文字讀得到、圖片全部載不出來」。
     return ValueListenableBuilder<bool>(
       valueListenable: usingBrowserTransport,
-      builder: (_, viaBrowser, _) => viaBrowser
+      builder: (_, viaBrowser, _) => viaBrowser && needsBrowserFor(url)
           ? _BrowserImage(
               url: url,
               width: width,

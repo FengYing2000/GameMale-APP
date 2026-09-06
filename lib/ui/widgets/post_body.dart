@@ -35,6 +35,13 @@ class PostBody extends StatelessWidget {
       html,
       textStyle: textStyle ?? const TextStyle(fontSize: 15.5, height: 1.7),
       onTapUrl: (url) => _openUrl(context, url),
+      // 帖子內所有圖片（含行內表情）都改由 App 自己載入。
+      //
+      // 套件預設用它自己的網路堆疊抓圖，**完全繞過 App 的傳輸層**——
+      // Cloudflare 擋著時那條路是死的，症狀是表情圖整片變成破圖。
+      // 覆寫 buildImageWidget 之後，圖片走 SmartImage（→ NetImage →
+      // 需要時的瀏覽器傳輸），而行內排版仍然交給套件處理。
+      factoryBuilder: () => _GmImageFactory(),
       customWidgetBuilder: (element) {
         // spoiler：sanitize 時標成 data-spoiler，這裡畫成可展開區塊
         final label = element.attributes['data-spoiler'];
@@ -318,6 +325,26 @@ class _PostImageState extends State<_PostImage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 讓帖子 HTML 裡的圖片走 App 自己的載入器。
+///
+/// 只覆寫圖片這一件事，其餘一律沿用套件的行為——尤其是行內表情的排版，
+/// 那是 `customWidgetBuilder` 攔截時會弄壞的東西。
+class _GmImageFactory extends WidgetFactory {
+  @override
+  Widget? buildImageWidget(BuildTree tree, ImageSource src) {
+    final url = src.url;
+    // data: / asset: / file: 這些沒有網路問題，交給套件原本的處理
+    if (!url.startsWith('http')) return super.buildImageWidget(tree, src);
+
+    return SmartImage(
+      src: url,
+      width: src.width,
+      height: src.height,
+      fit: BoxFit.contain,
     );
   }
 }

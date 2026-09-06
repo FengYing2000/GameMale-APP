@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamemale/services/browser_fetch.dart';
+import 'package:gamemale/ui/widgets/net_image.dart';
 
 /// 走 WebView 傳輸時拿不到狀態碼與標頭（`fetch()` 只回文字），所以
 /// 「這是不是攔截頁」只能靠內文特徵判斷。判斷錯的後果非常嚴重：
@@ -86,6 +87,35 @@ void main() {
         reason: '那支腳本在正常頁面上也有',
       );
       expect(BrowserFetch.probeJs, contains('_cf_chl_opt'));
+    });
+  });
+
+  group('只有論壇自己的網域需要繞瀏覽器', () {
+    // Cloudflare 擋的是 gamemale.com（含子網域）。第三方圖床和 jsDelivr 的
+    // 表情圖根本沒被擋，把它們也塞進瀏覽器傳輸只會白白多開一顆 WebView、
+    // 多繞一圈，還更容易失敗——記錄廣場的表情圖就是這樣整片變成破圖的。
+    bool needs(String url) => NetImage.needsBrowserFor(url);
+
+    test('論壇本體與圖片子網域要走', () {
+      expect(needs('https://www.gamemale.com/uc_server/avatar.php?uid=1'), isTrue);
+      expect(needs('https://img.gamemale.com/album/x.gif'), isTrue);
+      expect(needs('https://gamemale.com/forum.php'), isTrue);
+    });
+
+    test('jsDelivr 的表情圖不要走', () {
+      expect(
+        needs('https://gcore.jsdelivr.net/gh/googlefonts/noto-emoji/png/128/emoji_u1f60d.png'),
+        isFalse,
+      );
+    });
+
+    test('第三方圖床不要走', () {
+      expect(needs('https://i.imgs.ovh/2026/08/21/x.jpg'), isFalse);
+    });
+
+    test('不能被含有 gamemale 字樣的其他網域騙到', () {
+      expect(needs('https://gamemale.com.evil.example/x.png'), isFalse);
+      expect(needs('https://notgamemale.com/x.png'), isFalse);
     });
   });
 }

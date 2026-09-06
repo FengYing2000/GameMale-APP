@@ -373,3 +373,20 @@ WebView 上會留著背景前渲染好的舊論壇頁面——DOM 裡有論壇�
 
 所以 `onResume` 與驗證頁開啟時都**無條件重載**，不要先探測。
 
+## 帖子 HTML 裡的圖也要走 App 的載入器
+
+`flutter_widget_from_html_core` 預設用**它自己的網路堆疊**抓圖，完全繞過
+App 的傳輸層。Cloudflare 擋著時那條路是死的——症狀是行內表情整片變成破圖
+（內容圖沒事，因為那些被 `customWidgetBuilder` 攔下來自己畫了）。
+
+不要靠 `customWidgetBuilder` 攔表情：那會弄壞行內排版。正確的掛鉤是
+`factoryBuilder` ＋ 覆寫 `WidgetFactory.buildImageWidget`，只換掉「圖片怎麼
+載」，排版仍然交給套件。
+
+## 只有論壇自己的網域需要繞瀏覽器
+
+Cloudflare 擋的是 `gamemale.com`（含 `img` 子網域）。jsDelivr 的表情圖、
+第三方圖床根本沒被擋，把它們也塞進瀏覽器傳輸只會白白多開一顆 WebView、
+多繞一圈，還更容易失敗。判斷要用 host 結尾比對，別用 `contains`——
+`gamemale.com.evil.example` 會騙過去。
+
