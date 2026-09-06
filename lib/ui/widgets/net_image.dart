@@ -152,6 +152,21 @@ class _BrowserImageState extends State<_BrowserImage> {
   void initState() {
     super.initState();
     _load();
+    // 驗證通過之後要讓失敗的圖再試一次。失敗狀態記在元件裡，而下拉刷新
+    // 不會換掉這個元件（網址沒變），沒有這個信號就只能重開 App 才會好。
+    imageRetryTick.addListener(_retry);
+  }
+
+  void _retry() {
+    if (!_failed || !mounted) return;
+    setState(() => _failed = false);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    imageRetryTick.removeListener(_retry);
+    super.dispose();
   }
 
   @override
@@ -178,9 +193,20 @@ class _BrowserImageState extends State<_BrowserImage> {
       _BrowserImage._cache[widget.url] = b;
       if (mounted) setState(() => _bytes = b);
     } catch (_) {
+      if (!mounted) return;
+      // 先自己重試一次再放棄。Cloudflare 剛通過的那幾秒常有零星失敗，
+      // 一次就判死刑的話那些圖要等到下一個信號才會回來。
+      if (!_retriedOnce) {
+        _retriedOnce = true;
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (mounted) await _load();
+        return;
+      }
       if (mounted) setState(() => _failed = true);
     }
   }
+
+  bool _retriedOnce = false;
 
   @override
   Widget build(BuildContext context) {
