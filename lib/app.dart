@@ -127,6 +127,8 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     Api.onTransportChanged = (usingBrowser) async {
       // 圖片元件在監聽這個——切換的瞬間要讓它們一起重建改走瀏覽器
       usingBrowserTransport.value = usingBrowser;
+      // 換了傳輸方式，之前用舊路徑失敗的圖也該再試一次
+      retryFailedImages();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kCfActive, usingBrowser);
     };
@@ -139,6 +141,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
           fullscreenDialog: true,
         ),
       );
+      // 驗證期間畫面上的圖片全都失敗了，而失敗狀態記在元件裡——
+      // 不主動叫它們重試的話，使用者得重開 App 才看得到頭像。
+      if (ok == true) retryFailedImages();
       return ok == true;
     };
   }
