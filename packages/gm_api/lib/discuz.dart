@@ -140,6 +140,17 @@ Future<OnlineInfo> fetchIndexOnline({bool force = false}) async {
   return _onlineCache ?? const OnlineInfo();
 }
 
+/// 抓在線名單。
+///
+/// **名單只有登入之後才看得到**，而且要 `showoldetails=yes` 才會展開——
+/// 首頁預設是收合的，那時論壇只吐總人數與歷史紀錄（實測訪客版就是這樣）。
+/// 所以名單改成使用者真的去展開卡片時才抓，不必為了它每次都拉一份大頁面。
+Future<OnlineInfo> fetchOnlineDetails() async {
+  final doc = toDoc(
+      await Api.instance.get('forum.php?showoldetails=yes', desktop: true));
+  return parseIndexOnline(doc);
+}
+
 /// 解析 `#online` 區塊。
 ///
 /// 統計數字刻意用正則從整段文字撈，不照 `<strong>` 的出現順序取——

@@ -331,6 +331,32 @@ class _OnlineCard extends StatefulWidget {
 
 class _OnlineCardState extends State<_OnlineCard> {
   bool _open = false;
+  bool _loading = false;
+
+  /// 展開時才抓到的完整名單（收合狀態的首頁不含名單）
+  OnlineInfo? _detail;
+
+  OnlineInfo get _info => _detail ?? widget.info;
+
+  /// 名單只有登入後、而且 `showoldetails=yes` 時才拿得到，所以首頁那份
+  /// 通常只有總人數。使用者真的要看時才去抓，不必每次都拉一份大頁面。
+  Future<void> _toggle() async {
+    if (_open) {
+      setState(() => _open = false);
+      return;
+    }
+    setState(() => _open = true);
+    if (_detail != null || _loading) return;
+    setState(() => _loading = true);
+    try {
+      final d = await api.fetchOnlineDetails();
+      if (mounted) setState(() => _detail = d);
+    } on DiscuzException {
+      // 抓不到就維持只有數字，不要把卡片變成錯誤訊息
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   /// 論壇用小圖示的顏色區分身分，這裡用主題色重現
   Color _colorOf(String group, ColorScheme scheme) => switch (group) {
@@ -343,7 +369,7 @@ class _OnlineCardState extends State<_OnlineCard> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final info = widget.info;
+    final info = _info;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -357,25 +383,46 @@ class _OnlineCardState extends State<_OnlineCard> {
               '${tr('在線會員')} ${info.total}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: Text(
-              [
-                '${tr('會員')} ${info.members}'
-                    '${info.invisible > 0 ? '（${tr('隱身')} ${info.invisible}）' : ''}',
-                '${tr('訪客')} ${info.guests}',
-              ].join(' · '),
-              style: const TextStyle(fontSize: 12),
-            ),
+            // 首頁收合時論壇只給總人數，沒有細分——那時顯示「會員 0 ·
+            // 訪客 0」是錯的，整行不要出現
+            subtitle: info.hasBreakdown
+                ? Text(
+                    [
+                      '${tr('會員')} ${info.members}'
+                          '${info.invisible > 0 ? '（${tr('隱身')} ${info.invisible}）' : ''}',
+                      '${tr('訪客')} ${info.guests}',
+                    ].join(' · '),
+                    style: const TextStyle(fontSize: 12),
+                  )
+                : null,
             trailing: Icon(
               _open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
               size: 18,
               color: faint(context),
             ),
-            onTap: info.users.isEmpty
-                ? null
-                : () => setState(() => _open = !_open),
+            onTap: _toggle,
           ),
           if (_open) ...[
-            const Divider(height: 1),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (info.users.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: Text(
+                  tr('看不到名單——論壇只對登入的會員顯示'),
+                  style: TextStyle(fontSize: 12.5, color: faint(context)),
+                ),
+              ),
+            if (info.users.isNotEmpty) const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
               child: Wrap(

@@ -85,4 +85,32 @@ void main() {
       expect(none.users, isEmpty);
     });
   });
+
+  group('收合／未登入時的形狀（實測訪客版就是這樣）', () {
+    // 首頁預設是收合的，論壇只吐「总计 N 人在线 - 最高记录是 …」，
+    // 既沒有會員／訪客的細分，也沒有名單。
+    final info = parseIndexOnline(toDoc(
+      '<div id="online" class="bm oll"><div class="bm_h">'
+      '<h2><strong>在线会员</strong></h2>'
+      '<span class="xs1">总计 <strong>3193</strong> 人在线'
+      ' - 最高记录是 <strong>45510</strong> 于 <strong>2026-9-4</strong>.'
+      '</span></div></div>',
+    ));
+
+    test('總人數與紀錄讀得到', () {
+      expect(info.total, 3193);
+      expect(info.record, 45510);
+      expect(info.recordDate, '2026-9-4');
+    });
+
+    test('沒有細分時要講得出來', () {
+      // 這時顯示「會員 0 · 訪客 0」是錯的，介面靠這個旗標整行不顯示
+      expect(info.hasBreakdown, isFalse);
+      expect(info.users, isEmpty);
+    });
+
+    test('但不算空的——總人數還是有意義', () {
+      expect(info.isEmpty, isFalse);
+    });
+  });
 }

@@ -565,6 +565,12 @@ class OnlineInfo {
   final List<OnlineUser> users;
 
   bool get isEmpty => total == 0 && users.isEmpty;
+
+  /// 有沒有會員／訪客的分佈。
+  ///
+  /// 首頁收合時（以及未登入時）論壇只吐「总计 N 人在线」，沒有細分——
+  /// 那時顯示「會員 0 · 訪客 0」是錯的，整行要不顯示。
+  bool get hasBreakdown => members > 0 || guests > 0;
 }
 
 class OnlineUser {

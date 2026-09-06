@@ -157,8 +157,12 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool(_kCfActive) ?? false) {
-        Api.forceBrowser();
-        usingBrowserTransport.value = true;
+        // 只把 WebView 暖起來，**不要直接指定走瀏覽器**。
+        //
+        // 指定的話會鎖在慢的那條路，要等十分鐘的探測才回得去直連——
+        // 論壇一關掉驗證，使用者每次啟動都要白白慢十分鐘。
+        // 讓第一個請求自己去撞：沒被擋就直連（快），被擋了也只多一次
+        // 幾百毫秒的來回，而 WebView 已經暖好了。
         BrowserFetch.instance.warmUp();
       }
     } catch (_) {
