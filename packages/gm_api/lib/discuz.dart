@@ -155,6 +155,32 @@ Future<OnlineInfo> fetchOnlineDetails() async {
 ///
 /// 統計數字刻意用正則從整段文字撈，不照 `<strong>` 的出現順序取——
 /// 沒有隱身會員時論壇不會輸出那一段，照順序取會整排錯位。
+/// 解析名單上方那行圖例：哪些身分組用哪一種圖示。
+///
+/// 結構是一連串「<img src=...online_X.gif> 身分組名稱」，中間用空白隔開。
+/// 靠它才講得出這個論壇自己的用語（村長、站員、見習版主…），
+/// 而不是寫死 Discuz 的通用名稱。
+Map<String, List<String>> _parseOnlineLegend(dom.Element box) {
+  final out = <String, List<String>>{};
+  final dt = box.querySelector('#onlinelist dt');
+  if (dt == null) return out;
+
+  String? current;
+  for (final node in dt.nodes) {
+    if (node is dom.Element && node.localName == 'img') {
+      current =
+          RegExp(r'online_(\w+)\.gif').firstMatch(attr(node, 'src'))?.group(1);
+      continue;
+    }
+    if (current == null) continue;
+    final name = node.text?.replaceAll(' ', ' ').trim() ?? '';
+    if (name.isEmpty) continue;
+    out.putIfAbsent(current, () => []).add(sys(name));
+    current = null;
+  }
+  return out;
+}
+
 OnlineInfo parseIndexOnline(dom.Document doc) {
   final box = doc.querySelector('#online');
   if (box == null) return const OnlineInfo();
@@ -188,6 +214,7 @@ OnlineInfo parseIndexOnline(dom.Document doc) {
   }
 
   return OnlineInfo(
+    legend: _parseOnlineLegend(box),
     total: pick(r'(\d+)\s*人在[线線]'),
     members: pick(r'(\d+)\s*[会會][员員]'),
     invisible: pick(r'(\d+)\s*[隐隱]身'),

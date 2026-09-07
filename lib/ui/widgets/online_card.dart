@@ -51,8 +51,12 @@ class _OnlineCardState extends State<OnlineCard> {
 
   /// 身分的排序與樣式。
   ///
-  /// 論壇用不同顏色的小圖示區分身分。全部混在一起排的話看起來很亂，
-  /// 也找不到管理團隊，所以照身分由高到低分組。
+  /// 論壇用不同顏色的小圖示區分身分。全部混在一起排看起來很亂，也找不到
+  /// 管理團隊，所以照身分由高到低分組。
+  ///
+  /// 這裡的 label 只是**後備**：名單上方那行圖例會告訴我們這個論壇實際的
+  /// 身分組叫什麼（村長、站員、見習版主…），有圖例就優先用它——每個論壇
+  /// 的命名都不一樣，寫死 Discuz 的通用名稱會對不上。
   static const _ranks = <String, ({int order, String label, Color color})>{
     'admin': (order: 0, label: '管理員', color: Color(0xFFE05A4E)),
     'supermod': (order: 1, label: '超級版主', color: Color(0xFF3E8ED0)),
@@ -62,6 +66,13 @@ class _OnlineCardState extends State<OnlineCard> {
 
   static ({int order, String label, Color color}) _rankOf(String g) =>
       _ranks[g] ?? _ranks['member']!;
+
+  /// 分組標題：有圖例就用論壇自己的名稱，沒有才退回通用的
+  String _labelOf(String group) {
+    final names = _info.legend[group];
+    if (names == null || names.isEmpty) return tr(_rankOf(group).label);
+    return names.join('／');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,12 +175,14 @@ class _OnlineCardState extends State<OnlineCard> {
                 ),
               ),
               const SizedBox(width: 7),
-              Text(
-                '${tr(rank.label)}  ${users.length}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: subtle(context),
+              Expanded(
+                child: Text(
+                  '${_labelOf(k)}  ${users.length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: subtle(context),
+                  ),
                 ),
               ),
             ],

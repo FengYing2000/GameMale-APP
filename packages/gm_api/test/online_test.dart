@@ -113,4 +113,34 @@ void main() {
       expect(info.isEmpty, isFalse);
     });
   });
+
+  group('圖例：論壇自己的身分組名稱', () {
+    // 名單只給得出 Discuz 內建的四種圖示，看不出某人是「村長」還是「村委」。
+    // 但頁面上有一行圖例說明每種圖示涵蓋哪些身分組——用它當標題比寫死
+    // 「管理員」準確得多，每個論壇的命名都不一樣。
+    final info = parseIndexOnline(toDoc(
+      '<div id="online"><dl id="onlinelist"><dt>'
+      '<img src="static/image/common/online_admin.gif"> 村委 · II &nbsp; '
+      '<img src="static/image/common/online_supermod.gif"> 见习版主 &nbsp; '
+      '<img src="static/image/common/online_admin.gif"> 村长 · III &nbsp; '
+      '<img src="static/image/common/online_moderator.gif"> 站员 &nbsp; '
+      '<img src="static/image/common/online_member.gif"> 会员 &nbsp; '
+      '</dt><dd><ul></ul></dd></dl></div>',
+    ));
+
+    test('同一個圖示可以對到多個身分組', () {
+      expect(info.legend['admin'], ['村委 · II', '村长 · III']);
+    });
+
+    test('其餘三種各自對得上', () {
+      expect(info.legend['supermod'], ['见习版主']);
+      expect(info.legend['moderator'], ['站员']);
+      expect(info.legend['member'], ['会员']);
+    });
+
+    test('沒有圖例時安靜地回空的', () {
+      final none = parseIndexOnline(toDoc('<div id="online"></div>'));
+      expect(none.legend, isEmpty);
+    });
+  });
 }

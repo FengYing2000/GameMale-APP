@@ -547,6 +547,7 @@ class OnlineInfo {
     this.record = 0,
     this.recordDate = '',
     this.users = const [],
+    this.legend = const {},
   });
 
   /// 目前線上總人數
@@ -563,6 +564,14 @@ class OnlineInfo {
 
   /// 看得到的會員（隱身的不會出現在名單裡）
   final List<OnlineUser> users;
+
+  /// 圖示代號 → 這個論壇實際的身分組名稱。
+  ///
+  /// 名單只給得出 Discuz 內建的四種圖示（admin／supermod／moderator／
+  /// member），看不出某個人是「村長」還是「村委」。但頁面上有一行圖例
+  /// 說明每種圖示涵蓋哪些身分組，用它當標題比寫死「管理員」準確得多——
+  /// 每個論壇的身分組命名都不一樣。
+  final Map<String, List<String>> legend;
 
   bool get isEmpty => total == 0 && users.isEmpty;
 
