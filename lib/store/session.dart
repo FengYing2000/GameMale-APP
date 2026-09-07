@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gm_api/discuz.dart' as api;
+import 'package:gm_api/http.dart';
+import '../services/browser_fetch_stub.dart'
+    if (dart.library.io) '../services/browser_fetch.dart';
 import 'package:gm_api/models.dart';
 
 class SessionStore extends ChangeNotifier {
@@ -142,6 +145,12 @@ class SessionStore extends ChangeNotifier {
     } on DiscuzException {
       // 伺服器端沒清成功也要讓本地登出
     }
+    // WebView 那份 cookie 也要清。只清 App 這份的話，被驗證擋著時走的是
+    // WebView，而它還是登入狀態——抓回來的會是舊帳號的頁面，驗證碼也會
+    // 對不上（那是另一個 session 的碼）。
+    if (!kIsWeb) await BrowserFetch.instance.clearCookies();
+    // 讓下一個請求重新判斷擋不擋，並允許驗證頁立刻跳出來
+    Api.resetTransport();
     loggedIn = false;
     uid = null;
     name = '';

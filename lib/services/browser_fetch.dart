@@ -402,6 +402,30 @@ class BrowserFetch {
     return jsError.isEmpty ? '取得內容失敗' : '取得內容失敗：$jsError';
   }
 
+  /// 登出時把 WebView 那份 cookie 也清掉。
+  ///
+  /// **不清會出大問題**：App 的連線和 WebView 各有一份 cookie。只清 App 那份
+  /// 的話，WebView 仍是登入狀態——於是它抓回來的是**舊帳號**的頁面（資料看
+  /// 起來沒更新）、驗證頁一打開就自己關掉（它探測的是 WebView，那邊一切正常
+  /// 所以看不到彈窗），而驗證碼更糟：拿到的是 WebView 那個 session 的碼，
+  /// 就算圖出來了也對不上。
+  Future<void> clearCookies() async {
+    try {
+      await WebViewCookieManager().clearCookies();
+    } catch (_) {
+      // 清不掉也要繼續往下重載，至少頁面會回到未登入狀態
+    }
+    _forumOkAt = null;
+    for (final c in [ready.value, ..._byOrigin.values]) {
+      if (c == null) continue;
+      try {
+        await c.reload();
+      } catch (_) {
+        // 個別重載失敗不影響其他顆
+      }
+    }
+  }
+
   /// App 從背景回來時呼叫。
   ///
   /// 掛在背景太久，iOS 會把 WebView 的內容清掉或讓 Cloudflare 的通行證過期，

@@ -482,6 +482,9 @@ class Api {
 
   /// 手動全部切回直連（測試用；正常情況會自己探測）
   static void resetTransport() {
+    // 冷卻也要清。登出之後使用者馬上就需要驗證頁跳出來重新登入，
+    // 卡在「剛解過就不再彈」那 20 秒裡的話，他只會看到一句錯誤。
+    _lastSolved = null;
     if (_blocked.isEmpty) return;
     _blocked.clear();
     onTransportChanged?.call(false);

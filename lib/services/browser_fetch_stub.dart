@@ -21,6 +21,8 @@ class BrowserFetch {
 
   Future<void> onResume() async {}
 
+  Future<void> clearCookies() async {}
+
   static const probeJs = '';
 
   Future<Uint8List> fetchBytes(String url) async =>
