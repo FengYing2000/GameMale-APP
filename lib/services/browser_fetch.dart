@@ -440,10 +440,24 @@ class BrowserFetch {
     }
   }
 
+  /// 導覽專用的 WebView。
+  ///
+  /// **不能跟抓圖那顆共用**：導覽會把整個頁面帶走，其他正在用同一顆
+  /// WebView `fetch()` 的圖片會當場斷掉——實機症狀是「有些版塊圖示出得來、
+  /// 有些出不來」，而且每次失敗的都不一樣。
+  WebViewController? _navView;
+
   Future<Uint8List> _navigateAndRead(String url) async {
-    final origin = Uri.tryParse(url)?.origin ?? kForumOrigin;
-    // 借圖片那顆來跑，不要動到停在論壇上的主 WebView
-    final c = await _viewFor(origin == kForumOrigin ? '$_imageOrigin/' : url);
+    var c = _navView;
+    if (c == null) {
+      c = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setUserAgent(Api.userAgent)
+        ..addJavaScriptChannel(_channel, onMessageReceived: _onMessage);
+      _navView = c;
+      _byOrigin['__nav'] = c; // 掛上畫面，JS 才跑得動
+      origins.value++;
+    }
 
     final loaded = Completer<void>();
     c.setNavigationDelegate(
@@ -479,8 +493,6 @@ class BrowserFetch {
     return _decodeDataUrl(raw);
   }
 
-  /// 論壇把圖片放在這個子網域
-  static const _imageOrigin = 'https://img.gamemale.com';
 
   static const _injectedJs = '''
 window.__gmFetch = function (a) {

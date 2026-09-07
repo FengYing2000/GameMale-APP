@@ -361,6 +361,9 @@ class Api {
   /// 驗證碼圖片必須帶著 session cookie 抓，所以走這裡而不是直接給 Image.network
   Future<Uint8List> getBytes(String path) async {
     await init();
+    if (_preferBrowser && browserFetchBytes != null) {
+      return await browserFetchBytes!('$kOrigin${mobileUrl(path)}');
+    }
     try {
       final res = await _dio.get<List<int>>(
         mobileUrl(path),
@@ -376,6 +379,9 @@ class Api {
   /// 抓任意絕對網址的二進位內容（圖片可能來自外站圖床）
   Future<Uint8List> getAbsoluteBytes(String url) async {
     await init();
+    if (_preferBrowser && browserFetchBytes != null && _isForumHost(url)) {
+      return await browserFetchBytes!(url);
+    }
     try {
       final res = await _dio.get<List<int>>(
         url,
@@ -426,6 +432,13 @@ class Api {
   /// 由 App 端注入（gm_api 是純 Dart 的，碰不到 WebView）。
   static Future<String> Function(String url, {Map<String, String>? form})?
       browserFetch;
+
+  /// 用真瀏覽器抓二進位內容。
+  ///
+  /// **驗證碼一定要走這條**：它是圖片，走的是 getBytes 而不是 get，
+  /// 被擋著時 dio 拿回來的是攔截頁的 HTML，Image.memory 當然畫不出來——
+  /// 而且那正好是使用者要重新登入的時候，卡在這裡就完全沒救了。
+  static Future<Uint8List> Function(String url)? browserFetchBytes;
 
   /// 撞過一次挑戰之後就固定走瀏覽器，不必每個請求都先吃一個 403。
   static bool _preferBrowser = false;
@@ -580,6 +593,12 @@ class Api {
 
   /// Cloudflare 的挑戰頁回的也是 403，所以不能只看狀態碼——
   /// 那會跟「沒有權限」混在一起，然後給使用者一個沒用的「重試」。
+  /// 只有論壇自己的網域被擋——外站圖床走一般的路就好
+  static bool _isForumHost(String url) {
+    final host = Uri.tryParse(url)?.host ?? '';
+    return host == 'gamemale.com' || host.endsWith('.gamemale.com');
+  }
+
   void _guardResponse(Response<dynamic> res) {
     if (isCloudflareChallenge(res)) throw const CloudflareException(_cfMessage);
     // 新的 Turnstile 外掛回的是 200，狀態碼看不出來，只能比對內文

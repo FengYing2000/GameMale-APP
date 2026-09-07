@@ -160,6 +160,7 @@ class _BrowserImageState extends State<_BrowserImage> {
   void _retry() {
     if (!_failed || !mounted) return;
     setState(() => _failed = false);
+    _tries = 0;
     _load();
   }
 
@@ -196,9 +197,11 @@ class _BrowserImageState extends State<_BrowserImage> {
       if (!mounted) return;
       // 先自己重試一次再放棄。Cloudflare 剛通過的那幾秒常有零星失敗，
       // 一次就判死刑的話那些圖要等到下一個信號才會回來。
-      if (!_retriedOnce) {
-        _retriedOnce = true;
-        await Future<void>.delayed(const Duration(seconds: 2));
+      // 多試幾次再放棄。走 WebView 抓圖時偶發失敗很常見（頁面正在導覽、
+      // 併發排隊逾時…），一次就判死刑會讓同一頁的圖有的出得來有的出不來。
+      if (_tries < 3) {
+        _tries++;
+        await Future<void>.delayed(Duration(seconds: _tries));
         if (mounted) await _load();
         return;
       }
@@ -206,7 +209,7 @@ class _BrowserImageState extends State<_BrowserImage> {
     }
   }
 
-  bool _retriedOnce = false;
+  int _tries = 0;
 
   @override
   Widget build(BuildContext context) {

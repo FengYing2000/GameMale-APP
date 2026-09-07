@@ -124,6 +124,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     // 撞到挑戰時改由 WebView 發請求。實測光把 cf_clearance 搬給 HTTP
     // 客戶端不夠——Cloudflare 也看 TLS 指紋，拿票的必須真的是瀏覽器。
     Api.browserFetch = BrowserFetch.instance.fetch;
+    // 驗證碼、圖片位元組也要走同一條——它們用的是 getBytes 不是 get，
+    // 被擋著時 dio 拿回來的是攔截頁的 HTML，畫不出圖。
+    Api.browserFetchBytes = BrowserFetch.instance.fetchBytes;
     Api.onTransportChanged = (usingBrowser) async {
       // 圖片元件在監聽這個——切換的瞬間要讓它們一起重建改走瀏覽器
       usingBrowserTransport.value = usingBrowser;
