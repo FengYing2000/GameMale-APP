@@ -92,7 +92,9 @@ class NetImage extends StatelessWidget {
     // 載入失敗——實機症狀就是「文字讀得到、圖片全部載不出來」。
     return ValueListenableBuilder<bool>(
       valueListenable: usingBrowserTransport,
-      builder: (_, viaBrowser, _) => viaBrowser && needsBrowserFor(url)
+      // 分主機判斷：只有真的被擋住的網域才繞 WebView。實測出現過
+      // 「www 被擋、img 子網域沒擋」，一律繞的話圖片白白慢好幾倍。
+      builder: (_, _, _) => Api.hostNeedsBrowser(url)
           ? _BrowserImage(
               url: url,
               width: width,

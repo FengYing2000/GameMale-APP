@@ -137,4 +137,40 @@ void main() {
       );
     });
   });
+
+  group('分主機判斷要不要走瀏覽器', () {
+    tearDown(Api.resetTransport);
+
+    test('沒被擋過時一律直連', () {
+      expect(Api.usingBrowser, isFalse);
+      expect(Api.hostNeedsBrowser('https://www.gamemale.com/forum.php'), isFalse);
+      expect(Api.hostNeedsBrowser('https://img.gamemale.com/a.gif'), isFalse);
+    });
+
+    test('只有被擋的那個主機要繞', () {
+      // 實測出現過「www 被擋、img 子網域沒擋」。用單一全域旗標的話，
+      // 圖片會跟著繞進 WebView，白白慢好幾倍。
+      Api.forceBrowser(); // 標記論壇本站
+      expect(Api.hostNeedsBrowser('https://www.gamemale.com/forum.php'), isTrue);
+      expect(
+        Api.hostNeedsBrowser('https://img.gamemale.com/a.gif'),
+        isFalse,
+        reason: 'img 沒被擋就該走直連',
+      );
+      expect(Api.usingBrowser, isTrue);
+    });
+
+    test('外站一律不繞', () {
+      Api.forceBrowser();
+      expect(Api.hostNeedsBrowser('https://i.imgs.ovh/x.jpg'), isFalse);
+      expect(Api.hostNeedsBrowser('https://gcore.jsdelivr.net/x.png'), isFalse);
+    });
+
+    test('resetTransport 會把全部清掉', () {
+      Api.forceBrowser();
+      Api.resetTransport();
+      expect(Api.usingBrowser, isFalse);
+      expect(Api.hostNeedsBrowser('https://www.gamemale.com/forum.php'), isFalse);
+    });
+  });
 }

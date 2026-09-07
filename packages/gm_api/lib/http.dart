@@ -199,7 +199,8 @@ class Api {
     final target = desktop ? desktopUrl(path) : mobileUrl(path);
 
     // 走瀏覽器期間定期回頭探一次直連，論壇關掉驗證就自己切回來
-    if (_preferBrowser && browserFetch != null && !_shouldProbeDirect) {
+    final host = Uri.parse(kOrigin).host;
+    if (_shouldUseBrowser(host) && browserFetch != null) {
       final body = await _viaBrowser(target);
       if (followInterstitial) {
         final next = _interstitialTarget(body);
@@ -216,11 +217,11 @@ class Api {
       try {
         _guardResponse(res);
         // 直連成功——論壇把驗證關掉了，切回快的那條
-        if (_preferBrowser) resetTransport();
+        _markClear(host);
       } on CloudflareException {
         // 有瀏覽器傳輸就改走它——那是一定過得去的路。
         if (browserFetch != null) {
-          _useBrowser();
+          _markBlocked(host);
           return await get(path,
               followInterstitial: followInterstitial, desktop: desktop);
         }
@@ -287,7 +288,8 @@ class Api {
       if (v != null) data[k] = v.toString();
     });
 
-    if (_preferBrowser && browserFetch != null) {
+    final host = Uri.parse(kOrigin).host;
+    if (_shouldUseBrowser(host) && browserFetch != null) {
       return await _viaBrowser(desktop ? desktopUrl(path) : mobileUrl(path),
           form: data.map((k, v) => MapEntry(k, '$v')));
     }
@@ -305,7 +307,7 @@ class Api {
         _guardResponse(res);
       } on CloudflareException {
         if (browserFetch != null) {
-          _useBrowser();
+          _markBlocked(host);
           return await _viaBrowser(desktop ? desktopUrl(path) : mobileUrl(path),
               form: data.map((k, v) => MapEntry(k, '$v')));
         }
@@ -361,7 +363,8 @@ class Api {
   /// 驗證碼圖片必須帶著 session cookie 抓，所以走這裡而不是直接給 Image.network
   Future<Uint8List> getBytes(String path) async {
     await init();
-    if (_preferBrowser && browserFetchBytes != null) {
+    if (_shouldUseBrowser(Uri.parse(kOrigin).host) &&
+        browserFetchBytes != null) {
       return await browserFetchBytes!('$kOrigin${mobileUrl(path)}');
     }
     try {
@@ -379,7 +382,8 @@ class Api {
   /// 抓任意絕對網址的二進位內容（圖片可能來自外站圖床）
   Future<Uint8List> getAbsoluteBytes(String url) async {
     await init();
-    if (_preferBrowser && browserFetchBytes != null && _isForumHost(url)) {
+    // 分主機判斷：img 子網域沒被擋時，圖片就該走又快又直接的那條
+    if (browserFetchBytes != null && hostNeedsBrowser(url)) {
       return await browserFetchBytes!(url);
     }
     try {
@@ -440,48 +444,58 @@ class Api {
   /// 而且那正好是使用者要重新登入的時候，卡在這裡就完全沒救了。
   static Future<Uint8List> Function(String url)? browserFetchBytes;
 
-  /// 撞過一次挑戰之後就固定走瀏覽器，不必每個請求都先吃一個 403。
-  static bool _preferBrowser = false;
-
-  /// 什麼時候切去走瀏覽器的。用來決定何時該回頭探一次直連。
-  static DateTime? _browserSince;
+  /// 哪些主機正被擋著，以及是什麼時候發現的。
+  ///
+  /// **要分主機記，不能只用一個全域旗標。** 論壇的驗證是逐站設定的——
+  /// 實測就出現過「www 被擋、img 子網域沒擋」的組合。用單一旗標的話，
+  /// 圖片會跟著繞一大圈進 WebView，白白慢好幾倍。
+  static final _blocked = <String, DateTime>{};
 
   /// 隔多久回頭試一次直連。
   ///
-  /// 論壇的驗證通常是臨時擋攻擊，關掉之後應該**自己**切回直連——
-  /// 直連比繞 WebView 快得多，不該讓使用者一直付那個代價。
-  /// 探測的成本只是偶爾多一個 403。
+  /// 驗證通常是臨時擋攻擊，關掉之後應該**自己**切回直連——直連比繞
+  /// WebView 快得多，不該讓使用者一直付那個代價。
+  /// 探測的成本只是偶爾多吃一個攔截頁。
   static const _probeDirectAfter = Duration(minutes: 10);
 
-  static bool get _shouldProbeDirect {
-    final since = _browserSince;
-    return since != null &&
-        DateTime.now().difference(since) > _probeDirectAfter;
+  static bool _shouldUseBrowser(String host) {
+    final since = _blocked[host];
+    if (since == null) return false;
+    // 過了探測間隔就放它走一次直連，看擋著的狀態解除了沒
+    return DateTime.now().difference(since) <= _probeDirectAfter;
   }
 
-  /// 現在是不是走瀏覽器。App 端存起來，下次啟動就能先把 WebView 暖好，
-  /// 不必讓使用者對著轉圈圈等它從零開始載入論壇。
-  static bool get usingBrowser => _preferBrowser;
+  /// 有沒有任何主機正被擋著。App 端存起來，下次啟動就能先把 WebView 暖好。
+  static bool get usingBrowser => _blocked.isNotEmpty;
 
-  /// 傳輸方式改變時通知 App（存偏好、預熱用）
+  /// 這個網址的主機現在要不要走瀏覽器（介面用來決定圖片怎麼載）
+  static bool hostNeedsBrowser(String url) {
+    final h = Uri.tryParse(url)?.host ?? '';
+    return h.isNotEmpty && _shouldUseBrowser(h);
+  }
+
+  /// 傳輸方式改變時通知 App（存偏好、預熱、讓失敗的圖重試）
   static void Function(bool usingBrowser)? onTransportChanged;
 
-  /// 上次啟動就在走瀏覽器的話，開頭直接指定，省掉先吃一個 403 的來回。
-  static void forceBrowser() => _useBrowser();
+  /// 上次啟動就有主機被擋著的話，開頭先把論壇本站標起來
+  static void forceBrowser() => _markBlocked(Uri.parse(kForumOrigin).host);
 
-  /// 手動切回直連（測試用；正常情況會自己探測）
+  /// 手動全部切回直連（測試用；正常情況會自己探測）
   static void resetTransport() {
-    if (!_preferBrowser) return;
-    _preferBrowser = false;
-    _browserSince = null;
+    if (_blocked.isEmpty) return;
+    _blocked.clear();
     onTransportChanged?.call(false);
   }
 
-  static void _useBrowser() {
-    final was = _preferBrowser;
-    _preferBrowser = true;
-    _browserSince = DateTime.now();
-    if (!was) onTransportChanged?.call(true);
+  static void _markBlocked(String host) {
+    final had = _blocked.isNotEmpty;
+    _blocked[host] = DateTime.now();
+    if (!had) onTransportChanged?.call(true);
+  }
+
+  static void _markClear(String host) {
+    if (_blocked.remove(host) == null) return;
+    onTransportChanged?.call(_blocked.isNotEmpty);
   }
 
   Future<String> _viaBrowser(String relative,
@@ -593,11 +607,6 @@ class Api {
 
   /// Cloudflare 的挑戰頁回的也是 403，所以不能只看狀態碼——
   /// 那會跟「沒有權限」混在一起，然後給使用者一個沒用的「重試」。
-  /// 只有論壇自己的網域被擋——外站圖床走一般的路就好
-  static bool _isForumHost(String url) {
-    final host = Uri.tryParse(url)?.host ?? '';
-    return host == 'gamemale.com' || host.endsWith('.gamemale.com');
-  }
 
   void _guardResponse(Response<dynamic> res) {
     if (isCloudflareChallenge(res)) throw const CloudflareException(_cfMessage);
