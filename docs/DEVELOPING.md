@@ -469,3 +469,22 @@ Turnstile，**跟 Cloudflare 原生的攔截頁完全不同**：
 走 WebView 抓圖本來就會偶發失敗（頁面正在導覽、併發排隊逾時…），
 所以 `NetImage` 會退避重試三次再放棄。
 
+## 網頁版過不了 Turnstile：網域綁定（實測結論）
+
+新的驗證是論壇自己裝的 Discuz 外掛，流程是：
+
+    Turnstile 通過 → axios.post('plugin.php?id=dev8133_cloudflare', token)
+    → 外掛向 Cloudflare 驗證 → 設自己的 Discuz cookie → reload
+
+這比舊的 CF 原生攔截**更有機會**：外掛設的是普通的論壇 cookie，不像
+`cf_clearance` 綁 IP；而且轉發本來就會把 cookie 原樣送回瀏覽器。實測轉發
+也確實把挑戰頁完整送過來了，`plugin.php` 端點通、送出目標是相對網址，
+會正確落在 `/gm/plugin.php`。
+
+**但實測在 `852111.xyz` 上開啟時，Turnstile 回 `110200`（網域未註冊）。**
+那個 sitekey 只綁 `gamemale.com`，Cloudflare 根本不發驗證元件給別的網域。
+
+所以網頁版依然無解，而且**能解的人變了**：不再是「請管理員加 VPS 的 IP
+白名單」（外掛對所有 IP 一視同仁，加 IP 沒用），而是要論壇那邊改外掛設定
+——例如放行已登入的會員，或把該網域加進 Turnstile 的允許清單。
+
