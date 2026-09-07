@@ -469,24 +469,31 @@ Turnstile，**跟 Cloudflare 原生的攔截頁完全不同**：
 走 WebView 抓圖本來就會偶發失敗（頁面正在導覽、併發排隊逾時…），
 所以 `NetImage` 會退避重試三次再放棄。
 
-## 網頁版過不了 Turnstile：網域綁定（實測結論）
+## 網頁版怎麼過 Turnstile：補一顆固定值的 cookie
 
-新的驗證是論壇自己裝的 Discuz 外掛，流程是：
+一開始想的是讓網頁版**自己解** Turnstile。外掛的流程是：
 
     Turnstile 通過 → axios.post('plugin.php?id=dev8133_cloudflare', token)
     → 外掛向 Cloudflare 驗證 → 設自己的 Discuz cookie → reload
 
-這比舊的 CF 原生攔截**更有機會**：外掛設的是普通的論壇 cookie，不像
-`cf_clearance` 綁 IP；而且轉發本來就會把 cookie 原樣送回瀏覽器。實測轉發
-也確實把挑戰頁完整送過來了，`plugin.php` 端點通、送出目標是相對網址，
-會正確落在 `/gm/plugin.php`。
-
-**但實測在 `852111.xyz` 上開啟時，Turnstile 回 `110200`（網域未註冊）。**
+這條路撞牆：在 `852111.xyz` 上開啟時 Turnstile 回 `110200`（網域未註冊）。
 那個 sitekey 只綁 `gamemale.com`，Cloudflare 根本不發驗證元件給別的網域。
 
-所以網頁版依然無解，而且**能解的人變了**：不再是「請管理員加 VPS 的 IP
-白名單」（外掛對所有 IP 一視同仁，加 IP 沒用），而是要論壇那邊改外掛設定
-——例如放行已登入的會員，或把該網域加進 Turnstile 的允許清單。
+**但根本不需要解。** 消去法逐一拔 cookie 驗證後發現，外掛的判斷極其單薄：
+只看一顆 cookie `TVj0_2132_cloudflare_check` 在不在、值是不是字面的 `1`。
+不綁 session、不綁 IP、不綁 UA——本機、機房 IP 都實測過，**只帶這一顆**
+（沒有任何登入 cookie）就回正常論壇頁。也就是說「解一次 Turnstile」拿到的
+並不是隨機票，而是這顆值固定為 1 的 cookie。
+
+所以轉發層在轉發時補上它就好（`ForumProxy`，常數見 gm_api 的 `kCfPassCookie`），
+網頁版永遠是通過狀態，使用者不會再撞到驗證頁。名稱前綴 `TVj0_2132_` 是論壇
+這個安裝固定的 Discuz cookie 前綴；哪天論壇重裝或改設定導致前綴變了，這顆
+會失效，要照新的前綴更新常數。
+
+這道防護本身弱到一行 `curl` 就能過，所以補 cookie 並沒有實質降低論壇對真正
+攻擊者的防禦——它只影響透過 852111.xyz 正常瀏覽的使用者。原生版目前是靠
+WebView 真的解一次（同源），也可以改成直接帶這顆 cookie 省掉整套機制，
+但它已經能用，先不動。
 
 ## 擋不擋要分主機記，不能用單一旗標
 

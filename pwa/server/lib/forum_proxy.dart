@@ -63,15 +63,26 @@ class ForumProxy {
     outgoing.headers['referer'] = '$kForumOrigin/forum.php?mobile=2';
     outgoing.headers['origin'] = kForumOrigin;
 
-    // 只轉論壇的 cookie，我們自己的 session token 不要送出去
+    // 只轉論壇的 cookie，我們自己的 session token 不要送出去。
     final cookie = request.headers['cookie'];
-    if (cookie != null && cookie.isNotEmpty) {
-      final forwarded = cookie
-          .split(';')
-          .where((c) => !c.trimLeft().startsWith('gm_session='))
-          .join(';');
-      if (forwarded.trim().isNotEmpty) outgoing.headers['cookie'] = forwarded;
+    final jar = <String>[
+      if (cookie != null && cookie.isNotEmpty)
+        ...cookie
+            .split(';')
+            .map((c) => c.trim())
+            .where((c) => c.isNotEmpty && !c.startsWith('gm_session=')),
+    ];
+    // 補上論壇 Turnstile 外掛的通關 cookie，網頁版才不會撞到驗證頁。
+    //
+    // 那個外掛只檢查這顆 cookie 在不在、值是不是字面的 1——不綁 session、
+    // 不綁 IP、不綁 UA（見 [kCfPassCookie] 的說明）。瀏覽器這邊沒辦法自己
+    // 解 Turnstile（sitekey 綁在 gamemale.com 網域，852111.xyz 會報 110200），
+    // 但根本不需要解：補這顆固定值的 cookie 就等於通過。
+    // 瀏覽器自己已經帶了就別重複加。
+    if (!jar.any((c) => c.startsWith('$kCfPassCookie='))) {
+      jar.add('$kCfPassCookie=$kCfPassValue');
     }
+    if (jar.isNotEmpty) outgoing.headers['cookie'] = jar.join('; ');
 
     if (request.method == 'POST' || request.method == 'PUT') {
       outgoing.bodyBytes = await request.read()

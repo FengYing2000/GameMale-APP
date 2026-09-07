@@ -1,5 +1,5 @@
 name: gm_server
-description: GameMale PWA 後端 —— 轉發論壇、輪詢提醒、送 Web Push
+description: GameMale PWA 後端 —— 轉發論壇、圖片代理、掛靜態檔
 publish_to: none
 version: 0.1.0
 
