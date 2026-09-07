@@ -18,6 +18,7 @@ import '../widgets/quick_menu.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
 import '../widgets/net_image.dart';
+import '../widgets/online_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -311,151 +312,10 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
               ],
-              if (!_online.isEmpty) _OnlineCard(info: _online),
+              if (!_online.isEmpty) OnlineCard(info: _online),
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 在線會員。**預設收起**——線上常常三百多人，攤開會把首頁灌爆。
-class _OnlineCard extends StatefulWidget {
-  const _OnlineCard({required this.info});
-  final OnlineInfo info;
-
-  @override
-  State<_OnlineCard> createState() => _OnlineCardState();
-}
-
-class _OnlineCardState extends State<_OnlineCard> {
-  bool _open = false;
-  bool _loading = false;
-
-  /// 展開時才抓到的完整名單（收合狀態的首頁不含名單）
-  OnlineInfo? _detail;
-
-  OnlineInfo get _info => _detail ?? widget.info;
-
-  /// 名單只有登入後、而且 `showoldetails=yes` 時才拿得到，所以首頁那份
-  /// 通常只有總人數。使用者真的要看時才去抓，不必每次都拉一份大頁面。
-  Future<void> _toggle() async {
-    if (_open) {
-      setState(() => _open = false);
-      return;
-    }
-    setState(() => _open = true);
-    if (_detail != null || _loading) return;
-    setState(() => _loading = true);
-    try {
-      final d = await api.fetchOnlineDetails();
-      if (mounted) setState(() => _detail = d);
-    } on DiscuzException {
-      // 抓不到就維持只有數字，不要把卡片變成錯誤訊息
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  /// 論壇用小圖示的顏色區分身分，這裡用主題色重現
-  Color _colorOf(String group, ColorScheme scheme) => switch (group) {
-        'admin' => const Color(0xFFE05A4E),
-        'supermod' => const Color(0xFF3E8ED0),
-        'moderator' => const Color(0xFF48A868),
-        _ => scheme.onSurfaceVariant,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final info = _info;
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: Icon(LucideIcons.users, color: scheme.primary),
-            title: Text(
-              '${tr('在線會員')} ${info.total}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            // 首頁收合時論壇只給總人數，沒有細分——那時顯示「會員 0 ·
-            // 訪客 0」是錯的，整行不要出現
-            subtitle: info.hasBreakdown
-                ? Text(
-                    [
-                      '${tr('會員')} ${info.members}'
-                          '${info.invisible > 0 ? '（${tr('隱身')} ${info.invisible}）' : ''}',
-                      '${tr('訪客')} ${info.guests}',
-                    ].join(' · '),
-                    style: const TextStyle(fontSize: 12),
-                  )
-                : null,
-            trailing: Icon(
-              _open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
-              size: 18,
-              color: faint(context),
-            ),
-            onTap: _toggle,
-          ),
-          if (_open) ...[
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 18),
-                child: Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              )
-            else if (info.users.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                child: Text(
-                  tr('看不到名單——論壇只對登入的會員顯示'),
-                  style: TextStyle(fontSize: 12.5, color: faint(context)),
-                ),
-              ),
-            if (info.users.isNotEmpty) const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final u in info.users)
-                    ActionChip(
-                      label: Text(
-                        u.name,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: _colorOf(u.group, scheme),
-                        ),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      onPressed: () => context.push('/u/${u.uid}'),
-                    ),
-                ],
-              ),
-            ),
-          ],
-          if (info.record > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                '${tr('最高紀錄')} ${info.record}'
-                '${info.recordDate.isEmpty ? '' : '（${info.recordDate}）'}',
-                style: TextStyle(fontSize: 11.5, color: faint(context)),
-              ),
-            ),
-        ],
       ),
     );
   }

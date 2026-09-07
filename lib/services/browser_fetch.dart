@@ -63,7 +63,13 @@ class BrowserFetch {
     if (origin == kForumOrigin) return main;
 
     final existing = _byOrigin[origin];
-    if (existing != null) return existing;
+    if (existing != null) {
+      // **一定要等它載好**。之前這裡直接回傳，而 controller 是在 await 之前
+      // 就放進 map 的——併發的第二個請求會拿到一顆還沒載完的 WebView，
+      // fetch 立刻失敗。症狀是「有些圖出得來有些出不來，捲走再回來就好了」。
+      await _originReady[origin];
+      return existing;
+    }
 
     final c = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -72,11 +78,47 @@ class BrowserFetch {
     _byOrigin[origin] = c;
     origins.value++; // 掛上畫面，JS 才跑得動
 
-    // 載入該來源的任一頁面，把文件的 origin 定在那裡，之後 fetch 才同源。
-    // 被 Cloudflare 擋的話這裡拿到的是挑戰頁，真瀏覽器通常會自己解掉。
-    await c.loadRequest(Uri.parse('$origin/'));
-    await Future<void>.delayed(const Duration(seconds: 3));
+    final boot = _bootOrigin(c, origin);
+    _originReady[origin] = boot;
+    await boot;
     return c;
+  }
+
+  final _originReady = <String, Future<void>>{};
+
+  /// 載入該來源的任一頁面，把文件的 origin 定在那裡，之後 fetch 才同源。
+  ///
+  /// **不能用固定秒數硬等**。圖片子網域一樣可能被驗證擋著，真瀏覽器要幾秒
+  /// 才解得完；等不夠就整批圖片失敗，等太久又拖慢每一次啟動。
+  /// 改成等到頁面真的不是攔截頁為止。
+  Future<void> _bootOrigin(WebViewController c, String origin) async {
+    final loaded = Completer<void>();
+    c.setNavigationDelegate(
+      NavigationDelegate(
+        onPageFinished: (_) {
+          if (!loaded.isCompleted) loaded.complete();
+        },
+        onWebResourceError: (_) {
+          if (!loaded.isCompleted) loaded.complete();
+        },
+      ),
+    );
+    await c.loadRequest(Uri.parse('$origin/'));
+    await loaded.future.timeout(const Duration(seconds: 20), onTimeout: () {});
+
+    for (var i = 0; i < 10; i++) {
+      if (!await _isChallengePage(c)) return;
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+  }
+
+  Future<bool> _isChallengePage(WebViewController c) async {
+    try {
+      final r = await c.runJavaScriptReturningResult(probeJs);
+      return r.toString().replaceAll('"', '') == 'challenge';
+    } catch (_) {
+      return false; // 問不出來就別卡著，讓 fetch 自己去撞
+    }
   }
 
   Completer<void>? _settled;
