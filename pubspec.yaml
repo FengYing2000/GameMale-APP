@@ -44,7 +44,7 @@ dependencies:
   shared_preferences: ^2.5.5
   # 記住密碼（可選）用它存 iOS Keychain / Android Keystore，不落明文。
   # 只在原生版用；網頁版不記密碼。
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^11.0.0
   html: ^0.15.6
   # 論壇資料層。抽成純 Dart 套件是為了讓 PWA 後端能重用同一套解析，
   # 不必用別的語言把十幾輪踩出來的選擇器知識重寫一遍。
@@ -68,12 +68,6 @@ dependencies:
   webview_flutter: ^4.14.1
   flutter_svg: ^2.3.0
   lucide_icons_flutter: ^3.1.17
-
-# flutter_secure_storage 9.x 的 Windows 子套件要 win32 ^5，跟 package_info_plus
-# 要的 win32 ^6 打架。這個 App 不出 Windows（只 iOS/Android/web），那個子套件
-# 根本不會編，所以直接把 win32 壓到 package_info_plus 要的版本，讓解析過關。
-dependency_overrides:
-  win32: ^6.0.1
 
 dev_dependencies:
   flutter_test:
