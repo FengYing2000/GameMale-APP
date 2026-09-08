@@ -628,11 +628,11 @@ class Api {
   /// 那會跟「沒有權限」混在一起，然後給使用者一個沒用的「重試」。
 
   void _guardResponse(Response<dynamic> res) {
-    if (isCloudflareChallenge(res)) throw const CloudflareException(_cfMessage);
+    if (isCloudflareChallenge(res)) throw CloudflareException(_cfMessage);
     // 新的 Turnstile 外掛回的是 200，狀態碼看不出來，只能比對內文
     final body = res.data is String ? res.data as String : '';
     if (body.isNotEmpty && isChallengeHtml(body)) {
-      throw const CloudflareException(_cfMessage);
+      throw CloudflareException(_cfMessage);
     }
     final status = res.statusCode;
     if (status != null && status >= 400) {
