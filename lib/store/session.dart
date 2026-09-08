@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -99,7 +100,14 @@ class SessionStore extends ChangeNotifier {
       if (user != null) {
         _apply(user);
       } else {
-        loggedIn = false;
+        // 論壇明確回訪客頁 = 登入已在論壇端失效。連同本機快取一起清掉，
+        // 不要只設 loggedIn=false 卻留著舊 uid/name/avatar——那會有兩個症狀：
+        //  1. 畫面顯示「未登入」卻還掛著舊頭像舊暱稱（殘影）
+        //  2. 重新登入若是同一帳號，applyUser 的 was!=uid 會是 false，
+        //     revision 不遞增，被保活的首頁不會自動重抓，得手動下拉
+        // 只在「明確拿到訪客頁」時清；連不上／被 CF 擋走的是下面的 exception
+        // 分支，那是暫時性的，要保留快取不能清。
+        await _clearLocal();
       }
     } on DiscuzException catch (e) {
       // 連不上論壇時無從判斷，保留快取狀態並把錯誤帶給畫面
@@ -112,11 +120,13 @@ class SessionStore extends ChangeNotifier {
 
   /// session 過期：清掉本機狀態但不打登出 API（cookie 早就沒用了）
   void markLoggedOut() {
-    if (!loggedIn) return;
-    loggedIn = false;
-    sign = null;
+    if (!loggedIn && uid == null) return;
+    // 跟 restore() 同一個道理：連 uid/name/avatar 一起清，否則會有殘影，
+    // 且重登同一帳號時 revision 不遞增、被保活的首頁不會自動重抓。
     revision++;
+    _resetFields();
     notifyListeners();
+    unawaited(_clearPersisted());
   }
 
   void applyUser(SessionUser user) {
@@ -151,15 +161,30 @@ class SessionStore extends ChangeNotifier {
     if (!kIsWeb) await BrowserFetch.instance.clearCookies();
     // 讓下一個請求重新判斷擋不擋，並允許驗證頁立刻跳出來
     Api.resetTransport();
+    revision++;
+    await _clearLocal();
+    notifyListeners();
+  }
+
+  /// 清掉登入相關的記憶體欄位（同步）。
+  void _resetFields() {
     loggedIn = false;
     uid = null;
     name = '';
     avatar = '';
     sign = null;
-    revision++;
+  }
+
+  /// 清掉持久化的登入快取。
+  Future<void> _clearPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
-    notifyListeners();
+  }
+
+  /// 記憶體 + 持久化一起清。
+  Future<void> _clearLocal() async {
+    _resetFields();
+    await _clearPersisted();
   }
 
   Future<void> _persist() async {
