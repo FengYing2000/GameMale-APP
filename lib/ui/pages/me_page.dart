@@ -160,7 +160,7 @@ class _MePageState extends State<MePage> {
               title: Text(tr('新增帳號')),
               onTap: () {
                 Navigator.pop(sheetCtx);
-                context.push('/login');
+                context.push('/login?add=1');
               },
             ),
             const SizedBox(height: 4),

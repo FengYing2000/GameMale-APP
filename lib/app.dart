@@ -284,11 +284,20 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
       // 之前只要 session 一失效就被鎖在登入頁，連返回都沒有，只能關掉 App。
       // 需要登入的操作由論壇自己擋，App 再提示即可。
       if (!session.ready) return null;
-      if (session.loggedIn && state.matchedLocation == '/login') return '/';
+      // 「新增帳號」會帶 ?add=1 進來——那是已登入狀態下要再登另一個帳號，
+      // 不能被重導走，否則點了新增只會彈回首頁。
+      if (session.loggedIn &&
+          state.matchedLocation == '/login' &&
+          state.uri.queryParameters['add'] != '1') {
+        return '/';
+      }
       return null;
     },
     routes: [
-      GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
+      GoRoute(
+        path: '/login',
+        builder: (c, s) => LoginPage(add: s.uri.queryParameters['add'] == '1'),
+      ),
       GoRoute(
         path: '/f/:fid/post',
         builder: (c, s) => NewThreadPage(fid: _int(s, 'fid')),

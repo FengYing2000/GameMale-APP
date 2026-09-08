@@ -12,7 +12,10 @@ import '../../theme.dart';
 import '../widgets/toast.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.add = false});
+
+  /// 從「新增帳號」進來：已登入狀態下要再登一個帳號，欄位保持空白
+  final bool add;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -41,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
   /// 帶入上次的帳號；若那個帳號記了密碼就一起帶入並預勾「記住密碼」。
   /// 服務最常見的情境：cookie 過期回到這頁，不必重打。
   Future<void> _prefill() async {
-    if (!mounted) return;
+    if (!mounted || widget.add) return;
     final accounts = context.read<AccountsStore>();
     final cur = accounts.current;
     if (cur == null || cur.username.isEmpty) return;
