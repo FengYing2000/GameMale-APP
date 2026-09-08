@@ -32,11 +32,14 @@ class _LoginPageState extends State<LoginPage> {
   bool _loadingMeta = true;
   bool _busy = false;
   bool _remember = false;
+  bool _addDone = false;
+  AccountsStore? _accounts;
   String? _err;
 
   @override
   void initState() {
     super.initState();
+    _accounts = context.read<AccountsStore>();
     _load();
     WidgetsBinding.instance.addPostFrameCallback((_) => _prefill());
   }
@@ -61,6 +64,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    // 新增帳號沒成功就離開 → 把原本的帳號 cookie 換回來
+    if (widget.add && !_addDone) _accounts?.cancelAdd();
     _user.dispose();
     _pass.dispose();
     _answer.dispose();
@@ -126,15 +131,24 @@ class _LoginPageState extends State<LoginPage> {
       }
       final user = await api.checkSession();
       if (!mounted) return;
-      if (user != null) {
-        context.read<SessionStore>().applyUser(user);
-        // 存進本機帳號清單（記住帳號；勾了記住密碼才連密碼一起存安全區）
-        await context.read<AccountsStore>().addOrUpdate(
-              user,
-              username: _user.text.trim(),
-              password: _remember ? _pass.text : null,
-              remember: _remember,
-            );
+      // 論壇說登入表單過了、但實際 session 沒建立 → 別誤報成功。
+      // （新增帳號會先清成訪客，錯的帳密就會走到這裡。）
+      if (user == null) {
+        setState(() => _err = tr('登入未生效，請確認帳號密碼後重試'));
+        await _refreshCaptcha();
+        return;
+      }
+      context.read<SessionStore>().applyUser(user);
+      // 存進本機帳號清單（記住帳號；勾了記住密碼才連密碼一起存安全區）
+      await context.read<AccountsStore>().addOrUpdate(
+            user,
+            username: _user.text.trim(),
+            password: _remember ? _pass.text : null,
+            remember: _remember,
+          );
+      if (widget.add) {
+        _accounts?.finishAdd();
+        _addDone = true;
       }
       if (!mounted) return;
       toast(context, tr('登入成功'));

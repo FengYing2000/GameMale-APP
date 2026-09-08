@@ -237,6 +237,41 @@ class AccountsStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 新增帳號時暫存「原本要回去的帳號」——登入沒成功就把它的 cookie 換回來。
+  int? _addReturnUid;
+
+  /// 開始新增帳號：先存好目前帳號的 cookie，再清空連線變「訪客」。
+  ///
+  /// **一定要清**：不清的話登入頁還是已登入狀態，論壇不給登入表單也不出
+  /// 驗證碼，而且送出後 checkSession 會看到舊 session、隨便輸入都「成功」，
+  /// 實際上根本沒登入新帳號。清成訪客才能真正登入另一個帳號。
+  Future<void> beginAdd() async {
+    if (kIsWeb) return;
+    await _snapshotCurrent();
+    _addReturnUid = currentUid;
+    await Api.instance.clearCookies();
+    await BrowserFetch.instance.clearCookies();
+    Api.resetTransport();
+  }
+
+  /// 取消新增（登入頁沒成功就離開）：把原本帳號的 cookie 換回來。
+  Future<void> cancelAdd() async {
+    if (kIsWeb) return;
+    final uid = _addReturnUid;
+    _addReturnUid = null;
+    if (uid == null) return;
+    final acc = _byUid(uid);
+    await Api.instance.clearCookies();
+    if (acc != null && acc.cookies.isNotEmpty) {
+      await Api.instance.seedCookies(acc.cookies);
+    }
+    await BrowserFetch.instance.clearCookies();
+    Api.resetTransport();
+  }
+
+  /// 新增成功，不必還原
+  void finishAdd() => _addReturnUid = null;
+
   /// 讀某帳號存的密碼（沒有記住就回 null）
   Future<String?> passwordFor(int uid) async {
     if (kIsWeb) return null;

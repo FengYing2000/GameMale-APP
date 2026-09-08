@@ -158,9 +158,11 @@ class _MePageState extends State<MePage> {
             ListTile(
               leading: const Icon(LucideIcons.plus),
               title: Text(tr('新增帳號')),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(sheetCtx);
-                context.push('/login?add=1');
+                // 先清成訪客（存好目前帳號），登入頁才能真正登入新帳號
+                await accounts.beginAdd();
+                if (context.mounted) context.push('/login?add=1');
               },
             ),
             const SizedBox(height: 4),
