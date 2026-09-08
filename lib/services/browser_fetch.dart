@@ -426,6 +426,53 @@ class BrowserFetch {
     }
   }
 
+  /// 撈出 WebView 目前的論壇 cookie（含 HttpOnly 的 `auth`）。
+  ///
+  /// **為什麼非它不可**：被 CF 擋著時，登入是在 WebView 裡完成的，登入憑證
+  /// （`auth`）的 Set-Cookie 只進了 WebView 的 cookie store，Dart 的 cookie jar
+  /// 讀不到。多帳號存快照時若只讀 jar 會漏掉 auth，切回來就變訪客、跳驗證。
+  Future<String> exportCookies() async {
+    try {
+      final list = await WebViewCookieManager().getCookies(
+        domain: Uri.parse(kForumOrigin),
+      );
+      return list.map((c) => '${c.name}=${c.value}').join('; ');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// 把 WebView 的 cookie 換成指定這一份（切換帳號用）：清掉舊的、灌新的、重載。
+  ///
+  /// 少了這步，切換只換了 Dart jar，WebView 還停在上一個帳號（或被清空成訪客），
+  /// 一旦下個請求走 WebView 就是訪客 → 跳驗證 + 未登入。
+  Future<void> setCookies(String header) async {
+    final mgr = WebViewCookieManager();
+    try {
+      await mgr.clearCookies();
+      final host = Uri.parse(kForumOrigin).host;
+      for (final part in header.split(';')) {
+        final t = part.trim();
+        final i = t.indexOf('=');
+        if (i <= 0) continue;
+        await mgr.setCookie(WebViewCookie(
+          name: t.substring(0, i).trim(),
+          value: t.substring(i + 1).trim(),
+          domain: host,
+        ));
+      }
+    } catch (_) {
+      // 灌不進去也要往下重載
+    }
+    _forumOkAt = null;
+    for (final c in [ready.value, ..._byOrigin.values]) {
+      if (c == null) continue;
+      try {
+        await c.reload();
+      } catch (_) {}
+    }
+  }
+
   /// App 從背景回來時呼叫。
   ///
   /// 掛在背景太久，iOS 會把 WebView 的內容清掉或讓 Cloudflare 的通行證過期，

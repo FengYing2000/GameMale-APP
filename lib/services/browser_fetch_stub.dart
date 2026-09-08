@@ -23,6 +23,10 @@ class BrowserFetch {
 
   Future<void> clearCookies() async {}
 
+  Future<String> exportCookies() async => '';
+
+  Future<void> setCookies(String header) async {}
+
   static const probeJs = '';
 
   Future<Uint8List> fetchBytes(String url) async =>

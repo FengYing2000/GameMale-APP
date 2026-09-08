@@ -194,9 +194,9 @@ class AccountsStore extends ChangeNotifier {
       await Api.instance.seedCookies(target.cookies);
     }
 
-    // 3. WebView 那份 cookie 也要換，否則被驗證擋著時走 WebView 會抓回
-    //    上一個帳號的頁面（跟登出那個 bug 同一個道理）
-    await BrowserFetch.instance.clearCookies();
+    // 3. WebView 那份 cookie 也要換成目標帳號的（含 auth），否則被驗證擋著時
+    //    走 WebView 會是訪客 → 跳驗證 + 未登入（切換帳號的核心 bug）
+    await BrowserFetch.instance.setCookies(target.cookies);
     Api.resetTransport();
 
     // 4. 指標移過去
@@ -262,10 +262,11 @@ class AccountsStore extends ChangeNotifier {
     if (uid == null) return;
     final acc = _byUid(uid);
     await Api.instance.clearCookies();
-    if (acc != null && acc.cookies.isNotEmpty) {
-      await Api.instance.seedCookies(acc.cookies);
+    final header = acc?.cookies ?? '';
+    if (header.isNotEmpty) {
+      await Api.instance.seedCookies(header);
     }
-    await BrowserFetch.instance.clearCookies();
+    await BrowserFetch.instance.setCookies(header);
     Api.resetTransport();
   }
 
@@ -281,8 +282,20 @@ class AccountsStore extends ChangeNotifier {
   }
 
   Future<String> _currentCookieHeader() async {
-    final cookies = await Api.instance.allCookies();
-    return cookies.map((c) => '${c.name}=${c.value}').join('; ');
+    final map = <String, String>{};
+    for (final c in await Api.instance.allCookies()) {
+      map[c.name] = c.value;
+    }
+    // WebView 那份常有直連缺的登入 auth——被 CF 擋著時登入是在 WebView 完成的，
+    // 憑證只在 WebView 的 cookie store，Dart jar 讀不到。用它覆蓋，才不會存下
+    // 缺 auth 的殘缺快照、切回來變訪客跳驗證。
+    final wv = await BrowserFetch.instance.exportCookies();
+    for (final part in wv.split(';')) {
+      final t = part.trim();
+      final i = t.indexOf('=');
+      if (i > 0) map[t.substring(0, i).trim()] = t.substring(i + 1).trim();
+    }
+    return map.entries.map((e) => '${e.key}=${e.value}').join('; ');
   }
 
   Future<void> _snapshotCurrent() async {
