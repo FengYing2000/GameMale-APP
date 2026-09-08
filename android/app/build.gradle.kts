@@ -17,7 +17,9 @@ android {
     defaultConfig {
         // 跟 iOS 的 bundle id 一致
         applicationId = "com.fengying.gamemale"
-        minSdk = flutter.minSdkVersion
+        // flutter_secure_storage 11（記住密碼用的 Keystore 加密儲存）要求 API 24。
+        // Flutter 預設可能更低，取兩者較大值。
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
