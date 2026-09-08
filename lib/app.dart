@@ -12,6 +12,7 @@ import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/s2t.dart';
 import 'package:gm_api/http.dart';
 
+import 'store/accounts.dart';
 import 'store/favorites.dart';
 import 'store/replied.dart';
 import 'store/session.dart';
@@ -65,6 +66,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   late final SettingsStore _settings;
   late final RepliedStore _replied;
   late final FavoriteStore _favorites;
+  late final AccountsStore _accounts;
   late final GoRouter _router;
 
   @override
@@ -74,6 +76,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     _settings = SettingsStore();
     _replied = RepliedStore();
     _favorites = FavoriteStore();
+    _accounts = AccountsStore(_session);
     _router = _buildRouter(_session, _settings);
     WidgetsBinding.instance.addObserver(this);
     _boot();
@@ -186,6 +189,9 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     _applyReplied();
     await _favorites.load();
     await _session.restore();
+    // 現有登入收進帳號清單（升級到多帳號版的第一個帳號），也更新目前帳號的快照
+    await _accounts.load();
+    await _accounts.syncFromSession();
     // 登入狀態確定之後才問得到紅點
     _refreshBadges();
   }
@@ -234,6 +240,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
         ChangeNotifierProvider.value(value: _settings),
         ChangeNotifierProvider.value(value: _replied),
         ChangeNotifierProvider.value(value: _favorites),
+        ChangeNotifierProvider.value(value: _accounts),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp.router(

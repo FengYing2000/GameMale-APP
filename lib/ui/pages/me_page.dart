@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/models.dart';
+import '../../store/accounts.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
@@ -88,6 +89,106 @@ class _MePageState extends State<MePage> {
     if (mounted) toast(context, tr('已登出'));
   }
 
+  /// 帳號切換入口。網頁版與沒有已存帳號時不顯示（accounts 在網頁版是空的）。
+  Widget _accountSwitcher(BuildContext context) {
+    final accounts = context.watch<AccountsStore>();
+    if (accounts.accounts.isEmpty) return const SizedBox.shrink();
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: Icon(LucideIcons.users, color: Theme.of(context).colorScheme.primary),
+        title: Text(tr('切換帳號')),
+        subtitle: Text(accounts.hasMultiple
+            ? tr('已保存 ${accounts.accounts.length} 個帳號')
+            : tr('新增其他帳號可快速切換')),
+        trailing: const Icon(LucideIcons.chevronRight, size: 18),
+        onTap: () => _showAccounts(context),
+      ),
+    );
+  }
+
+  void _showAccounts(BuildContext context) {
+    final accounts = context.read<AccountsStore>();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(tr('帳號'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            for (final a in accounts.accounts)
+              ListTile(
+                leading: Avatar(a.avatar, size: 40),
+                title: Row(
+                  children: [
+                    Flexible(child: Text(a.name.isEmpty ? 'UID ${a.uid}' : a.name)),
+                    if (a.uid == accounts.currentUid) ...[
+                      const SizedBox(width: 6),
+                      Icon(LucideIcons.check,
+                          size: 16, color: Theme.of(context).colorScheme.primary),
+                    ],
+                  ],
+                ),
+                subtitle: Text('UID ${a.uid}'
+                    '${a.remember ? ' · ${tr('已記住密碼')}' : ''}'),
+                trailing: IconButton(
+                  icon: Icon(LucideIcons.trash2, size: 18, color: faint(context)),
+                  tooltip: tr('移除'),
+                  onPressed: () => _confirmRemove(sheetCtx, a),
+                ),
+                onTap: a.uid == accounts.currentUid
+                    ? null
+                    : () async {
+                        Navigator.pop(sheetCtx);
+                        await accounts.switchTo(a.uid);
+                        if (context.mounted) {
+                          toast(context, tr('已切換到 ${a.name}'), kind: ToastKind.ok);
+                        }
+                      },
+              ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(LucideIcons.plus),
+              title: Text(tr('新增帳號')),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                context.push('/login');
+              },
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmRemove(BuildContext sheetCtx, Account a) async {
+    final accounts = context.read<AccountsStore>();
+    final ok = await showDialog<bool>(
+      context: sheetCtx,
+      builder: (c) => AlertDialog(
+        title: Text(tr('移除帳號')),
+        content: Text(tr('確定要從這台裝置移除「${a.name}」嗎？'
+            '已記住的密碼也會一併刪除，論壇上的帳號不受影響。')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('移除'))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+    await accounts.remove(a.uid);
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionStore>();
@@ -150,6 +251,7 @@ class _MePageState extends State<MePage> {
                 ),
               ),
             ),
+            _accountSwitcher(context),
             Builder(builder: (context) {
               final items = _entries
                   .where((e) => session.loggedIn || !e.$4)

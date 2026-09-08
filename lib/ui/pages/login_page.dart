@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/models.dart';
+import '../../store/accounts.dart';
 import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/toast.dart';
@@ -27,12 +28,32 @@ class _LoginPageState extends State<LoginPage> {
   String _questionid = '0';
   bool _loadingMeta = true;
   bool _busy = false;
+  bool _remember = false;
   String? _err;
 
   @override
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefill());
+  }
+
+  /// 帶入上次的帳號；若那個帳號記了密碼就一起帶入並預勾「記住密碼」。
+  /// 服務最常見的情境：cookie 過期回到這頁，不必重打。
+  Future<void> _prefill() async {
+    if (!mounted) return;
+    final accounts = context.read<AccountsStore>();
+    final cur = accounts.current;
+    if (cur == null || cur.username.isEmpty) return;
+    _user.text = cur.username;
+    if (!cur.remember) return;
+    final pw = await accounts.passwordFor(cur.uid);
+    if (pw != null && mounted) {
+      setState(() {
+        _pass.text = pw;
+        _remember = true;
+      });
+    }
   }
 
   @override
@@ -102,7 +123,17 @@ class _LoginPageState extends State<LoginPage> {
       }
       final user = await api.checkSession();
       if (!mounted) return;
-      if (user != null) context.read<SessionStore>().applyUser(user);
+      if (user != null) {
+        context.read<SessionStore>().applyUser(user);
+        // 存進本機帳號清單（記住帳號；勾了記住密碼才連密碼一起存安全區）
+        await context.read<AccountsStore>().addOrUpdate(
+              user,
+              username: _user.text.trim(),
+              password: _remember ? _pass.text : null,
+              remember: _remember,
+            );
+      }
+      if (!mounted) return;
       toast(context, tr('登入成功'));
       if (context.mounted) context.go('/');
     } on DiscuzException catch (e) {
@@ -220,8 +251,20 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error, fontSize: 13, height: 1.5)),
                   ),
+                CheckboxListTile(
+                  value: _remember,
+                  onChanged: (v) => setState(() => _remember = v ?? false),
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: Text(tr('記住密碼'), style: const TextStyle(fontSize: 14)),
+                  subtitle: Text(
+                    tr('存在此裝置的安全區（Keychain／Keystore），不會上傳'),
+                    style: TextStyle(fontSize: 11.5, color: faint(context)),
+                  ),
+                ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: SizedBox(
                     height: 48,
                     child: FilledButton(
