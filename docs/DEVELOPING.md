@@ -469,31 +469,25 @@ Turnstile，**跟 Cloudflare 原生的攔截頁完全不同**：
 走 WebView 抓圖本來就會偶發失敗（頁面正在導覽、併發排隊逾時…），
 所以 `NetImage` 會退避重試三次再放棄。
 
-## 網頁版怎麼過 Turnstile：補一顆固定值的 cookie
+## 網頁版與訪客怎麼過 Turnstile：UserAgent 白名單（官方授權）
 
-一開始想的是讓網頁版**自己解** Turnstile。外掛的流程是：
+**演進（別再走前兩步的回頭路）**：
+1. 想讓網頁版自己解 Turnstile → 撞牆：`852111.xyz` 開驗證元件回 `110200`
+   （sitekey 只綁 `gamemale.com`）。
+2. 改成轉發時補一顆固定值 cookie `TVj0_2132_cloudflare_check=1`（消去法測出來，
+   當時外掛只認這顆、不綁 session/IP/UA）→ 一度可行。
+3. **2026-09-09 管理員改了插件機制，第 2 招失效**：訪客不管帶不帶那顆 cookie
+   都一律回 Turnstile（實測三個對照都是）。新規則＝**只放行真正已登入的 session**
+   （外掛「跳過檢測已登入用戶」，管理員原話）。已登入暢通，訪客（新增帳號、
+   登入頁、網頁版首次進）被擋。
 
-    Turnstile 通過 → axios.post('plugin.php?id=dev8133_cloudflare', token)
-    → 外掛向 Cloudflare 驗證 → 設自己的 Discuz cookie → reload
+**現行解法＝管理員給的 UserAgent 白名單**：App 的 UA 尾巴加 `GameMaleApp/1.0`
+（gm_api `_ua`），把關鍵詞 `GameMaleApp` 給管理員加白名單後，訪客請求也放行。
+原生版所有裝置與網頁版（VPS 出口）帶的是同一個 UA，一條白名單全涵蓋。
+補 cookie（`ForumProxy` 的 `kCfPassCookie`）已移除。
 
-這條路撞牆：在 `852111.xyz` 上開啟時 Turnstile 回 `110200`（網域未註冊）。
-那個 sitekey 只綁 `gamemale.com`，Cloudflare 根本不發驗證元件給別的網域。
-
-**但根本不需要解。** 消去法逐一拔 cookie 驗證後發現，外掛的判斷極其單薄：
-只看一顆 cookie `TVj0_2132_cloudflare_check` 在不在、值是不是字面的 `1`。
-不綁 session、不綁 IP、不綁 UA——本機、機房 IP 都實測過，**只帶這一顆**
-（沒有任何登入 cookie）就回正常論壇頁。也就是說「解一次 Turnstile」拿到的
-並不是隨機票，而是這顆值固定為 1 的 cookie。
-
-所以轉發層在轉發時補上它就好（`ForumProxy`，常數見 gm_api 的 `kCfPassCookie`），
-網頁版永遠是通過狀態，使用者不會再撞到驗證頁。名稱前綴 `TVj0_2132_` 是論壇
-這個安裝固定的 Discuz cookie 前綴；哪天論壇重裝或改設定導致前綴變了，這顆
-會失效，要照新的前綴更新常數。
-
-這道防護本身弱到一行 `curl` 就能過，所以補 cookie 並沒有實質降低論壇對真正
-攻擊者的防禦——它只影響透過 852111.xyz 正常瀏覽的使用者。原生版目前是靠
-WebView 真的解一次（同源），也可以改成直接帶這顆 cookie 省掉整套機制，
-但它已經能用，先不動。
+原生版就算白名單還沒生效也能用：訪客請求被擋時走 WebView 真的過一次 Turnstile
+（同源），只是要跳一頁驗證；白名單讓那頁也免了。
 
 ## 擋不擋要分主機記，不能用單一旗標
 

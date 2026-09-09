@@ -16,21 +16,6 @@ const bool kIsWebPlatform = bool.fromEnvironment('dart.library.js_util');
 /// 論壇的正式網址。用來判斷「這是不是站內連結」。
 const String kForumOrigin = 'https://www.gamemale.com';
 
-/// 論壇 Turnstile 外掛（`dev8133_cloudflare`）的通關 cookie。
-///
-/// 論壇 2026-09-05 前後裝了這個 Discuz 外掛，會把任何請求換成一頁人機
-/// 驗證。它**不是** Cloudflare 邊緣挑戰——回應是來源站的 HTTP 200，
-/// CF 邊緣其實放行，是論壇 PHP 自己攔，所以 `cf_clearance` 那套完全無關。
-///
-/// 這個外掛的判斷極其單薄：**只看這顆 cookie 在不在、值是不是字面的 `1`**。
-/// 不綁 session、不綁 IP、不綁 UA（本機與機房 IP 都實測過）。也就是說
-/// 「解一次 Turnstile」拿到的並不是隨機票，而是這顆值固定為 1 的 cookie。
-///
-/// 於是網頁版的轉發層只要在轉發時補上它，就永遠是通過狀態，使用者不會
-/// 再撞到驗證頁。名稱前綴 `TVj0_2132_` 是論壇這個安裝固定的 Discuz cookie
-/// 前綴；哪天論壇重裝或改設定導致前綴變了，這顆會失效，要照新的前綴更新。
-const String kCfPassCookie = 'TVj0_2132_cloudflare_check';
-const String kCfPassValue = '1';
 
 /// 實際要打的位址。
 ///
@@ -67,8 +52,14 @@ bool _isProxyableAssetHost(String url) {
   return host.endsWith('jsdelivr.net');
 }
 
+// 尾巴的 `GameMaleApp/1.0` 是給論壇管理員加 UserAgent 白名單用的可辨識關鍵詞
+// （2026-09-09 管理員同意）。前面保留完整 iPhone Safari 串，手機版模板判斷不受
+// 影響。白名單放行後，訪客請求（新增帳號、登入頁、網頁版首次進）也不會撞
+// Turnstile——取代已失效的 cloudflare_check 補 cookie（管理員改插件機制後，
+// 那顆固定 cookie 不再放行，改成只認真正已登入的 session）。
 const String _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
-    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1 '
+    'GameMaleApp/1.0';
 
 /// 撞到 Cloudflare 挑戰時要說什麼。
 ///

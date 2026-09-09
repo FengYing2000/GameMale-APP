@@ -64,25 +64,20 @@ class ForumProxy {
     outgoing.headers['origin'] = kForumOrigin;
 
     // 只轉論壇的 cookie，我們自己的 session token 不要送出去。
-    final cookie = request.headers['cookie'];
-    final jar = <String>[
-      if (cookie != null && cookie.isNotEmpty)
-        ...cookie
-            .split(';')
-            .map((c) => c.trim())
-            .where((c) => c.isNotEmpty && !c.startsWith('gm_session=')),
-    ];
-    // 補上論壇 Turnstile 外掛的通關 cookie，網頁版才不會撞到驗證頁。
     //
-    // 那個外掛只檢查這顆 cookie 在不在、值是不是字面的 1——不綁 session、
-    // 不綁 IP、不綁 UA（見 [kCfPassCookie] 的說明）。瀏覽器這邊沒辦法自己
-    // 解 Turnstile（sitekey 綁在 gamemale.com 網域，852111.xyz 會報 110200），
-    // 但根本不需要解：補這顆固定值的 cookie 就等於通過。
-    // 瀏覽器自己已經帶了就別重複加。
-    if (!jar.any((c) => c.startsWith('$kCfPassCookie='))) {
-      jar.add('$kCfPassCookie=$kCfPassValue');
+    // 曾經在這裡補一顆 TVj0_2132_cloudflare_check=1 繞 Turnstile，但論壇
+    // 2026-09-09 改了插件機制，那顆固定 cookie 不再放行（改成只認真正已登入
+    // 的 session）。改走管理員給的 UserAgent 白名單（gm_api 的 _ua 尾巴帶
+    // GameMaleApp/1.0），這裡就單純轉發論壇 cookie。
+    final cookie = request.headers['cookie'];
+    if (cookie != null && cookie.isNotEmpty) {
+      final forwarded = cookie
+          .split(';')
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty && !c.startsWith('gm_session='))
+          .join('; ');
+      if (forwarded.isNotEmpty) outgoing.headers['cookie'] = forwarded;
     }
-    if (jar.isNotEmpty) outgoing.headers['cookie'] = jar.join('; ');
 
     if (request.method == 'POST' || request.method == 'PUT') {
       outgoing.bodyBytes = await request.read()
