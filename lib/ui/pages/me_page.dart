@@ -148,9 +148,14 @@ class _MePageState extends State<MePage> {
                     ? null
                     : () async {
                         Navigator.pop(sheetCtx);
-                        await accounts.switchTo(a.uid);
-                        if (context.mounted) {
-                          toast(context, tr('已切換到 ${a.name}'), kind: ToastKind.ok);
+                        final r = await accounts.switchTo(a.uid);
+                        if (!context.mounted) return;
+                        if (r == SwitchResult.needLogin) {
+                          // 這個帳號登出過／過期了，帶去登入頁用記住的密碼重登
+                          context.push('/login?relogin=${a.uid}');
+                        } else {
+                          toast(context, tr('已切換到 ${a.name}'),
+                              kind: ToastKind.ok);
                         }
                       },
               ),

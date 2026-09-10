@@ -12,10 +12,13 @@ import '../../theme.dart';
 import '../widgets/toast.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, this.add = false});
+  const LoginPage({super.key, this.add = false, this.reloginUid});
 
   /// 從「新增帳號」進來：已登入狀態下要再登一個帳號，欄位保持空白
   final bool add;
+
+  /// 從切換面板來、但目標帳號 cookie 已失效：帶這個 uid，帳密自動填、一鍵重登
+  final int? reloginUid;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -40,20 +43,33 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _accounts = context.read<AccountsStore>();
-    _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prefill());
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    // relogin 是從切換面板來的，要先把連線清成訪客才登得了新 session
+    //（add 流程是 me_page 先清好的，這裡不用）。清完再抓登入表單、填帳密。
+    if (widget.reloginUid != null) {
+      await _accounts?.beginAdd();
+    }
+    await _load();
+    if (mounted) await _prefill();
   }
 
   /// 帶入上次的帳號；若那個帳號記了密碼就一起帶入並預勾「記住密碼」。
   /// 服務最常見的情境：cookie 過期回到這頁，不必重打。
   Future<void> _prefill() async {
-    if (!mounted || widget.add) return;
-    final accounts = context.read<AccountsStore>();
-    final cur = accounts.current;
-    if (cur == null || cur.username.isEmpty) return;
-    _user.text = cur.username;
-    if (!cur.remember) return;
-    final pw = await accounts.passwordFor(cur.uid);
+    if (!mounted) return;
+    final accounts = _accounts;
+    if (accounts == null) return;
+    // relogin：填那個帳號；新增：空白；一般：填目前帳號（cookie 過期回來）
+    final Account? acc = widget.reloginUid != null
+        ? accounts.accountFor(widget.reloginUid!)
+        : (widget.add ? null : accounts.current);
+    if (acc == null || acc.username.isEmpty) return;
+    _user.text = acc.username;
+    if (!acc.remember) return;
+    final pw = await accounts.passwordFor(acc.uid);
     if (pw != null && mounted) {
       setState(() {
         _pass.text = pw;
@@ -65,7 +81,9 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void dispose() {
     // 新增帳號沒成功就離開 → 把原本的帳號 cookie 換回來
-    if (widget.add && !_addDone) _accounts?.cancelAdd();
+    if ((widget.add || widget.reloginUid != null) && !_addDone) {
+      _accounts?.cancelAdd();
+    }
     _user.dispose();
     _pass.dispose();
     _answer.dispose();
@@ -146,7 +164,7 @@ class _LoginPageState extends State<LoginPage> {
             password: _remember ? _pass.text : null,
             remember: _remember,
           );
-      if (widget.add) {
+      if (widget.add || widget.reloginUid != null) {
         _accounts?.finishAdd();
         _addDone = true;
       }

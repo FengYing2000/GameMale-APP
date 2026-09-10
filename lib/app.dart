@@ -288,7 +288,8 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
       // 不能被重導走，否則點了新增只會彈回首頁。
       if (session.loggedIn &&
           state.matchedLocation == '/login' &&
-          state.uri.queryParameters['add'] != '1') {
+          state.uri.queryParameters['add'] != '1' &&
+          state.uri.queryParameters['relogin'] == null) {
         return '/';
       }
       return null;
@@ -296,7 +297,10 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (c, s) => LoginPage(add: s.uri.queryParameters['add'] == '1'),
+        builder: (c, s) => LoginPage(
+          add: s.uri.queryParameters['add'] == '1',
+          reloginUid: int.tryParse(s.uri.queryParameters['relogin'] ?? ''),
+        ),
       ),
       GoRoute(
         path: '/f/:fid/post',

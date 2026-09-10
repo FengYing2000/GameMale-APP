@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/http.dart';
 import 'package:gm_api/models.dart';
 
 import '../services/browser_fetch_stub.dart'
     if (dart.library.io) '../services/browser_fetch.dart';
 import 'session.dart';
+
+/// [AccountsStore.switchTo] 的結果：ok＝切好了；needLogin＝目標帳號的
+/// cookie 已失效（登出過／過期），要帶去登入頁重登。
+enum SwitchResult { ok, needLogin }
 
 /// 一個已保存的帳號。
 ///
@@ -83,6 +88,7 @@ class AccountsStore extends ChangeNotifier {
   List<Account> get accounts => List.unmodifiable(_accounts);
   bool get hasMultiple => _accounts.length > 1;
   Account? get current => _byUid(currentUid);
+  Account? accountFor(int uid) => _byUid(uid);
 
   Account? _byUid(int? uid) {
     for (final a in _accounts) {
@@ -180,10 +186,13 @@ class AccountsStore extends ChangeNotifier {
   }
 
   /// 切換到另一個已保存的帳號。
-  Future<void> switchTo(int uid) async {
-    if (kIsWeb || uid == currentUid) return;
+  ///
+  /// 回傳 [SwitchResult.needLogin] 代表目標帳號的 cookie 已失效（登出過或
+  /// 自然過期）——呼叫端該把使用者帶到登入頁，用記住的密碼一鍵重登。
+  Future<SwitchResult> switchTo(int uid) async {
+    if (kIsWeb || uid == currentUid) return SwitchResult.ok;
     final target = _byUid(uid);
-    if (target == null) return;
+    if (target == null) return SwitchResult.ok;
 
     // 1. 先把當前連線的 cookie 存回目前帳號（它可能在使用中更新過）
     await _snapshotCurrent();
@@ -195,7 +204,7 @@ class AccountsStore extends ChangeNotifier {
     }
 
     // 3. WebView 那份 cookie 也要換成目標帳號的（含 auth），否則被驗證擋著時
-    //    走 WebView 會是訪客 → 跳驗證 + 未登入（切換帳號的核心 bug）
+    //    走 WebView 會是訪客 → 跳驗證 + 未登入
     await BrowserFetch.instance.setCookies(target.cookies);
     Api.resetTransport();
 
@@ -203,14 +212,29 @@ class AccountsStore extends ChangeNotifier {
     currentUid = uid;
     await _persist();
 
-    // 5. 樂觀把畫面切成目標帳號 → revision 跳動 → 首頁自動用新 cookie 重抓校正
-    _session.applyUser(SessionUser(
-      uid: target.uid,
-      name: target.name,
-      avatar: target.avatar,
-      loggedIn: true,
-    ));
+    // 5. 目標 cookie 還有效嗎？登出過或過期就失效了——那份存著的 cookie
+    //    論壇端已作廢，切過去只會變訪客。明確失效就回 needLogin 讓 UI 帶去
+    //    登入頁重登（連不上時無從判斷，樂觀當它還登入著）。
+    try {
+      final user = await api.checkSession();
+      if (user == null) {
+        _session.markLoggedOut();
+        notifyListeners();
+        return SwitchResult.needLogin;
+      }
+      _session.applyUser(user);
+      target.cookies = await _currentCookieHeader(); // 順手把快照更新成有效的
+      await _persist();
+    } on DiscuzException {
+      _session.applyUser(SessionUser(
+        uid: target.uid,
+        name: target.name,
+        avatar: target.avatar,
+        loggedIn: true,
+      ));
+    }
     notifyListeners();
+    return SwitchResult.ok;
   }
 
   /// 刪除一個已保存的帳號（連同它的密碼與 cookie）。

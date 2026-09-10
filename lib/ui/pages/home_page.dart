@@ -461,7 +461,7 @@ class _Collections extends StatelessWidget {
                               const SizedBox(height: 5),
                               Text(
                                 '${c.threads} ${tr('主題')}'
-                                '${c.meta.isEmpty ? '' : '　${c.meta}'}',
+                                '${c.meta.isEmpty ? '' : '　${sys(c.meta)}'}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -519,7 +519,7 @@ class _FavoriteForums extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 8),
                   child: ActionChip(
                     avatar: const Icon(LucideIcons.star, size: 15),
-                    label: Text(f.name, style: const TextStyle(fontSize: 13)),
+                    label: Text(sys(f.name), style: const TextStyle(fontSize: 13)),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => context.push('/f/${f.fid}'),
                   ),
