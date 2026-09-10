@@ -31,10 +31,13 @@ class ForumProxy {
   /// canvas 時就會被擋掉——所以要把這種轉址也接回自己的網域。
   final String assetPrefix;
 
-  /// 這些標頭不能原樣轉——連線層自己會處理，照抄會壞掉
+  /// 這些標頭不能原樣轉——連線層自己會處理，照抄會壞掉。
+  /// `user-agent` 也要擋掉瀏覽器那份：論壇的 UserAgent 白名單認的是
+  /// `GameMaleApp`，得改帶 [Api.userAgent]（見下方覆蓋）；照抄瀏覽器的
+  /// Safari UA 會被當訪客擋在 Turnstile。
   static const _skipRequest = {
     'host', 'connection', 'content-length', 'accept-encoding',
-    'origin', 'referer', 'cookie',
+    'origin', 'referer', 'cookie', 'user-agent',
   };
   static const _skipResponse = {
     'content-encoding', 'content-length', 'transfer-encoding',
@@ -62,6 +65,9 @@ class ForumProxy {
     // 論壇會看 Referer 決定要不要收表單，補成它自己的網址
     outgoing.headers['referer'] = '$kForumOrigin/forum.php?mobile=2';
     outgoing.headers['origin'] = kForumOrigin;
+    // 帶 GameMaleApp 的 UA，訪客請求才會被論壇的 UserAgent 白名單放行
+    // （否則轉發瀏覽器的 Safari UA，論壇當訪客擋在 Turnstile）
+    outgoing.headers['user-agent'] = Api.userAgent;
 
     // 只轉論壇的 cookie，我們自己的 session token 不要送出去。
     //

@@ -47,5 +47,22 @@ void main() {
       final sent = await forwardedCookie(null);
       expect(sent, anyOf(isNull, isEmpty));
     });
+
+    test('送往論壇的 UA 帶 GameMaleApp（給白名單認），不照抄瀏覽器的', () async {
+      String? ua;
+      final client = MockClient((req) async {
+        ua = req.headers['user-agent'];
+        return http.Response('ok', 200);
+      });
+      final proxy = ForumProxy(client: client);
+      final req = Request(
+        'GET',
+        Uri.parse('https://852111.xyz/gm/forum.php?mobile=2'),
+        headers: {'user-agent': 'Mozilla/5.0 (iPhone) Safari 瀏覽器原本的 UA'},
+      );
+      await proxy.handle(req.change(path: 'gm'));
+      expect(ua, contains('GameMaleApp'));
+      expect(ua, isNot(contains('瀏覽器原本的')));
+    });
   });
 }
