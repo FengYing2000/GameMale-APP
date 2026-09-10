@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:gm_server/asset_guard.dart';
 import 'package:gm_server/forum_proxy.dart';
+import 'package:gm_server/rate_limit.dart';
 import 'package:gm_api/http.dart';
 import 'package:http/http.dart' as http;
 import 'package:shelf/shelf.dart';
@@ -75,8 +76,19 @@ Future<void> main(List<String> args) async {
 
   // 論壇轉發：讓瀏覽器裡的 Flutter 網頁版能打到論壇（它自己不准跨網域）
   final proxy = ForumProxy();
+  // 逐 IP 限流，只擋濫用；上限遠高於正常瀏覽（含回帖檢測）用得到的量。
+  // 防的是「把本站當免驗證跳板灌爆論壇」——見 rate_limit.dart。
+  final limiter = RateLimiter();
   Handler withProxy(Handler inner) => (Request r) {
         if (r.url.path == 'gm' || r.url.path.startsWith('gm/')) {
+          if (!limiter.allow(clientIp(r))) {
+            return Response(429,
+                body: '請求過於頻繁，請稍後再試',
+                headers: {
+                  'content-type': 'text/plain; charset=utf-8',
+                  'retry-after': '30',
+                });
+          }
           return proxy.handle(r.change(path: 'gm'));
         }
         return inner(r);
