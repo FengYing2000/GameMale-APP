@@ -75,18 +75,32 @@ const String _cfMessage = kIsWebPlatform
 
 /// 這段 HTML 是不是「請先通過驗證」的攔截頁。
 ///
-/// **不能只看狀態碼。** 論壇 2026-09-06 換成了 Turnstile 的 Discuz 外掛
-/// （`source/plugin/dev8133_cloudflare/`），它跟 Cloudflare 自己的攔截頁
-/// 完全不同：**回的是 200**、沒有 `cf-mitigated` 標頭、也沒有 `_cf_chl_opt`。
-/// 只認舊標記的話會把攔截頁當成正常內容解析，結果是空的版塊列表加
-/// 「未登入」——實機上就是整頁空白。
+/// **不能只憑內容出現關鍵字。** 論壇 2026-09-06 換成 Turnstile 的 Discuz
+/// 外掛（`source/plugin/dev8133_cloudflare/`），攔截頁回 200、沒有
+/// `cf-mitigated`／`_cf_chl_opt`。一開始是掃內容裡的 turnstile/dev8133 等字，
+/// 但那會誤傷：**CODE. 板塊有討論 CF 驗證的技術帖**，正常板塊頁（幾十 KB）
+/// 內容裡就帶了這些字，整頁被誤判成挑戰、跳「需要驗證」（單帖頁沒那組字
+/// 所以能讀）。
 ///
-/// 舊的兩種標記一起留著：論壇隨時可能切回 Cloudflare 原生的攔截。
-bool isChallengeHtml(String html) =>
-    html.contains('challenges.cloudflare.com/turnstile') ||
-    html.contains('dev8133_cloudflare') ||
-    html.contains('_cf_chl_opt') ||
-    html.contains('cf-browser-verification');
+/// 改成看**攔截頁的結構**：它整頁就是驗證、只有幾 KB，`<title>` 就是
+/// 「请稍候」。正常論壇頁的 title 是板塊／帖名，動輒幾十 KB。
+bool isChallengeHtml(String html) {
+  // 攔截頁的 `<title>` 就是「请稍候」。正常論壇頁的 title 是板塊/帖名，
+  // 就算內文提到「请稍候」也在 body、不在 title——只看 title 標籤最準。
+  final title =
+      RegExp(r'<title[^>]*>(.*?)</title>', dotAll: true).firstMatch(html)?.group(1) ??
+          '';
+  if (title.contains('请稍候') || title.contains('請稍候')) return true;
+  // Cloudflare 原生攔截頁的 JS 標記是攔截頁專有，但保險起見只在很小的頁面
+  // （攔截頁只有幾 KB）才採信，避免大頁面內容裡的關鍵字誤觸。
+  if (html.length < 20000) {
+    return html.contains('challenges.cloudflare.com/turnstile') ||
+        html.contains('dev8133_cloudflare') ||
+        html.contains('_cf_chl_opt') ||
+        html.contains('cf-browser-verification');
+  }
+  return false;
+}
 
 /// 論壇連線層。
 ///
