@@ -480,6 +480,7 @@ ThreadData parseThread(dom.Document doc, int tid) {
     pager: parsePager(doc),
     poll: _parsePoll(doc),
     requiresLogin: isLoginWall(doc),
+    reward: parseReward(doc),
   );
 }
 
@@ -1942,6 +1943,29 @@ Future<ThreadExtras> fetchThreadExtras(int tid, {int page = 1}) async {
   return ThreadExtras(
     prize: parseThreadPrize(doc),
     attachments: parseAttachments(doc),
+  );
+}
+
+/// 懸賞問答（悬赏提问）的金額與狀態。手機版結構：
+/// `.rewardTit` > `.z`(悬赏) `strong`(金額) 「金币」 `.y`(未解决/已解决)。
+ThreadReward? parseReward(dom.Document doc) {
+  final box = doc.querySelector('.rewardTit');
+  if (box == null) return null;
+  final amount = txt(box.querySelector('strong'));
+  if (amount.isEmpty) return null;
+  final status = txt(box.querySelector('.y'));
+  final full = txt(box);
+  var currency = '';
+  for (final c in const ['金币', '金幣', '威望', '贡献', '貢獻', '积分', '積分']) {
+    if (full.contains(c)) {
+      currency = c;
+      break;
+    }
+  }
+  return ThreadReward(
+    amount: amount,
+    currency: currency,
+    solved: status.contains('已解'),
   );
 }
 

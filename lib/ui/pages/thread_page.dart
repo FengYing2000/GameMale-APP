@@ -570,6 +570,7 @@ class _ThreadPageState extends State<ThreadPage> {
               ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
             if (d != null && !d.requiresLogin) ...[
               if (_extras.prize != null) _PrizeBanner(prize: _extras.prize!),
+              if (d.reward != null) _RewardBanner(reward: d.reward!),
               if (_page == 1 && d.title.isNotEmpty)
                 Container(
                   color: Theme.of(context).colorScheme.surface,
@@ -1084,6 +1085,52 @@ class _FloorComments extends StatelessWidget {
 
 
 /// 回帖獎勵橫幅
+/// 懸賞問答（悬赏提问）的橫幅：金額 + 解決狀態
+class _RewardBanner extends StatelessWidget {
+  const _RewardBanner({required this.reward});
+  final ThreadReward reward;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final accent = reward.solved ? c.tertiary : c.primary;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: .28)),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.coins, size: 22, color: accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${tr('懸賞')}　${reward.amount} ${sys(reward.currency)}',
+              style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: accent),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              reward.solved ? tr('已解決') : tr('未解決'),
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PrizeBanner extends StatelessWidget {
   const _PrizeBanner({required this.prize});
   final ThreadPrize prize;

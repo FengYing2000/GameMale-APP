@@ -274,6 +274,7 @@ class ThreadData {
   final PageInfo pager;
   final Poll? poll;
   final bool requiresLogin;
+  final ThreadReward? reward;
 
   const ThreadData({
     required this.tid,
@@ -285,6 +286,7 @@ class ThreadData {
     this.pager = const PageInfo(),
     this.poll,
     this.requiresLogin = false,
+    this.reward,
   });
 }
 
@@ -973,6 +975,18 @@ class ThreadPrize {
   const ThreadPrize({required this.pool, required this.rule});
   final String pool;
   final String rule;
+}
+
+/// 懸賞問答（悬赏提问）：樓主出金幣求答案，回帖就是回答。
+class ThreadReward {
+  const ThreadReward({
+    required this.amount,
+    required this.currency,
+    required this.solved,
+  });
+  final String amount; // "70"
+  final String currency; // 論壇原字，通常「金币」
+  final bool solved; // 已解决＝true
 }
 
 /// 註冊問答的一個選項
