@@ -261,6 +261,17 @@ class AccountsStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 拖動調整帳號順序。索引依 `onReorderItem` 的語意——newIndex 已經是
+  /// 「把 oldIndex 移走之後」的目標位置，不必再自己 -1。
+  Future<void> reorder(int oldIndex, int newIndex) async {
+    if (kIsWeb) return;
+    if (oldIndex < 0 || oldIndex >= _accounts.length) return;
+    final item = _accounts.removeAt(oldIndex);
+    _accounts.insert(newIndex.clamp(0, _accounts.length), item);
+    await _persist();
+    notifyListeners();
+  }
+
   // 新增帳號時暫存「原本要回去的帳號」——登入沒成功就把它的 cookie 換回來。
   int? _addReturnUid;
 

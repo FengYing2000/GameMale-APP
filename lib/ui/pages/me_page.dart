@@ -112,68 +112,105 @@ class _MePageState extends State<MePage> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(tr('帳號'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+      // 帳號多時清單可能比半個螢幕高，讓 sheet 能長高＋自己捲
+      isScrollControlled: true,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(tr('帳號　·　長按右側把手可拖動排序'),
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                ),
               ),
-            ),
-            for (final a in accounts.accounts)
-              ListTile(
-                leading: Avatar(a.avatar, size: 40),
-                title: Row(
+              Flexible(
+                child: ReorderableListView(
+                  shrinkWrap: true,
+                  buildDefaultDragHandles: false,
+                  onReorderItem: (oldI, newI) {
+                    accounts.reorder(oldI, newI);
+                    setSheet(() {});
+                  },
                   children: [
-                    Flexible(child: Text(a.name.isEmpty ? 'UID ${a.uid}' : a.name)),
-                    if (a.uid == accounts.currentUid) ...[
-                      const SizedBox(width: 6),
-                      Icon(LucideIcons.check,
-                          size: 16, color: Theme.of(context).colorScheme.primary),
-                    ],
+                    for (var i = 0; i < accounts.accounts.length; i++)
+                      _accountTile(
+                          context, sheetCtx, accounts, accounts.accounts[i], i),
                   ],
                 ),
-                subtitle: Text('UID ${a.uid}'
-                    '${a.remember ? ' · ${tr('已記住密碼')}' : ''}'),
-                trailing: IconButton(
-                  icon: Icon(LucideIcons.trash2, size: 18, color: faint(context)),
-                  tooltip: tr('移除'),
-                  onPressed: () => _confirmRemove(sheetCtx, a),
-                ),
-                onTap: a.uid == accounts.currentUid
-                    ? null
-                    : () async {
-                        Navigator.pop(sheetCtx);
-                        final r = await accounts.switchTo(a.uid);
-                        if (!context.mounted) return;
-                        if (r == SwitchResult.needLogin) {
-                          // 這個帳號登出過／過期了，帶去登入頁用記住的密碼重登
-                          context.push('/login?relogin=${a.uid}');
-                        } else {
-                          toast(context, tr('已切換到 ${a.name}'),
-                              kind: ToastKind.ok);
-                        }
-                      },
               ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(LucideIcons.plus),
-              title: Text(tr('新增帳號')),
-              onTap: () async {
-                Navigator.pop(sheetCtx);
-                // 先清成訪客（存好目前帳號），登入頁才能真正登入新帳號
-                await accounts.beginAdd();
-                if (context.mounted) context.push('/login?add=1');
-              },
-            ),
-            const SizedBox(height: 4),
-          ],
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(LucideIcons.plus),
+                title: Text(tr('新增帳號')),
+                onTap: () async {
+                  Navigator.pop(sheetCtx);
+                  // 先清成訪客（存好目前帳號），登入頁才能真正登入新帳號
+                  await accounts.beginAdd();
+                  if (context.mounted) context.push('/login?add=1');
+                },
+              ),
+              const SizedBox(height: 4),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _accountTile(BuildContext context, BuildContext sheetCtx,
+      AccountsStore accounts, Account a, int index) {
+    return ListTile(
+      key: ValueKey(a.uid),
+      leading: Avatar(a.avatar, size: 40),
+      title: Row(
+        children: [
+          Flexible(child: Text(a.name.isEmpty ? 'UID ${a.uid}' : a.name)),
+          if (a.uid == accounts.currentUid) ...[
+            const SizedBox(width: 6),
+            Icon(LucideIcons.check,
+                size: 16, color: Theme.of(context).colorScheme.primary),
+          ],
+        ],
+      ),
+      subtitle: Text('UID ${a.uid}'
+          '${a.remember ? ' · ${tr('已記住密碼')}' : ''}'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(LucideIcons.trash2, size: 18, color: faint(context)),
+            tooltip: tr('移除'),
+            onPressed: () => _confirmRemove(sheetCtx, a),
+          ),
+          // 拖動把手：只有壓在這裡才會拖，避免跟整列的點擊切換打架
+          ReorderableDragStartListener(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: Icon(LucideIcons.gripVertical,
+                  size: 18, color: faint(context)),
+            ),
+          ),
+        ],
+      ),
+      onTap: a.uid == accounts.currentUid
+          ? null
+          : () async {
+              Navigator.pop(sheetCtx);
+              final r = await accounts.switchTo(a.uid);
+              if (!context.mounted) return;
+              if (r == SwitchResult.needLogin) {
+                // 這個帳號登出過／過期了，帶去登入頁用記住的密碼重登
+                context.push('/login?relogin=${a.uid}');
+              } else {
+                toast(context, tr('已切換到 ${a.name}'), kind: ToastKind.ok);
+              }
+            },
     );
   }
 
