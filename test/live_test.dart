@@ -287,14 +287,16 @@ void main() {
 
   test('authorid 判斷有沒有回過帖', () async {
     // 回過的帖會正常回內容，沒回過的論壇直接給「未定义操作」
-    Future<bool> replied(int tid) async {
-      final html = await Api.instance
-          .get('forum.php?mod=viewthread&tid=$tid&authorid=677863');
-      return !(html.contains('未定义操作') || html.contains('未定義操作'));
-    }
+    Future<({bool replied, int readPerm})> check(int tid) async =>
+        api.parseAuthorView(await Api.instance
+            .get('forum.php?mod=viewthread&tid=$tid&authorid=677863'));
 
-    expect(await replied(194186), isTrue, reason: '這帖回過');
-    expect(await replied(194170), isFalse, reason: '這帖沒回過');
+    expect((await check(194186)).replied, isTrue, reason: '這帖回過');
+    expect((await check(194170)).replied, isFalse, reason: '這帖沒回過');
+    // 閱讀權限 105 的帖：提示頁沒有「未定义操作」，以前被誤標成「已回」
+    final denied = await check(195793);
+    expect(denied.replied, isFalse);
+    expect(denied.readPerm, 105);
   }, timeout: const Timeout(Duration(seconds: 60)));
 
   test('勳章的等級、名稱、說明、加成要分得開', () async {

@@ -157,6 +157,32 @@ var disablepostctrl = parseInt('1');</script></body></html>''');
     });
   });
 
+  group('「已回」判定（authorid=自己）', () {
+    test('有樓層才算回過', () {
+      final r = api.parseAuthorView(
+          '<html><body><div class="postListItem" id="pid1"></div></body></html>');
+      expect(r.replied, isTrue);
+    });
+
+    test('未定义操作＝沒回過', () {
+      expect(api.parseAuthorView(_mobileMessage('未定义操作')).replied, isFalse);
+    });
+
+    test('閱讀權限不足不能標成已回，並記下要求的權限', () {
+      final r = api.parseAuthorView(
+          _mobileMessage('抱歉，本帖要求阅读权限高于 105 才能浏览'));
+      expect(r.replied, isFalse, reason: '以前沒看到「未定义操作」就當回過');
+      expect(r.readPerm, 105);
+    });
+
+    test('帖子被刪的提示頁也不算回過', () {
+      final r = api.parseAuthorView(
+          _mobileMessage('抱歉，指定的主题不存在或已被删除或正在被审核'));
+      expect(r.replied, isFalse);
+      expect(r.readPerm, 0);
+    });
+  });
+
   group('桌面版列表標記', () {
     test('閱讀權限與關閉的主題', () {
       final row = toDoc('''<table><tbody id="normalthread_10379"><tr>

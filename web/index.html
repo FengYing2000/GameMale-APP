@@ -78,29 +78,56 @@
 
   <script src="flutter_bootstrap.js" async></script>
   <script>
+    // ── 逼 Flutter 重量畫面大小 ────────────────────────────────
+    // iOS 的主畫面 App 偶爾會量錯可視區高度（剛開起來、切回前景時），
+    // 畫面比螢幕高、底部的頁碼列和按鈕被切到螢幕外，座標也跟觸控對不上，
+    // 重開 App 才恢復。
+    //
+    // ⚠️ Flutter 網頁版**只聽 visualViewport 的 resize**，不聽 window 的
+    // （引擎 full_page_dimensions_provider.dart）；在 iOS 上量的是
+    // documentElement.clientWidth/Height。以前這裡對 window 發 resize，
+    // Flutter 根本收不到，等於從沒生效過。
+    var gmResizeTarget = window.visualViewport || window;
+    function gmRemeasure() { gmResizeTarget.dispatchEvent(new Event('resize')); }
+
+    // iOS 修正可視區時不一定會發 resize：每秒看一次 Flutter 量的那個值，
+    // 變了就叫它重量（只是比對兩個數字，幾乎不花成本）
+    (function () {
+      var root = document.documentElement;
+      var size = function () { return root.clientWidth + 'x' + root.clientHeight; };
+      var last = size();
+      setInterval(function () {
+        var now = size();
+        if (now !== last) { last = now; gmRemeasure(); }
+      }, 1000);
+    })();
+
     window.addEventListener('flutter-first-frame', function () {
       const b = document.getElementById('boot');
       if (b) b.remove();
 
-      // iOS 的主畫面 App 剛開起來時，視窗高度量到的是還沒扣掉狀態列／
-      // 安全區的值。Flutter 只在啟動時量一次，所以畫面的座標會跟實際
-      // 觸控的位置對不上——按鈕點不到、或點到旁邊的東西。
-      // 使用者「滑一下返回就正常了」就是因為那個動作觸發了重新量測。
-      // 這裡主動補幾次 resize 逼它重量。
-      const nudge = function () { window.dispatchEvent(new Event('resize')); };
-      nudge();
-      setTimeout(nudge, 100);
-      setTimeout(nudge, 400);
-      setTimeout(nudge, 1000);
+      // 剛開起來量到的常是還沒扣掉狀態列／安全區的值，補幾次
+      gmRemeasure();
+      setTimeout(gmRemeasure, 100);
+      setTimeout(gmRemeasure, 400);
+      setTimeout(gmRemeasure, 1000);
+      setTimeout(gmRemeasure, 2500);
     });
 
     // 轉向、鍵盤收合、從背景切回來都會改變可視區域，一律重量一次
     window.addEventListener('orientationchange', function () {
-      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 250);
+      setTimeout(gmRemeasure, 250);
+    });
+    window.addEventListener('pageshow', function () {
+      setTimeout(gmRemeasure, 100);
+    });
+    document.addEventListener('focusout', function () {
+      setTimeout(gmRemeasure, 350);
     });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible') {
-        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 100);
+        setTimeout(gmRemeasure, 100);
+        setTimeout(gmRemeasure, 600);
       }
     });
   </script>

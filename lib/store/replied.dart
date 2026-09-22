@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/http.dart';
 
 /// 「我回過這帖沒有」的即時查詢。
@@ -22,6 +23,9 @@ class RepliedStore extends ChangeNotifier {
   int? _uid;
 
   final _state = <int, bool>{};
+
+  /// 查的時候發現看不到的帖子：要求的閱讀權限
+  final _readPerm = <int, int>{};
   final _pending = <int>{};
   final _queue = <int>[];
   int _running = 0;
@@ -29,6 +33,9 @@ class RepliedStore extends ChangeNotifier {
 
   /// null = 還不知道
   bool? statusOf(int tid) => _state[tid];
+
+  /// 這帖要求的閱讀權限高於自己的（看不到）；0 = 看得到或還不知道
+  int deniedReadPerm(int tid) => _readPerm[tid] ?? 0;
 
   bool get hasAny => _state.isNotEmpty;
 
@@ -49,6 +56,7 @@ class RepliedStore extends ChangeNotifier {
 
   void _reset() {
     _state.clear();
+    _readPerm.clear();
     _pending.clear();
     _queue.clear();
     notifyListeners();
@@ -83,11 +91,9 @@ class RepliedStore extends ChangeNotifier {
 
       final html = await Api.instance
           .get('forum.php?mod=viewthread&tid=$tid&authorid=$_uid');
-      // 繁簡兩種都要認，論壇會照使用者語言給
-      final none = html.contains('未定义操作') ||
-          html.contains('未定義操作') ||
-          html.contains('ERROR:');
-      _state[tid] = !none;
+      final r = api.parseAuthorView(html);
+      _state[tid] = r.replied;
+      if (r.readPerm > 0) _readPerm[tid] = r.readPerm;
       notifyListeners();
     } catch (_) {
       // 查不到就當作不知道，下次再問；不要誤標成「沒回過」

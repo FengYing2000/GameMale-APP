@@ -1320,9 +1320,10 @@ class _NoAccess extends StatelessWidget {
   const _NoAccess({required this.message});
   final String message;
 
+  // 不加「升級後就看得到」之類的說明：閱讀權限可以設得比任何用戶組都高
+  // （例如 255），那種帖子怎麼升級都看不到，這句話就是錯的
   @override
   Widget build(BuildContext context) {
-    final perm = RegExp(r'阅读权限|閱讀權限').hasMatch(message);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 28),
       child: Column(
@@ -1334,14 +1335,6 @@ class _NoAccess extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 15.5, height: 1.5, fontWeight: FontWeight.w600),
           ),
-          if (perm) ...[
-            const SizedBox(height: 8),
-            Text(
-              tr('閱讀權限跟著用戶組（等級）走，升級後才看得到。'),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: subtle(context)),
-            ),
-          ],
         ],
       ),
     );

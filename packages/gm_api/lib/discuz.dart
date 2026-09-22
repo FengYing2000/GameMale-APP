@@ -837,6 +837,29 @@ String replyProbe(String message) {
   return plain.length > 20 ? plain.substring(0, 20) : plain;
 }
 
+/// 用 `authorid=自己` 開帖子的結果，判斷「我回過這帖沒有」。
+///
+/// 自己沒發言過論壇回「未定义操作」；回過就是正常的帖子頁。**只有看到
+/// 樓層才算回過**——以前是「沒有未定义操作就算回過」，閱讀權限不足、
+/// 帖子被刪的提示頁也沒那幾個字，全被標成「已回」。
+///
+/// 順便認出看不到的帖子（`readPerm`）：手機版列表不標閱讀權限，
+/// 這是唯一不必多發請求就知道的地方。
+({bool replied, int readPerm}) parseAuthorView(String html) {
+  if (html.contains('未定义操作') ||
+      html.contains('未定義操作') ||
+      html.contains('ERROR:')) {
+    return (replied: false, readPerm: 0);
+  }
+  final doc = toDoc(html);
+  if (doc.querySelector('.postListItem') != null ||
+      doc.getElementById('postlist') != null) {
+    return (replied: true, readPerm: 0);
+  }
+  final m = RegExp(r'(?:阅读权限高于|閱讀權限高於)\s*(\d+)').firstMatch(html);
+  return (replied: false, readPerm: int.tryParse(m?.group(1) ?? '') ?? 0);
+}
+
 /// 論壇字數用 PHP strlen 算，也就是 UTF-8 位元組數
 int postBytes(String s) => utf8.encode(s).length;
 

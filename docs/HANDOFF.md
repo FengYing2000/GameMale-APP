@@ -1,6 +1,6 @@
 # GameMale 客戶端 — 交接文件
 
-> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.28.0+75**。
+> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.28.1+76**。
 > 這份是「整體狀態 + 怎麼繼續」；技術踩坑細節在 [DEVELOPING.md](DEVELOPING.md)，
 > 使用者面向說明在 [../README.md](../README.md)，長期記憶在 `~/.claude/.../memory/`
 > 的 `project_gamemale_ios` / `project_gamemale_pwa` / `reference_gamemale_cf_gate`。
@@ -99,7 +99,12 @@ echo 'cd /opt/stacks/gamemale-pwa && docker compose build && docker compose up -
   （GameMale 是 25／50000 **位元組**，中文一字 3）顯示字數、送出前先擋。
 - **閱讀權限不足的帖子**：論壇回提示頁、沒有樓層，`ThreadData.message` 帶出原話（以前是一片空白）。
   **關閉的主題**：桌面版回帖框換成「您现在无权发帖」→ `replyBlocked`，回覆鈕變鎖頭、點了顯示原因。
-  **手機版列表沒有**「[阅读权限 N]」與鎖頭，只有桌面版列表（淘專輯、群組、我的主題）標得出來。
+  **手機版列表沒有**「[阅读权限 N]」與鎖頭，只有桌面版列表（淘專輯、群組、我的主題）標得出來；
+  手機版列表的閱讀權限靠「已回」查詢（`authorid=自己`）撞到權限提示頁時順便得知（`parseAuthorView`）。
+- **「已回」只認看得到樓層**（1.28.1）：以前是「沒有未定义操作就算回過」，權限不足／被刪的提示頁全被標成已回。
+- **網頁版量高度的補救以前從沒生效**（1.28.1）：Flutter 網頁引擎**只聽 `visualViewport` 的 resize**
+  （iOS 上量 `documentElement.clientHeight`），`index.html` 卻對 `window` 發 resize。改對 visualViewport 發，
+  並每秒比對 clientWidth/Height、變了就重量。症狀是主畫面 App 偶爾畫面比螢幕高、底部頁碼列與按鈕被切掉。
 
 ---
 
