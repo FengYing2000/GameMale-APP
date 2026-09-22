@@ -160,9 +160,47 @@ class _ThreadPageState extends State<ThreadPage> {
     }
   }
 
+  /// 回帖框被論壇換成「您现在无权发帖」的那句話（主題關閉等）；空字串＝能回
+  String get _replyBlocked {
+    final d = _data;
+    if (d != null && d.replyBlocked.isNotEmpty) return d.replyBlocked;
+    return _extras.replyBlocked;
+  }
+
+  /// 網頁版的「您现在无权发帖。点击查看原因」。原因不在帖子頁上，
+  /// 要跟論壇要一次回覆表單，它才會說是主題關閉還是權限不足
+  Future<void> _explainNoReply() async {
+    final gate = api.replyGate(fid: _data?.fid ?? 0, tid: widget.tid);
+    final fallback = sys(_replyBlocked);
+    await showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+        icon: const Icon(LucideIcons.lock),
+        title: Text(tr('無法回帖')),
+        content: FutureBuilder<ReplyGate>(
+          future: gate,
+          builder: (c, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 48,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              );
+            }
+            final g = snap.data;
+            return Text(g != null && g.message.isNotEmpty ? sys(g.message) : fallback);
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(tr('知道了'))),
+        ],
+      ),
+    );
+  }
+
   Future<void> _reply([PostItem? post]) async {
     if (!await requireLogin(context, action: tr('回覆主題'))) return;
     if (!mounted) return;
+    if (_replyBlocked.isNotEmpty) return _explainNoReply();
     final uri = Uri(path: '/t/${widget.tid}/reply', queryParameters: {
       'fid': '${_data?.fid ?? 0}',
       'page': '$_page',
@@ -490,13 +528,15 @@ class _ThreadPageState extends State<ThreadPage> {
   Widget build(BuildContext context) {
     final d = _data;
     final session = context.watch<SessionStore>();
+    final blocked = _replyBlocked.isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           d?.title.isNotEmpty == true
               ? _zh(d!.title)
-              : (d?.forumName ?? tr('主題')),
+              : (d?.forumName.isNotEmpty == true ? d!.forumName : tr('主題')),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 16),
@@ -540,11 +580,14 @@ class _ThreadPageState extends State<ThreadPage> {
             }),
         ],
       ),
-      floatingActionButton: session.loggedIn
+      // 看不到帖子就沒有回帖這回事；回不了的（主題關閉）換成鎖頭，點了說原因
+      floatingActionButton: session.loggedIn && d?.message == null
           ? FloatingActionButton(
               onPressed: () => _reply(),
-              tooltip: tr('回覆'),
-              child: const Icon(LucideIcons.reply),
+              tooltip: blocked ? tr('無法回帖') : tr('回覆'),
+              backgroundColor: blocked ? scheme.surfaceContainerHighest : null,
+              foregroundColor: blocked ? faint(context) : null,
+              child: Icon(blocked ? LucideIcons.lock : LucideIcons.reply),
             )
           : null,
       bottomNavigationBar: d == null
@@ -569,6 +612,7 @@ class _ThreadPageState extends State<ThreadPage> {
             else
               ?StateBox.maybe(loading: _loading, error: _err, onRetry: _load),
             if (d != null && !d.requiresLogin) ...[
+              if (d.message case final msg?) _NoAccess(message: msg),
               if (_extras.prize != null) _PrizeBanner(prize: _extras.prize!),
               if (d.reward != null) _RewardBanner(reward: d.reward!),
               if (_page == 1 && d.title.isNotEmpty)
@@ -660,6 +704,9 @@ class _ThreadPageState extends State<ThreadPage> {
                   ),
                 ],
               ],
+              // 網頁版回帖框的位置，一樣寫「无权发帖」並能點開看原因
+              if (session.loggedIn && blocked && d.posts.isNotEmpty)
+                _NoReplyBar(onTap: _explainNoReply),
             ],
           ],
         ),
@@ -1268,6 +1315,81 @@ class _PaymentsSheetState extends State<_PaymentsSheet> {
 }
 
 /// 帖子底下的一排動作：頂／踩／淘帖／使用道具／舉報
+/// 論壇不給看（閱讀權限不足、帖子已刪…），整頁只有一句提示
+class _NoAccess extends StatelessWidget {
+  const _NoAccess({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final perm = RegExp(r'阅读权限|閱讀權限').hasMatch(message);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 28),
+      child: Column(
+        children: [
+          Icon(LucideIcons.lock, size: 38, color: faint(context)),
+          const SizedBox(height: 12),
+          Text(
+            sys(message),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 15.5, height: 1.5, fontWeight: FontWeight.w600),
+          ),
+          if (perm) ...[
+            const SizedBox(height: 8),
+            Text(
+              tr('閱讀權限跟著用戶組（等級）走，升級後才看得到。'),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: subtle(context)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 帖子底下原本是回帖框的地方
+class _NoReplyBar extends StatelessWidget {
+  const _NoReplyBar({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Row(
+            children: [
+              Icon(LucideIcons.lock, size: 17, color: faint(context)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(tr('您現在無權發帖'),
+                    style: TextStyle(fontSize: 14, color: subtle(context))),
+              ),
+              Text(tr('查看原因'),
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600)),
+              Icon(LucideIcons.chevronRight,
+                  size: 16, color: Theme.of(context).colorScheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ThreadActions extends StatelessWidget {
   const _ThreadActions({
     required this.onUp,

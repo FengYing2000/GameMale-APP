@@ -481,7 +481,24 @@ ThreadData parseThread(dom.Document doc, int tid) {
     poll: _parsePoll(doc),
     requiresLogin: isLoginWall(doc),
     reward: parseReward(doc),
+    // 閱讀權限不夠、帖子被刪或審核中…論壇回的是一頁提示、沒有任何樓層。
+    // 之前這種頁面直接畫成一片空白
+    message: posts.isEmpty && !isLoginWall(doc) ? noticeMessage(doc) : null,
+    replyBlocked: replyBlockedOf(doc),
   );
+}
+
+/// 回帖框被換成「您现在无权发帖。点击查看原因」（主題關閉、無回帖權限）。
+/// 桌面版在 `#f_pst`；手機版沒實際看過，同時看 `.replyCom`／`#fastpostform`。
+/// 只看回帖框，不看整頁 —— 帖子內容裡也可能有人寫「无权发帖」。
+String replyBlockedOf(dom.Document doc) {
+  for (final el
+      in doc.querySelectorAll('#f_pst, #fastpostform, .replyCom, .fastpost')) {
+    final t = txt(el);
+    final m = RegExp(r'您?现在无权发帖|您?現在無權發帖|无权回复|無權回覆').firstMatch(t);
+    if (m != null) return m.group(0)!;
+  }
+  return '';
 }
 
 /// 樓中樓（dxksst 外掛）：每個 li 的結構是
@@ -665,9 +682,16 @@ final _failurePatterns = RegExp(
     '请先登录|請先登錄|需要先登录|需要先登入|尚未登录|尚未登入|'
     '抱歉|不存在|已关闭|已關閉');
 
-SubmitResult submitResult(String html, String what) => _submitResult(html, what);
+/// 提示框是 alert_right 以外、訊息本身講明成功或送審的
+final _successPatterns = RegExp('成功|感谢|感謝|审核|審核');
 
-SubmitResult _submitResult(String html, String what) {
+SubmitResult submitResult(String html, String what, {bool expectThread = false}) =>
+    _submitResult(html, what, expectThread: expectThread);
+
+/// [expectThread]：回帖／發帖這類「成功一定轉回帖子頁」的動作。論壇回了一段
+/// 看不出成功的提示，對它們來說就是被擋下了——例如 2026-06-11 上線的每日
+/// 回帖上限，擋下的字句沒有固定樣態，失敗關鍵字列不完。
+SubmitResult _submitResult(String html, String what, {bool expectThread = false}) {
   // 明確的錯誤呼叫 errorhandle_x('訊息', {})。注意論壇連「操作成功」也走
   // errorhandle_（例如刪提醒），所以成敗還是要看訊息本身，不能一律當失敗。
   final err = RegExp(r"errorhandle_\w*\('([^']*)'").firstMatch(html)?.group(1);
@@ -708,7 +732,8 @@ SubmitResult _submitResult(String html, String what) {
     return SubmitResult(ok: true, message: '$what成功');
   }
 
-  final msg = noticeMessage(doc);
+  final note = noticeOf(doc);
+  final msg = note?.text;
   if (msg != null && _failurePatterns.hasMatch(msg)) {
     return SubmitResult(ok: false, message: msg);
   }
@@ -720,12 +745,26 @@ SubmitResult _submitResult(String html, String what) {
     return SubmitResult(ok: true, message: msg ?? '$what成功');
   }
 
-  if (RegExp('succeed|非常感谢|发布成功|操作成功|成功').hasMatch(html)) {
+  // 只看提示本身。桌面版提示頁一律內嵌隱藏的 #main_succeed，拿整頁比對
+  // succeed 會讓所有失敗提示都變成功（回帖被擋卻顯示已送出就是這樣來的）
+  if (note != null) {
+    if (note.kind == 'right' || _successPatterns.hasMatch(note.text)) {
+      return SubmitResult(ok: true, message: note.text);
+    }
+    return SubmitResult(ok: !expectThread, message: note.text, unsure: true);
+  }
+
+  if (expectThread) {
+    return SubmitResult(
+        ok: false, message: '看不出是否$what成功，請回帖子確認後再重試', unsure: true);
+  }
+
+  if (RegExp('非常感谢|发布成功|操作成功|成功').hasMatch(html)) {
     return SubmitResult(ok: true, message: msg ?? '$what成功');
   }
 
   // 沒有明確的失敗跡象就不要嚇使用者 —— 之前正是這裡把成功報成失敗
-  return SubmitResult(ok: true, message: msg ?? '$what已送出');
+  return SubmitResult(ok: true, message: '$what已送出', unsure: true);
 }
 
 Future<SubmitResult> replyThread({
@@ -734,6 +773,8 @@ Future<SubmitResult> replyThread({
   required String message,
   String repquote = '',
   int page = 1,
+  // 論壇回應看不出成敗時，拿來到帖子裡認自己的回覆
+  int? uid,
 }) async {
   var url = 'forum.php?mod=post&action=reply&fid=$fid&tid=$tid';
   if (repquote.isNotEmpty) url += '&repquote=$repquote';
@@ -758,7 +799,77 @@ Future<SubmitResult> replyThread({
     },
     desktop: true,
   );
-  return _submitResult(html, '回覆');
+  final r = _submitResult(html, '回覆', expectThread: true);
+  if (!r.unsure || uid == null) return r;
+
+  // 看不出成敗就去帖子最後一頁找這則回覆，找到才算數。
+  // 只比對作者不夠：昨天最後一樓正好是自己的話，今天被擋也會被當成功
+  try {
+    if (await _replyLanded(tid, uid, message)) {
+      return const SubmitResult(ok: true, message: '回覆成功');
+    }
+  } on DiscuzException {
+    // 確認不了就照論壇的原話
+  }
+  return SubmitResult(ok: false, message: r.message);
+}
+
+/// 帖子最後一頁的最後幾樓裡，有沒有 [uid] 剛發的這段內容
+Future<bool> _replyLanded(int tid, int uid, String message) async {
+  final probe = replyProbe(message);
+  if (probe.isEmpty) return false;
+  final d = parseThread(
+      await _page('forum.php?mod=redirect&tid=$tid&goto=lastpost'), tid);
+  final tail = d.posts.length > 5 ? d.posts.sublist(d.posts.length - 5) : d.posts;
+  return tail.any((p) =>
+      p.uid == uid &&
+      (toDoc(p.html).body?.text ?? '').replaceAll(RegExp(r'\s+'), '').contains(probe));
+}
+
+/// 拿來在帖子裡認出這則回覆的一小段純文字：去掉 BBCode、表情代碼與空白
+/// （這些渲染後都不是原字），取前 20 字
+String replyProbe(String message) {
+  final plain = message
+      .replaceAll(RegExp(r'\[quote\][\s\S]*?\[/quote\]', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\[/?[a-zA-Z*]+(=[^\]]*)?\]'), '')
+      .replaceAll(RegExp(r'\{:[^}]*:\}'), '')
+      .replaceAll(RegExp(r'\s+'), '');
+  return plain.length > 20 ? plain.substring(0, 20) : plain;
+}
+
+/// 論壇字數用 PHP strlen 算，也就是 UTF-8 位元組數
+int postBytes(String s) => utf8.encode(s).length;
+
+/// 開回覆頁時先要一次桌面版回覆表單：
+/// * 不能回（主題關閉、權限不足、達每日上限…）論壇會直接給提示頁說明原因，
+///   跟網頁上「您现在无权发帖。点击查看原因」點下去看到的是同一句
+/// * 表單頁帶著 `postminchars`／`postmaxchars`，就是論壇檢查字數的標準
+Future<ReplyGate> replyGate({required int fid, required int tid}) async {
+  final q = fid > 0 ? 'fid=$fid&tid=$tid' : 'tid=$tid';
+  final html = await Api.instance
+      .get('forum.php?mod=post&action=reply&$q', desktop: true);
+  return parseReplyGate(html);
+}
+
+ReplyGate parseReplyGate(String html) {
+  final doc = toDoc(html);
+  if (doc.querySelector('textarea[name="message"]') == null) {
+    final msg = noticeMessage(doc);
+    // 既沒表單也沒提示：看不懂就不擋，送出時論壇自己會說
+    if (msg != null) return ReplyGate(allowed: false, message: msg);
+    return const ReplyGate();
+  }
+  int jsInt(String name) =>
+      int.tryParse(RegExp("$name\\s*=\\s*parseInt\\('(\\d+)'\\)")
+              .firstMatch(html)
+              ?.group(1) ??
+          '') ??
+      0;
+  final exempt = jsInt('disablepostctrl') == 1;
+  return ReplyGate(
+    minBytes: exempt ? 0 : jsInt('postminchars'),
+    maxBytes: exempt ? 0 : jsInt('postmaxchars'),
+  );
 }
 
 Future<SubmitResult> newThread({
@@ -788,7 +899,7 @@ Future<SubmitResult> newThread({
     },
     desktop: true,
   );
-  return _submitResult(html, '發表');
+  return _submitResult(html, '發表', expectThread: true);
 }
 
 /// 讀取發文頁可選的主題分類（很多版塊強制要選）
@@ -1004,9 +1115,12 @@ CollectionView parseCollectionView(dom.Document doc, int ctid, {int page = 1}) {
     if (a == null || tid == null) continue;
     final bys = tr.querySelectorAll('td.by');
     final num = tr.querySelector('td.num');
+    final flags = threadRowFlags(tr);
     list.add(ThreadItem(
       tid: tid,
       title: txt(a),
+      readPerm: flags.readPerm,
+      closed: flags.closed,
       author: bys.isNotEmpty ? txt(bys[0].querySelector('cite')) : '',
       date: bys.isNotEmpty ? txt(bys[0].querySelector('em')) : '',
       replies: int.tryParse(txt(num?.querySelector('a'))) ?? 0,
@@ -1943,6 +2057,7 @@ Future<ThreadExtras> fetchThreadExtras(int tid, {int page = 1}) async {
   return ThreadExtras(
     prize: parseThreadPrize(doc),
     attachments: parseAttachments(doc),
+    replyBlocked: replyBlockedOf(doc),
   );
 }
 
@@ -2363,10 +2478,13 @@ Future<ListPage> fetchGuideMine({
 
     final forumLink = body.querySelector('td.by a[href*="forum-"]') ??
         body.querySelector('td.by a[href*="group-"]');
+    final flags = threadRowFlags(body);
 
     list.add(ThreadItem(
       tid: tid,
       title: txt(a),
+      readPerm: flags.readPerm,
+      closed: flags.closed,
       forumName: txt(forumLink),
       fid: int.tryParse(
           RegExp(r'(?:forum|group)-(\d+)')

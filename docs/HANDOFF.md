@@ -1,6 +1,6 @@
 # GameMale 客戶端 — 交接文件
 
-> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.27.8+74**。
+> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.28.0+75**。
 > 這份是「整體狀態 + 怎麼繼續」；技術踩坑細節在 [DEVELOPING.md](DEVELOPING.md)，
 > 使用者面向說明在 [../README.md](../README.md)，長期記憶在 `~/.claude/.../memory/`
 > 的 `project_gamemale_ios` / `project_gamemale_pwa` / `reference_gamemale_cf_gate`。
@@ -91,6 +91,15 @@ echo 'cd /opt/stacks/gamemale-pwa && docker compose build && docker compose up -
 - **UI 繁簡**：`sys()` 把論壇系統文字（版塊名、專輯統計）轉成使用者語言；帖子標題/內文/專輯名保留原文。
 - **帖子懸賞**（悬赏提问）：`.rewardTit` → 金額＋未解決/已解決橫幅。
 - **網頁版限流**：`/gm` 每 IP 120/分鐘，防被當免驗證跳板。
+- **回帖成敗判定重寫**（1.28.0）：桌面版提示頁開頭永遠有隱藏的 `#main_succeed`（空 `.alert_right`＋「如果您的浏览器没有自动跳转」），
+  舊的 `noticeMessage` 照文件順序抓到它、`_submitResult` 又拿整頁比對 `succeed` → **論壇擋下的回帖全被報成成功**。
+  現在 `noticeOf()` 先看 `#messagetext`；回帖／發帖用 `expectThread`，看不懂的提示＝失敗；回帖再看不出成敗就去
+  `goto=lastpost` 找自己的 uid＋內文片段確認（2026-06-11 起論壇有每日回帖上限，擋下的原句沒抓到過，所以不靠關鍵字）。
+- **回覆頁先問 `replyGate`**：要一次桌面版回覆表單 → 不能回就是論壇的提示（主題關閉等）；能回就讀 `postminchars`／`postmaxchars`
+  （GameMale 是 25／50000 **位元組**，中文一字 3）顯示字數、送出前先擋。
+- **閱讀權限不足的帖子**：論壇回提示頁、沒有樓層，`ThreadData.message` 帶出原話（以前是一片空白）。
+  **關閉的主題**：桌面版回帖框換成「您现在无权发帖」→ `replyBlocked`，回覆鈕變鎖頭、點了顯示原因。
+  **手機版列表沒有**「[阅读权限 N]」與鎖頭，只有桌面版列表（淘專輯、群組、我的主題）標得出來。
 
 ---
 

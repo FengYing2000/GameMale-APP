@@ -109,6 +109,12 @@ class ThreadItem {
   final String myReply;
   final int? myPid;
 
+  /// 標題後的「[阅读权限 105]」；0＝沒設。只有桌面版列表給得出來
+  final int readPerm;
+
+  /// 關閉的主題（列表是鎖頭圖示），不能回帖。只有桌面版列表給得出來
+  final bool closed;
+
   const ThreadItem({
     required this.tid,
     required this.title,
@@ -125,6 +131,8 @@ class ThreadItem {
     this.myPid,
     this.digest = '',
     this.favid,
+    this.readPerm = 0,
+    this.closed = false,
   });
 }
 
@@ -276,6 +284,12 @@ class ThreadData {
   final bool requiresLogin;
   final ThreadReward? reward;
 
+  /// 論壇不給看時的提示（「抱歉，本帖要求阅读权限高于 105 才能浏览」）
+  final String? message;
+
+  /// 回帖框被換成的那句話（「您现在无权发帖」）；空字串＝能回
+  final String replyBlocked;
+
   const ThreadData({
     required this.tid,
     this.fid,
@@ -287,6 +301,8 @@ class ThreadData {
     this.poll,
     this.requiresLogin = false,
     this.reward,
+    this.message,
+    this.replyBlocked = '',
   });
 }
 
@@ -457,7 +473,34 @@ class MeData {
 class SubmitResult {
   final bool ok;
   final String message;
-  const SubmitResult({required this.ok, required this.message});
+
+  /// 論壇的回應看不出成敗，[ok] 只是推測（回帖會再去帖子裡確認一次）
+  final bool unsure;
+
+  const SubmitResult({required this.ok, required this.message, this.unsure = false});
+}
+
+/// 開回覆頁時先問論壇一次：能不能回、字數限制多少。
+///
+/// 論壇的字數是**位元組**（PHP strlen，UTF-8 中文一字 3 位元組）：
+/// GameMale 目前是 25～50000，也就是回帖至少要約 9 個中文字。
+class ReplyGate {
+  const ReplyGate({
+    this.allowed = true,
+    this.message = '',
+    this.minBytes = 0,
+    this.maxBytes = 0,
+  });
+
+  /// 論壇肯給回覆表單。主題關閉、閱讀權限不足、達每日上限…都會是 false
+  final bool allowed;
+
+  /// 不能回時論壇給的原因（「抱歉，本主题已关闭，不能再回复」之類）
+  final String message;
+
+  /// 0 表示沒有限制（部分用戶組 disablepostctrl 不受限）
+  final int minBytes;
+  final int maxBytes;
 }
 
 class SecurityQuestion {
@@ -1213,9 +1256,16 @@ class AttachPay {
 
 /// 帖子頁桌面模板才有的東西：回帖獎勵與附件清單
 class ThreadExtras {
-  const ThreadExtras({this.prize, this.attachments = const []});
+  const ThreadExtras({
+    this.prize,
+    this.attachments = const [],
+    this.replyBlocked = '',
+  });
   final ThreadPrize? prize;
   final List<Attachment> attachments;
+
+  /// 桌面版回帖框的「您现在无权发帖」（主題關閉等）；空字串＝能回
+  final String replyBlocked;
 
   bool get isEmpty => prize == null && attachments.isEmpty;
 }

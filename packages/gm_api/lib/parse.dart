@@ -78,11 +78,57 @@ bool isGuestPage(dom.Document doc) {
       doc.querySelector('a[href*="mod=logging"]') != null;
 }
 
-String? noticeMessage(dom.Document doc) {
-  final el = doc.querySelector(
-      '.alert_error, .alert_info, .alert_right, .del_tips, #messagetext p');
-  final t = txt(el);
-  return t.isEmpty ? null : t;
+String? noticeMessage(dom.Document doc) => noticeOf(doc)?.text;
+
+/// 提示頁的訊息與類型：`right`＝成功、`error`、`info`。
+///
+/// 桌面版提示頁（showmessage）開頭永遠有一段隱藏的 `#main_succeed`：空的
+/// `.alert_right` 加一行「如果您的浏览器没有自动跳转，请点击此链接」。照文件
+/// 順序抓第一個 `.alert_*` 會抓到它，真正的訊息在後面的 `#messagetext`——
+/// 回帖被擋（達每日上限、主題關閉）時，App 就是這樣把失敗報成成功的。
+({String text, String kind})? noticeOf(dom.Document doc) {
+  final box = doc.getElementById('messagetext');
+  if (box != null) {
+    final t = txt(box.querySelector('p') ?? box);
+    if (t.isNotEmpty) return (text: t, kind: _alertKind(box));
+  }
+  for (final el in doc
+      .querySelectorAll('.alert_error, .alert_info, .alert_right, .del_tips')) {
+    if (_inHiddenSucceed(el)) continue;
+    final t = txt(el);
+    if (t.isEmpty) continue;
+    // 手機版是 <p class="del_tips"><span class="alert_error">…，類型在內層
+    return (
+      text: t,
+      kind: _alertKind(el.querySelector('[class*="alert_"]') ?? el),
+    );
+  }
+  return null;
+}
+
+/// 桌面版主題列表一列的附帶標記：標題後的 `- [阅读权限 <span>105</span>]`，
+/// 以及關閉主題的鎖頭圖示 `folder_lock.gif`。手機版列表兩者都不顯示。
+({int readPerm, bool closed}) threadRowFlags(dom.Element row) {
+  // 用原始文字，txt() 可能已經把「阅读」轉成繁體
+  final m = RegExp(r'阅读权限\s*(\d+)').firstMatch(row.querySelector('th')?.text ?? '');
+  return (
+    readPerm: int.tryParse(m?.group(1) ?? '') ?? 0,
+    closed: row.querySelector('img[src*="folder_lock"]') != null,
+  );
+}
+
+String _alertKind(dom.Element el) {
+  for (final k in const ['right', 'error', 'info']) {
+    if (el.classes.contains('alert_$k')) return k;
+  }
+  return 'info';
+}
+
+bool _inHiddenSucceed(dom.Element el) {
+  for (dom.Element? p = el; p != null; p = p.parent) {
+    if (p.id == 'main_succeed') return true;
+  }
+  return false;
 }
 
 const _strip = ['script', 'style', 'noscript', 'iframe', 'object', 'embed', 'form', 'link', 'meta'];

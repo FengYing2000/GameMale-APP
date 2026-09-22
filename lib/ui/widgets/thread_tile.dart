@@ -72,6 +72,37 @@ class ThreadTile extends StatelessWidget {
                               color: Theme.of(context).colorScheme.primary)),
                     ),
                   ),
+                // 關閉的主題：網頁版是鎖頭圖示，點進去也回不了帖
+                if (item.closed)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 5),
+                      child: Tooltip(
+                        message: tr('已關閉的主題，無法回帖'),
+                        child: Icon(LucideIcons.lock,
+                            size: 14, color: faint(context)),
+                      ),
+                    ),
+                  ),
+                if (item.readPerm > 0)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE08E0B).withValues(alpha: .16),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text('${tr('閱讀權限')} ${item.readPerm}',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFFF0B14A)
+                                  : const Color(0xFFA35F00))),
+                    ),
+                  ),
                 TextSpan(text: item.title),
               ]),
               style: const TextStyle(fontSize: 15, height: 1.42, fontWeight: FontWeight.w600),

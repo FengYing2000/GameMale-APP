@@ -34,9 +34,12 @@ GroupData parseGroup(dom.Document doc, String html, int fid, {int page = 1}) {
     if (tid == null) continue;
     final by = tr.querySelectorAll('td.by');
     final num = tr.querySelector('td.num');
+    final flags = threadRowFlags(tr);
     threads.add(ThreadItem(
       tid: tid,
       title: txt(a),
+      readPerm: flags.readPerm,
+      closed: flags.closed,
       author: by.isEmpty ? '' : txt(by.first.querySelector('cite')),
       date: by.isEmpty ? '' : txt(by.first.querySelector('em')),
       replies: int.tryParse(txt(num?.querySelector('a'))) ?? 0,
