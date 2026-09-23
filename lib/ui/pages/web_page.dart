@@ -35,10 +35,15 @@ class _WebPageState extends State<WebPage> {
   }
 
   Future<void> _boot() async {
-    // 網頁版沒有內嵌 WebView（本身就在瀏覽器裡），直接開新分頁。
-    // 反正 cookie 在瀏覽器上本來就有，開起來一樣是已登入狀態。
+    // 網頁版沒有內嵌 WebView（本身就在瀏覽器裡），新分頁開**論壇本站**。
+    //
+    // 不能開轉發網址：第一頁雖然帶著網頁版的登入，但論壇頁面有
+    // <base href="https://www.gamemale.com/">，裡面的連結全部直連本站，
+    // 瀏覽器在本站沒登入 → 一換頁就是訪客、跳 CF 驗證；圖片也因為來源是
+    // 852111.xyz 被防盜連擋掉。開本站的代價是瀏覽器那邊要另外登入一次。
     if (kIsWeb) {
-      await launchUrl(Uri.parse(widget.url), webOnlyWindowName: '_blank');
+      await launchUrl(Uri.parse(forumUrl(widget.url)),
+          webOnlyWindowName: '_blank');
       if (mounted) Navigator.of(context).maybePop();
       return;
     }

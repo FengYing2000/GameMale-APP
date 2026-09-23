@@ -117,4 +117,24 @@ void main() {
       expect(absoluteImage('https://i.imgs.ovh/x.jpg'), 'https://i.imgs.ovh/x.jpg');
     });
   });
+
+  group('交給瀏覽器整頁開的網址要換回論壇本站', () {
+    tearDown(() => kOrigin = kForumOrigin);
+
+    test('網頁版：轉發網址換回本站（否則換頁變訪客、圖片被防盜連擋）', () {
+      kOrigin = 'https://example.test/gm';
+      expect(forumUrl('https://example.test/gm/wodexunzhang-showxunzhang.html?action=my&mobile=no'),
+          'https://www.gamemale.com/wodexunzhang-showxunzhang.html?action=my&mobile=no');
+    });
+
+    test('本來就是本站或站外網址不動', () {
+      kOrigin = 'https://example.test/gm';
+      expect(forumUrl('https://www.gamemale.com/forum.php'), 'https://www.gamemale.com/forum.php');
+      expect(forumUrl('https://example.org/x'), 'https://example.org/x');
+    });
+
+    test('原生版原樣返回', () {
+      expect(forumUrl('https://www.gamemale.com/home.php'), 'https://www.gamemale.com/home.php');
+    });
+  });
 }

@@ -690,6 +690,17 @@ String _stripOrigin(String url) {
   return url;
 }
 
+/// 網頁版的轉發網址（`https://852111.xyz/gm/...`）換回論壇本站網址。
+///
+/// 要交給瀏覽器**整頁打開**的網址一定要換：論壇每頁都帶
+/// `<base href="https://www.gamemale.com/">`，經轉發開的頁面裡連結全部直連本站
+/// （瀏覽器在那邊沒登入 → 一換頁就變訪客、跳 CF 驗證），圖片又因為來源是
+/// 852111.xyz 被論壇的防盜連擋成 403。原生版兩個 origin 相同，原樣返回。
+String forumUrl(String url) {
+  if (kOrigin == kForumOrigin || !url.startsWith(kOrigin)) return url;
+  return '$kForumOrigin${url.substring(kOrigin.length)}';
+}
+
 /// 把頁面裡的相對網址轉成絕對網址
 String absolute(String? u) {
   if (u == null) return '';

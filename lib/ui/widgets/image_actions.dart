@@ -61,7 +61,7 @@ Future<void> showImageActions(BuildContext context, String url) async {
             title: Text(tr('用瀏覽器開啟')),
             onTap: () {
               Navigator.pop(sheet);
-              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              launchUrl(Uri.parse(forumUrl(url)), mode: LaunchMode.externalApplication);
             },
           ),
         ],

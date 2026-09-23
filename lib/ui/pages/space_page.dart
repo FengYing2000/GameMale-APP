@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:gm_api/models.dart';
 import 'package:gm_api/space.dart' as api;
+import 'package:gm_api/http.dart' show forumUrl;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
@@ -137,7 +138,7 @@ class _SpacePageState extends State<SpacePage>
 
   void _openExternal(String url) {
     if (url.isEmpty) return;
-    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    launchUrl(Uri.parse(forumUrl(url)), mode: LaunchMode.externalApplication);
   }
 
   @override

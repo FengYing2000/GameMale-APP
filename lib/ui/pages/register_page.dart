@@ -92,7 +92,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _openInBrowser() => launchUrl(
-        Uri.parse('$kOrigin/${api.registerPath}'),
+        Uri.parse(forumUrl('$kOrigin/${api.registerPath}')),
         mode: LaunchMode.externalApplication,
       );
 

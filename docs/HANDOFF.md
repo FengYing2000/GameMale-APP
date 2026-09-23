@@ -1,6 +1,6 @@
 # GameMale 客戶端 — 交接文件
 
-> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.28.1+76**。
+> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.28.2+77**。
 > 這份是「整體狀態 + 怎麼繼續」；技術踩坑細節在 [DEVELOPING.md](DEVELOPING.md)，
 > 使用者面向說明在 [../README.md](../README.md)，長期記憶在 `~/.claude/.../memory/`
 > 的 `project_gamemale_ios` / `project_gamemale_pwa` / `reference_gamemale_cf_gate`。
@@ -105,6 +105,10 @@ echo 'cd /opt/stacks/gamemale-pwa && docker compose build && docker compose up -
 - **網頁版量高度的補救以前從沒生效**（1.28.1）：Flutter 網頁引擎**只聽 `visualViewport` 的 resize**
   （iOS 上量 `documentElement.clientHeight`），`index.html` 卻對 `window` 發 resize。改對 visualViewport 發，
   並每秒比對 clientWidth/Height、變了就重量。症狀是主畫面 App 偶爾畫面比螢幕高、底部頁碼列與按鈕被切掉。
+- **網頁版不能把轉發網址（`852111.xyz/gm/...`）整頁交給瀏覽器開**（1.28.2）：論壇每頁帶
+  `<base href="https://www.gamemale.com/">`，頁內連結全直連本站（瀏覽器沒登入 → 換頁變訪客、跳 CF），
+  圖片來源是 852111.xyz 又被論壇**防盜連擋成 403**（實測：Referer 852111.xyz→403、本站或無→200）。
+  一律用 `forumUrl()` 換回本站；代價是瀏覽器要另外登入論壇一次（使用者選的做法，沒走整站轉發）。
 
 ---
 

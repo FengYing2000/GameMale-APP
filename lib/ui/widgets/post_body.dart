@@ -137,7 +137,7 @@ class PostBody extends StatelessWidget {
       context.push('/u/$uid');
     } else {
       // 站內但認不出是什麼頁（外掛、活動頁…），一樣走瀏覽器但不用問
-      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      launchUrl(Uri.parse(forumUrl(url)), mode: LaunchMode.externalApplication);
     }
     return true;
   }

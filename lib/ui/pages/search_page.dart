@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:gm_api/discuz.dart' as discuz;
 import 'package:gm_api/models.dart';
 import 'package:gm_api/parse.dart';
+import 'package:gm_api/http.dart' show forumUrl;
 import 'package:gm_api/search.dart' as api;
 import '../../i18n/ui.dart';
 import '../../theme.dart';
@@ -224,7 +225,7 @@ class _SearchPageState extends State<SearchPage> {
       }
     }
     if (hit.url.isNotEmpty) {
-      launchUrl(Uri.parse(hit.url), mode: LaunchMode.externalApplication);
+      launchUrl(Uri.parse(forumUrl(hit.url)), mode: LaunchMode.externalApplication);
     }
   }
 
