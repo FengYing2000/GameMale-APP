@@ -63,3 +63,6 @@ pwa/data/
 
 # Flutter 網頁版的產出：部署時才 build，不進版控（39MB）
 /build/
+
+# 發版腳本的部署金鑰（登記版本到 852111.xyz 控制台用），絕不進版控
+tool/.deploy_token

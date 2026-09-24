@@ -1,14 +1,12 @@
 name: 建置 iOS IPA
 
 on:
+  # 只在發版（推 v* 標籤）時建，平常推 main 不建。
+  # repo 改私有後 macOS 的分鐘數算 10 倍，每次推都建一次額度撐不了幾天
+  # （2026-09 就是這樣用光、才改成公開的）。臨時要測試版就手動觸發：
+  #   gh workflow run ios.yml
   push:
-    branches: [main]
-    # 只改 pwa/ 或文件不用重建 App。macOS 的分鐘數算 10 倍，
-    # 白跑一次很貴。
-    paths-ignore:
-      - 'pwa/**'
-      - '**.md'
-      - '.gitignore'
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:

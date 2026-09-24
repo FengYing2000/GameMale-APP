@@ -1,6 +1,6 @@
 # GameMale 客戶端 — 交接文件
 
-> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.28.2+77**。
+> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.29.0+78**。
 > 這份是「整體狀態 + 怎麼繼續」；技術踩坑細節在 [DEVELOPING.md](DEVELOPING.md)，
 > 使用者面向說明在 [../README.md](../README.md)，長期記憶在 `~/.claude/.../memory/`
 > 的 `project_gamemale_ios` / `project_gamemale_pwa` / `reference_gamemale_cf_gate`。
@@ -111,6 +111,26 @@ echo 'cd /opt/stacks/gamemale-pwa && docker compose build && docker compose up -
   一律用 `forumUrl()` 換回本站；代價是瀏覽器要另外登入論壇一次（使用者選的做法，沒走整站轉發）。
 
 ---
+
+## App 控制台：測試碼／維護／更新（1.29.0 起）
+
+後端在網頁版那台（`pwa/server/lib/control/`），**後台網址 `https://852111.xyz/admin`**。
+- 資料：VPS 的 `/opt/stacks/gamemale-pwa/data/control.json`（＋`secret.key` 簽 token 用）。
+  密碼與部署金鑰在同目錄 `.env`（`GM_ADMIN_PASSWORD`／`GM_DEPLOY_TOKEN`），**都不進版控**。
+- 存的是測試碼與 App 自己產生的隨機裝置 ID，**不是論壇帳號**。
+- **需要測試碼**開關：原生版只能在啟動時擋（`lib/store/gate.dart`，快取＋7 天離線寬限）；
+  網頁版在伺服器端擋 `/gm`、`/gmimg`（403 beta／503 maintenance），`Api.onGate` 讓 App 立即蓋上畫面。
+- 自己的 cookie 一律 `gmx_` 開頭，`ForumProxy` 轉發時濾掉。後台 cookie Path=/api/admin、SameSite=Strict，
+  改資料要帶 `X-GM-Admin: 1`（防跨站偽造）。
+- 「維護時可用」的碼（bypass）維護期間照樣能用，給自己測試。
+
+### 發版流程
+1. `pubspec.yaml` 改版本、`CHANGELOG.md` 寫這版內容（給使用者看；App 內更新日誌、下載頁、SideStore 都讀它）→ commit → push
+2. `git tag vX.Y.Z && git push origin vX.Y.Z` → iOS（**只在標籤／手動觸發時建**，repo 私有後 macOS 算 10 倍）＋Android 建置
+3. `python tool/publish_release.py` → 等建置 → 安裝檔上傳到**公開、只放安裝檔**的 `FengYing2000/GameMale-Releases` →
+   登記到控制台（部署金鑰在 `tool/.deploy_token`，gitignore）
+- SideStore 來源：`https://852111.xyz/api/app/source.json`（從控制台登記的版本動態產生）。
+- 臨時要一份 IPA 給自己：`gh workflow run ios.yml`。
 
 ## CF 驗證的完整演進 ⚠️（最容易踩雷，務必讀）
 

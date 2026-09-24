@@ -2,16 +2,18 @@ import '../../i18n/ui.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:gm_api/http.dart';
 import '../../services/cache_manager.dart';
+import '../../store/gate.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import '../widgets/toast.dart';
+import 'gate_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -24,16 +26,6 @@ class SettingsPage extends StatefulWidget {
 final _forumHost = Uri.parse(kForumOrigin).host;
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _version = '—';
-
-  @override
-  void initState() {
-    super.initState();
-    PackageInfo.fromPlatform().then((info) {
-      if (mounted) setState(() => _version = '${info.version} (${info.buildNumber})');
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionStore>();
@@ -170,31 +162,19 @@ class _SettingsPageState extends State<SettingsPage> {
             clipBehavior: Clip.antiAlias,
             child: _CacheTile(),
           ),
+          _section(context, tr('版本與更新')),
+          const Card(clipBehavior: Clip.antiAlias, child: _VersionCard()),
           _section(context, tr('關於')),
           Card(
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                _row(context, tr('版本'), _version),
-                const Divider(indent: 14, endIndent: 14),
                 ListTile(
                   title: Text(tr('用瀏覽器開啟論壇')),
                   trailing: Icon(LucideIcons.externalLink, size: 18, color: faint(context)),
+                  // 開論壇本站：網頁版的轉發網址整頁打開會變訪客、圖片被防盜連擋
                   onTap: () => launchUrl(
-                    Uri.parse('$kOrigin/forum.php'),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                ),
-                const Divider(indent: 14, endIndent: 14),
-                ListTile(
-                  title: Text(tr('原始碼')),
-                  subtitle: Text(
-                    'github.com/FengYing2000/GameMale-APP',
-                    style: TextStyle(fontSize: 12, color: faint(context)),
-                  ),
-                  trailing: Icon(LucideIcons.externalLink, size: 18, color: faint(context)),
-                  onTap: () => launchUrl(
-                    Uri.parse('https://github.com/FengYing2000/GameMale-APP'),
+                    Uri.parse('$kForumOrigin/forum.php'),
                     mode: LaunchMode.externalApplication,
                   ),
                 ),
@@ -405,5 +385,90 @@ class _CacheTileState extends State<_CacheTile> {
               width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
           : TextButton(onPressed: _clear, child: Text(tr('清除'))),
     );
+  }
+}
+
+/// 版本、檢查更新、更新日誌、測試資格
+class _VersionCard extends StatelessWidget {
+  const _VersionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final gate = context.watch<GateStore>();
+    final meta = TextStyle(fontSize: 12.5, color: faint(context));
+    final exp = gate.codeExpiresAt;
+    final u = gate.update;
+
+    return Column(
+      children: [
+        ListTile(
+          title: Text(tr('目前版本')),
+          trailing: Text('${gate.version} (${gate.build})', style: TextStyle(color: subtle(context))),
+        ),
+        const Divider(indent: 14, endIndent: 14),
+        ListTile(
+          title: Text(tr('檢查更新')),
+          subtitle: u == null ? null : Text(tr('有新版本 ${u.version}'), style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.primary)),
+          trailing: Icon(LucideIcons.refreshCw, size: 18, color: faint(context)),
+          onTap: () => checkUpdateNow(context),
+        ),
+        const Divider(indent: 14, endIndent: 14),
+        ListTile(
+          title: Text(tr('更新日誌')),
+          trailing: Icon(LucideIcons.chevronRight, size: 18, color: faint(context)),
+          onTap: () => context.push('/changelog'),
+        ),
+        if (gate.platform == 'ios') ...[
+          const Divider(indent: 14, endIndent: 14),
+          ListTile(
+            title: Text(tr('加入 SideStore 更新來源')),
+            subtitle: Text(tr('加入後 SideStore 會自己顯示新版、一鍵更新'), style: meta),
+            trailing: Icon(LucideIcons.externalLink, size: 18, color: faint(context)),
+            onTap: () => openSideStoreSource(context, gate),
+          ),
+        ],
+        if (gate.maintenanceBypassed) ...[
+          const Divider(indent: 14, endIndent: 14),
+          ListTile(
+            leading: Icon(LucideIcons.wrench, size: 18, color: Theme.of(context).colorScheme.error),
+            title: Text(tr('維護模式中')),
+            subtitle: Text(tr('你的測試碼可以略過維護，其他人目前看到的是維護畫面'), style: meta),
+          ),
+        ],
+        if (gate.hasCode) ...[
+          const Divider(indent: 14, endIndent: 14),
+          ListTile(
+            title: Text(tr('測試碼')),
+            subtitle: Text(
+              exp == null
+                  ? gate.codeHint
+                  : '${gate.codeHint}・${tr('到期')} ${exp.year}/${exp.month}/${exp.day}',
+              style: meta,
+            ),
+            trailing: TextButton(
+              onPressed: () => _unbind(context, gate),
+              child: Text(tr('解除此裝置')),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _unbind(BuildContext context, GateStore gate) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('解除此裝置？')),
+        content: Text(tr(gate.betaRequired
+            ? '這台裝置會釋出測試碼的名額，之後要重新輸入測試碼才能使用。'
+            : '這台裝置會釋出測試碼的名額。目前已正式開放，解除後仍可正常使用。')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('取消'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('解除'))),
+        ],
+      ),
+    );
+    if (ok == true) await gate.unbind();
   }
 }

@@ -3,6 +3,8 @@ name: 建置 Android APK
 on:
   push:
     branches: [main]
+    # 發版標籤也建一份，發版腳本從同一個 commit 的兩個建置拿安裝檔
+    tags: ['v*']
     # 只改 pwa/ 或文件不用重建 App。macOS 的分鐘數算 10 倍，
     # 白跑一次很貴。
     paths-ignore:

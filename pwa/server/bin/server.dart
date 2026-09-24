@@ -2,6 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:gm_server/asset_guard.dart';
+import 'package:gm_server/control/api.dart';
+import 'package:gm_server/control/service.dart';
+import 'package:gm_server/control/store.dart';
+import 'package:gm_server/control/tokens.dart';
 import 'package:gm_server/forum_proxy.dart';
 import 'package:gm_server/rate_limit.dart';
 import 'package:gm_api/http.dart';
@@ -22,11 +26,29 @@ import 'package:shelf_static/shelf_static.dart';
 ///   3. **`/gmimg` 圖片代理**：帖子裡的圖常放在沒送 CORS 的第三方圖床，
 ///      而 App 是把圖讀進 canvas 的，跨網域讀像素會被擋掉。
 ///
-/// 這裡**沒有**推播通知、沒有輪詢、沒有帳號儲存——那套整個移除了。
+///   4. **App 控制台**（`/api/app/*`、`/admin`）：測試碼、維護模式、版本檢查。
+///      存的是測試碼與 App 自己產生的隨機裝置 ID，**不是論壇帳號**——
+///      論壇的登入資料依舊一個都不留。
+///
+/// 這裡**沒有**推播通知、沒有輪詢、沒有論壇帳號儲存——那套整個移除了。
 Future<void> main(List<String> args) async {
   final env = Platform.environment;
   final port = int.tryParse(env['PORT'] ?? '') ?? 8080;
   final appRoot = env['APP_ROOT'] ?? '../../build/web';
+  final dataDir = env['DATA_DIR'] ?? 'data';
+
+  // ── App 控制台 ─────────────────────────────────────────────
+  final store = ControlStore(File('$dataDir/control.json'));
+  await store.load();
+  final control = ControlApi(
+    ControlService(
+      store,
+      TokenSigner(await _secret(env['GM_SECRET'], File('$dataDir/secret.key'))),
+      webBuild: _webBuild(appRoot),
+    ),
+    adminPassword: env['GM_ADMIN_PASSWORD'] ?? '',
+    deployToken: env['GM_DEPLOY_TOKEN'] ?? '',
+  );
 
   // 抓圖用的 client（公開資源，不帶任何登入狀態）
   final assetClient = http.Client();
@@ -80,7 +102,15 @@ Future<void> main(List<String> args) async {
   // 防的是「把本站當免驗證跳板灌爆論壇」——見 rate_limit.dart。
   final limiter = RateLimiter();
   Handler withProxy(Handler inner) => (Request r) {
-        if (r.url.path == 'gm' || r.url.path.startsWith('gm/')) {
+        final path = r.url.path;
+        final forum = path == 'gm' || path.startsWith('gm/');
+        // 網頁版在伺服器端擋：維護中、或需要測試碼卻沒有有效的碼，論壇轉發與
+        // 圖片代理都不給用。原生 App 直連論壇，只能在 App 啟動時擋。
+        if (forum || path == 'gmimg') {
+          final blocked = control.gate(r);
+          if (blocked != null) return blocked;
+        }
+        if (forum) {
           if (!limiter.allow(clientIp(r))) {
             return Response(429,
                 body: '請求過於頻繁，請稍後再試',
@@ -99,7 +129,8 @@ Future<void> main(List<String> args) async {
       defaultDocument: 'index.html',
       useHeaderBytesForContentType: true));
 
-  final handler = withProxy(Cascade().add(router.call).add(site).handler);
+  final handler = withProxy(
+      Cascade().add(router.call).add(control.router.call).add(site).handler);
 
   final server = await shelf_io.serve(
     const Pipeline().addMiddleware(logRequests()).addHandler(handler),
@@ -112,6 +143,38 @@ Future<void> main(List<String> args) async {
   stdout.writeln(Directory(appRoot).existsSync()
       ? 'Flutter 網頁版：已掛載（$appRoot）'
       : '⚠ 找不到 $appRoot —— 先跑 flutter build web');
+}
+
+/// 簽 token 用的金鑰：優先用環境變數，沒設就在資料夾裡產一把存著——
+/// 每次重啟都換新的話，大家的測試碼登入與後台登入會全部失效。
+Future<List<int>> _secret(String? fromEnv, File file) async {
+  if (fromEnv != null && fromEnv.length >= 32) return utf8.encode(fromEnv);
+  if (await file.exists()) return utf8.encode((await file.readAsString()).trim());
+  final key = randomHex(32);
+  await file.parent.create(recursive: true);
+  await file.writeAsString(key);
+  return utf8.encode(key);
+}
+
+/// 目前部署的網頁版 build 號（flutter build web 產出的 version.json）。
+/// 檔案沒變就用快取，每個狀態請求不必都讀一次檔
+int Function() _webBuild(String appRoot) {
+  final file = File('$appRoot/version.json');
+  DateTime? stamp;
+  var build = 0;
+  return () {
+    try {
+      final m = file.lastModifiedSync();
+      if (m != stamp) {
+        stamp = m;
+        final j = json.decode(file.readAsStringSync()) as Map;
+        build = int.tryParse('${j['build_number']}') ?? 0;
+      }
+    } catch (_) {
+      // 本機開發沒有 build/web 也沒關係
+    }
+    return build;
+  };
 }
 
 /// 靜態檔的快取策略。

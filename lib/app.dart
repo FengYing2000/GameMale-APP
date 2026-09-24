@@ -14,6 +14,7 @@ import 'package:gm_api/http.dart';
 
 import 'store/accounts.dart';
 import 'store/favorites.dart';
+import 'store/gate.dart';
 import 'store/replied.dart';
 import 'store/session.dart';
 import 'store/settings.dart';
@@ -22,6 +23,8 @@ import 'services/transport_state.dart';
 import 'services/browser_fetch_stub.dart'
     if (dart.library.io) 'services/browser_fetch.dart';
 import 'ui/pages/cf_challenge_page.dart';
+import 'ui/pages/changelog_page.dart';
+import 'ui/pages/gate_page.dart';
 import 'ui/pages/doing_page.dart';
 import 'ui/pages/edit_post_page.dart';
 import 'ui/pages/forum_page.dart';
@@ -67,6 +70,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
   late final RepliedStore _replied;
   late final FavoriteStore _favorites;
   late final AccountsStore _accounts;
+  late final GateStore _gate;
   late final GoRouter _router;
 
   @override
@@ -77,6 +81,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     _replied = RepliedStore();
     _favorites = FavoriteStore();
     _accounts = AccountsStore(_session);
+    _gate = GateStore();
     _router = _buildRouter(_session, _settings);
     WidgetsBinding.instance.addObserver(this);
     _boot();
@@ -90,6 +95,8 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
       // 過期。不重新確認的話每個請求都失敗，而且因為那不是「新的挑戰」，
       // 驗證頁也不會跳出來——實機症狀是只能重開 App。
       if (!kIsWeb) BrowserFetch.instance.onResume();
+      // 維護、停用測試碼要能在使用中生效（10 分鐘內只問一次）
+      _gate.check();
       _refreshBadges();
     }
   }
@@ -184,6 +191,11 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     await _settings.load();
     _applyLang();
     _settings.addListener(_applyLang);
+    // 測試碼／維護／強制更新：確認能用之前不打論壇（網頁版在這之前一律 403）。
+    // 上次確認能用的話 init 會先放行、背景再問，不會拖慢啟動
+    Api.onGate = (_) => _gate.onBlocked();
+    await _gate.init();
+    await _gate.waitUntilOpen();
     _settings.addListener(_applyReplied);
     _session.addListener(_applyReplied);
     _applyReplied();
@@ -228,6 +240,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
     _session.dispose();
     _replied.dispose();
     _favorites.dispose();
+    _gate.dispose();
     _settings.dispose();
     super.dispose();
   }
@@ -241,6 +254,7 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
         ChangeNotifierProvider.value(value: _replied),
         ChangeNotifierProvider.value(value: _favorites),
         ChangeNotifierProvider.value(value: _accounts),
+        ChangeNotifierProvider.value(value: _gate),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp.router(
@@ -254,7 +268,10 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
           // 它**必須真的在畫面上**（1×1）——iOS 的 WKWebView 不在 widget
           // 樹裡時 JavaScript 會被節流甚至完全不跑。
           builder: (context, child) => Stack(
-            children: [?child, if (!kIsWeb) BrowserFetch.instance.host()],
+            children: [
+              GateHost(navigatorKey: rootNavigatorKey, child: child),
+              if (!kIsWeb) BrowserFetch.instance.host(),
+            ],
           ),
         ),
       ),
@@ -319,6 +336,7 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
         builder: (c, s) => ForumPage(fid: _int(s, 'fid')),
       ),
       GoRoute(path: '/settings/tools', builder: (c, s) => const ToolsPage()),
+      GoRoute(path: '/changelog', builder: (c, s) => const ChangelogPage()),
       GoRoute(path: '/blogs', builder: (c, s) => const BlogListPageView()),
       GoRoute(
         path: '/collections',

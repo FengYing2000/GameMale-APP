@@ -180,7 +180,31 @@ class Api {
     ));
 
     _dio.interceptors.add(CookieManager(_jar));
+    _dio.interceptors.add(InterceptorsWrapper(
+      onResponse: (res, h) {
+        _noticeGate(res);
+        h.next(res);
+      },
+      onError: (e, h) {
+        _noticeGate(e.response);
+        h.next(e);
+      },
+    ));
     _ready = true;
+  }
+
+  /// 網頁版的轉發被自家伺服器擋下時（維護中、測試碼失效）呼叫，
+  /// 參數是 `maintenance` 或 `beta`。App 收到就重新問一次狀態、蓋上對應畫面，
+  /// 不然使用者只會看到一堆「伺服器回應 403」。原生版直連論壇，不會觸發。
+  static void Function(String kind)? onGate;
+
+  static void _noticeGate(Response<dynamic>? res) {
+    final code = res?.statusCode;
+    if (code != 403 && code != 503) return;
+    final body = res!.data;
+    if (body is! String || !body.contains('"gate"')) return;
+    final kind = RegExp(r'"gate"\s*:\s*"(\w+)"').firstMatch(body)?.group(1);
+    if (kind != null) onGate?.call(kind);
   }
 
   /// 這條連線目前持有的 cookie。

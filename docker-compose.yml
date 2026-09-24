@@ -7,8 +7,12 @@
 #
 # 跟站上其他服務一致：不綁主機埠，加入共用的 web 網路，由 Caddy 用容器名代理。
 #
-# **沒有任何機密要設**：伺服器不保存帳號、不保存 cookie、不發通知。
-# 登入狀態完全由瀏覽器自己保管（同源之後 cookie 就歸它管）。
+# 論壇帳號依舊**一個都不存**：登入狀態完全由瀏覽器自己保管（同源之後 cookie 就歸它管）。
+#
+# App 控制台（測試碼、維護模式、版本）的資料放 ./data（control.json＋簽 token 的金鑰），
+# 後台密碼與發版用的部署金鑰放 .env——這兩樣都只在 VPS 上，不進版控：
+#   GM_ADMIN_PASSWORD=…   /admin 後台登入密碼（沒設＝後台停用）
+#   GM_DEPLOY_TOKEN=…     tool/publish_release.py 登記版本用
 services:
   gm-push:
     build:
@@ -16,6 +20,11 @@ services:
       dockerfile: pwa/Dockerfile
     container_name: gm-push
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/data
     networks:
       - web
 

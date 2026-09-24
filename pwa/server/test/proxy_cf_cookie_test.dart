@@ -43,6 +43,13 @@ void main() {
       expect(sent, contains('TVj0_2132_auth=abc'));
     });
 
+    test('測試碼與後台的 gmx_ cookie 不會送到論壇', () async {
+      final sent = await forwardedCookie(
+          'gmx_beta=tok; TVj0_2132_auth=abc; gmx_admin=adm');
+      expect(sent, isNot(contains('gmx_')));
+      expect(sent, contains('TVj0_2132_auth=abc'));
+    });
+
     test('沒帶 cookie 就不硬補（不再補 cloudflare_check）', () async {
       final sent = await forwardedCookie(null);
       expect(sent, anyOf(isNull, isEmpty));

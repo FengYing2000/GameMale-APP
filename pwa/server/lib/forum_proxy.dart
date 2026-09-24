@@ -45,6 +45,10 @@ class ForumProxy {
     'content-security-policy', 'x-frame-options',
   };
 
+  /// 本站自己的 cookie：`gmx_` 開頭（測試碼、後台），以及舊版的 gm_session
+  static bool _ours(String cookie) =>
+      cookie.startsWith('gmx_') || cookie.startsWith('gm_session=');
+
   Future<Response> handle(Request request) async {
     final rest = request.url.path;
     // ⚠️ 一定要用**原始的 query 字串**，不能用 queryParameters 重建。
@@ -69,7 +73,7 @@ class ForumProxy {
     // （否則轉發瀏覽器的 Safari UA，論壇當訪客擋在 Turnstile）
     outgoing.headers['user-agent'] = Api.userAgent;
 
-    // 只轉論壇的 cookie，我們自己的 session token 不要送出去。
+    // 只轉論壇的 cookie，我們自己的（測試碼、後台登入）不要送出去。
     //
     // 曾經在這裡補一顆 TVj0_2132_cloudflare_check=1 繞 Turnstile，但論壇
     // 2026-09-09 改了插件機制，那顆固定 cookie 不再放行（改成只認真正已登入
@@ -80,7 +84,7 @@ class ForumProxy {
       final forwarded = cookie
           .split(';')
           .map((c) => c.trim())
-          .where((c) => c.isNotEmpty && !c.startsWith('gm_session='))
+          .where((c) => c.isNotEmpty && !_ours(c))
           .join('; ');
       if (forwarded.isNotEmpty) outgoing.headers['cookie'] = forwarded;
     }

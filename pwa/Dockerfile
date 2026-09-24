@@ -29,7 +29,9 @@ COPY --from=build /src/gm_server /usr/local/bin/gm_server
 # Flutter 網頁版（先在本機 flutter build web 產好再一起送上來）。
 # 不在映像裡編：那要整包 Flutter SDK，映像會肥好幾 GB。
 COPY build/web/ /srv/app/
+# DATA_DIR 掛 volume（docker-compose.yml 的 ./data）：測試碼、裝置、版本都在這
 ENV APP_ROOT=/srv/app \
+    DATA_DIR=/data \
     TZ=Asia/Taipei \
     PORT=8080
 EXPOSE 8080

@@ -34,6 +34,9 @@ import 'package:gamemale/ui/pages/register_page.dart';
 import 'package:gamemale/ui/pages/reply_page.dart';
 import 'package:gamemale/ui/pages/search_page.dart';
 import 'package:gamemale/ui/pages/settings_page.dart';
+import 'package:gamemale/ui/pages/changelog_page.dart';
+import 'package:gamemale/ui/pages/gate_page.dart';
+import 'package:gamemale/store/gate.dart';
 import 'package:gamemale/ui/pages/space_page.dart';
 import 'package:gamemale/ui/pages/sign_page.dart';
 import 'package:gamemale/ui/pages/thread_page.dart';
@@ -49,6 +52,7 @@ Widget _host(Widget page) => MultiProvider(
         ChangeNotifierProvider(create: (_) => FavoriteStore()),
         ChangeNotifierProvider(
             create: (ctx) => AccountsStore(ctx.read<SessionStore>())),
+        ChangeNotifierProvider(create: (_) => GateStore()),
       ],
       child: MaterialApp(home: page),
     );
@@ -104,6 +108,7 @@ void main() {
     '淘專輯內頁': const CollectionViewPage(ctid: 452),
     '簽到': const SignPage(),
     '設定': const SettingsPage(),
+    '更新日誌': const ChangelogPage(),
     '編輯帖子': const EditPostPage(fid: 150, tid: 1, pid: 1),
     '登入': const LoginPage(),
     '註冊': const RegisterPage(),
@@ -167,4 +172,72 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+
+  group('測試碼／維護／更新的擋下畫面', () {
+    Future<void> pumpGate(WidgetTester tester, GateStore gate) async {
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: gate,
+        child: MaterialApp(home: GateScreen(gate: gate)),
+      ));
+      expect(tester.takeException(), isNull);
+    }
+
+    testWidgets('需要測試碼：有輸入框與啟用鈕', (tester) async {
+      final gate = GateStore()
+        ..stage = GateStage.needCode
+        ..deviceId = 'abcdef0123456789';
+      await pumpGate(tester, gate);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('啟用'), findsOneWidget);
+      expect(find.textContaining('abcdef01'), findsOneWidget, reason: '顯示裝置識別碼方便對照後台');
+    });
+
+    testWidgets('維護中：顯示後台寫的訊息', (tester) async {
+      final gate = GateStore()
+        ..stage = GateStage.maintenance
+        ..maintenanceMessage = '伺服器升級中，預計 30 分鐘';
+      await pumpGate(tester, gate);
+      expect(find.text('伺服器升級中，預計 30 分鐘'), findsOneWidget);
+      expect(find.text('重試'), findsOneWidget);
+    });
+
+    testWidgets('強制更新：有更新鈕與更新內容', (tester) async {
+      final gate = GateStore()
+        ..stage = GateStage.updateRequired
+        ..version = '1.28.2'
+        ..update = const UpdateInfo(version: '1.29.0', build: 78, notes: '新增測試碼', url: 'https://x/a.apk');
+      await pumpGate(tester, gate);
+      expect(find.text('更新'), findsOneWidget);
+      expect(find.text('新增測試碼'), findsOneWidget);
+    });
+
+    testWidgets('還沒確認能用之前不建立底下的頁面', (tester) async {
+      final gate = GateStore()..stage = GateStage.needCode;
+      final key = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: gate,
+        child: MaterialApp(
+          builder: (c, child) => GateHost(navigatorKey: key, child: child),
+          home: const Text('論壇首頁'),
+        ),
+      ));
+      expect(find.text('論壇首頁'), findsNothing);
+      expect(find.text('輸入測試碼'), findsOneWidget);
+
+      gate
+        ..stage = GateStage.open
+        ..notifyListeners();
+      await tester.pump();
+      expect(find.text('論壇首頁'), findsOneWidget);
+      expect(find.text('輸入測試碼'), findsNothing);
+    });
+
+    testWidgets('設定頁的「版本與更新」卡片建得起來', (tester) async {
+      tester.view.physicalSize = const Size(1170, 9000); // 390 × 3000 邏輯像素（iPhone 寬）
+      addTearDown(tester.view.resetPhysicalSize);
+      await _smoke(tester, const SettingsPage());
+      expect(find.text('檢查更新'), findsOneWidget);
+      expect(find.text('更新日誌'), findsOneWidget);
+    });
+  });
 }
