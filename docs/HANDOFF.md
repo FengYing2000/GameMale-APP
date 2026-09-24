@@ -66,11 +66,10 @@ cd pwa/server    && "C:/src/flutter/bin/dart.bat" test     # ~38 項
 ### 部署網頁版（VPS，手動，**沒有 CI**）
 VPS：`160.236.111.8`（root 密碼登入，密碼走 `VPS_PASS` 環境變數，**絕不寫進檔案**）。
 站點在 `/opt/stacks/gamemale-pwa`（**不是 git repo**，SFTP 上傳），Dockge + Caddy + docker compose。
-scratchpad 有 `vps.py`（SSH exec，stdin 餵命令）、`sftp_sync.py`（同步 gm_api/lib + pwa/server + bin）。
+部署腳本 `tool/deploy_pwa.py`（paramiko；VPS 密碼只從環境變數讀）：
 ```bash
-export VPS_PASS='...' PYTHONIOENCODING=utf-8
-python .../sftp_sync.py                      # 同步檔案
-echo 'cd /opt/stacks/gamemale-pwa && docker compose build && docker compose up -d' | python .../vps.py
+"C:/src/flutter/bin/flutter.bat" build web --wasm --release --pwa-strategy=none
+VPS_PASS='...' PYTHONIOENCODING=utf-8 python tool/deploy_pwa.py
 ```
 - **VPS 沒有 flutter/dart**；前端沒改就不用重傳 `build/web`。
 - VPS 用 `dart:stable`（比本機新），const 求值更嚴——本機能編不代表 VPS 能編，以 `docker compose build`（內含 `dart analyze && dart test`）為準。
