@@ -16,3 +16,7 @@ lib/ui/
 pwa/data/
 pwa/.env
 *.iml
+
+# 控制台的資料與機密：只給執行中的容器（volume／env_file），不送進建置
+data/
+.env
