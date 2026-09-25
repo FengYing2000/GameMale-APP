@@ -110,7 +110,7 @@ padding:9px 16px;border-radius:10px;font-size:14px;z-index:9;pointer-events:none
         <div id="created"></div>
       </div>
       <div class="row" style="margin-bottom:10px">
-        <input id="cFilter" class="grow" placeholder="搜尋碼或備註">
+        <input id="cFilter" class="grow" placeholder="搜尋碼、備註、論壇暱稱或 UID">
       </div>
       <div id="codeList"></div>
     </section>
@@ -236,18 +236,23 @@ function invite(c) {
 
 function renderCodes() {
   const q = $('cFilter').value.trim().toUpperCase();
+  const hit = (c) => c.code.includes(q) || (c.note || '').toUpperCase().includes(q) ||
+    c.devices.some((d) => (d.forumName || '').toUpperCase().includes(q) || String(d.forumUid || '') === q);
   const list = state.codes
-    .filter((c) => !q || c.code.includes(q) || (c.note || '').toUpperCase().includes(q))
+    .filter((c) => !q || hit(c))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   $('codeList').replaceChildren(...(list.length ? list.map(codeCard) : [h('p', { class: 'sub' }, '還沒有測試碼。')]));
 }
 
 function codeCard(c) {
   const max = c.maxDevices ? c.maxDevices : '不限';
+  // 同一組碼綁的裝置登入了不同論壇帳號＝可能轉借給別人了
+  const accounts = new Set(c.devices.map((d) => d.forumUid).filter(Boolean));
   return h('div', { class: 'card' },
     h('div', { class: 'row' },
       h('span', { class: 'code grow' }, c.code),
-      codeStatus(c), c.bypass ? h('span', { class: 'badge warn' }, '維護時可用') : null),
+      codeStatus(c), c.bypass ? h('span', { class: 'badge warn' }, '維護時可用') : null,
+      accounts.size > 1 ? h('span', { class: 'badge err', title: '這組碼的裝置登入了 ' + accounts.size + ' 個不同的論壇帳號' }, accounts.size + ' 個論壇帳號') : null),
     h('div', { class: 'row sub' },
       h('span', { class: 'grow' }, c.note || '（沒有備註）'),
       h('span', {}, '裝置 ' + c.devices.length + ' / ' + max),
@@ -258,12 +263,22 @@ function codeCard(c) {
       h('button', { onclick: () => editCode(c) }, '編輯'),
       h('button', { onclick: () => patchCode(c, { enabled: !c.enabled }) }, c.enabled ? '停用' : '啟用'),
       h('button', { class: 'danger', onclick: () => delCode(c) }, '刪除')),
-    ...c.devices.map((d) => h('div', { class: 'dev' },
-      h('div', { class: 'row' },
-        h('span', { class: 'grow' }, [platformName(d.platform), d.model, d.appVersion && ('v' + d.appVersion)].filter(Boolean).join(' · ')),
-        h('span', { class: 'faint' }, '最後使用 ' + ago(d.lastSeen)),
-        h('button', { class: 'danger', onclick: () => unbind(c, d) }, '解除')),
-      h('div', { class: 'faint' }, '綁定於 ' + fmt(d.firstSeen) + ' · ' + d.id.slice(0, 8)))));
+    ...c.devices.map(deviceRow.bind(null, c)));
+}
+
+function deviceRow(c, d) {
+  const forum = d.forumUid
+    ? h('a', { href: 'https://www.gamemale.com/space-uid-' + encodeURIComponent(d.forumUid) + '.html',
+        target: '_blank', rel: 'noopener noreferrer', style: 'color:var(--brand)' },
+        (d.forumName || '（沒有暱稱）') + '（UID ' + d.forumUid + '）')
+    : h('span', { class: 'faint' }, '還沒登入過論壇');
+  return h('div', { class: 'dev' },
+    h('div', { class: 'row' },
+      h('b', { class: 'grow' }, [d.model || platformName(d.platform), d.os, d.appVersion && ('v' + d.appVersion)].filter(Boolean).join(' · ')),
+      h('span', { class: 'faint' }, '最後使用 ' + ago(d.lastSeen)),
+      h('button', { class: 'danger', onclick: () => unbind(c, d) }, '解除')),
+    h('div', { class: 'row' }, h('span', { class: 'sub' }, '論壇：'), forum),
+    h('div', { class: 'faint' }, [platformName(d.platform), d.ip && ('IP ' + d.ip), '綁定於 ' + fmt(d.firstSeen), d.id.slice(0, 8)].filter(Boolean).join(' · ')));
 }
 const platformName = (p) => ({ ios: 'iOS', android: 'Android', web: '網頁版' }[p] || p || '未知');
 

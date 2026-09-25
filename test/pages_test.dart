@@ -37,6 +37,7 @@ import 'package:gamemale/ui/pages/settings_page.dart';
 import 'package:gamemale/ui/pages/changelog_page.dart';
 import 'package:gamemale/ui/pages/gate_page.dart';
 import 'package:gamemale/store/gate.dart';
+import 'package:gamemale/ui/widgets/launch_splash.dart';
 import 'package:gamemale/ui/pages/space_page.dart';
 import 'package:gamemale/ui/pages/sign_page.dart';
 import 'package:gamemale/ui/pages/thread_page.dart';
@@ -217,7 +218,7 @@ void main() {
       await tester.pumpWidget(ChangeNotifierProvider.value(
         value: gate,
         child: MaterialApp(
-          builder: (c, child) => GateHost(navigatorKey: key, child: child),
+          builder: (c, child) => GateHost(navigatorKey: key, splash: false, child: child),
           home: const Text('論壇首頁'),
         ),
       ));
@@ -230,6 +231,50 @@ void main() {
       await tester.pump();
       expect(find.text('論壇首頁'), findsOneWidget);
       expect(find.text('輸入測試碼'), findsNothing);
+    });
+
+    testWidgets('從「檢查中」變成「輸入測試碼」畫面要跟著換（不能卡在檢查中）', (tester) async {
+      final gate = GateStore();
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: gate,
+        child: MaterialApp(
+          builder: (c, child) =>
+              GateHost(navigatorKey: GlobalKey<NavigatorState>(), splash: false, child: child),
+          home: const Text('論壇首頁'),
+        ),
+      ));
+      expect(find.text('檢查中…'), findsOneWidget);
+      gate
+        ..stage = GateStage.needCode
+        ..deviceId = 'abcdef0123456789'
+        ..notifyListeners();
+      await tester.pump();
+      expect(find.text('檢查中…'), findsNothing);
+      expect(find.text('輸入測試碼'), findsOneWidget);
+    });
+
+    testWidgets('啟動動畫：準備好之後播完一輪就淡出', (tester) async {
+      var done = false;
+      // 換 MaterialApp 的 home 不會重建已經建好的首頁路由，要從裡面改
+      final ready = ValueNotifier(false);
+      await tester.pumpWidget(MaterialApp(
+        home: ValueListenableBuilder<bool>(
+          valueListenable: ready,
+          builder: (_, r, _) =>
+              LaunchSplash(ready: r, waitingLabel: '連線中…', onDone: () => done = true),
+        ),
+      ));
+      // 一次 pump 一大段只會畫一幀，動畫根本沒跑；要一幀一幀推
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(done, isFalse, reason: '還沒準備好就要一直等');
+      expect(find.text('連線中…'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      ready.value = true;
+      await tester.pumpAndSettle();
+      expect(done, isTrue);
     });
 
     testWidgets('設定頁的「版本與更新」卡片建得起來', (tester) async {

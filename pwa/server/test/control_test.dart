@@ -168,11 +168,38 @@ void main() {
 
     test('查狀態會更新裝置的最後使用時間與版本', () {
       final c = svc.createCodes().single;
-      final t = svc.activate(input: c.code, deviceId: 'device-0001', version: '1.28.2').token;
+      final t = svc.activate(
+              input: c.code, deviceId: 'device-0001', report: const DeviceReport(version: '1.28.2'))
+          .token;
       clock = clock.add(const Duration(hours: 3));
-      svc.status(platform: 'ios', version: '1.29.0', token: t);
+      svc.status(platform: 'ios', token: t, report: const DeviceReport(version: '1.29.0'));
       expect(c.devices.single.lastSeen, clock);
       expect(c.devices.single.appVersion, '1.29.0');
+    });
+
+    test('記下型號、系統、IP 與論壇帳號；沒回報的欄位不覆蓋', () {
+      final c = svc.createCodes().single;
+      final t = svc.activate(
+        input: c.code,
+        deviceId: 'device-0001',
+        report: const DeviceReport(
+            platform: 'ios', model: 'iPhone 16 Pro', os: 'iOS 18.5', ip: '1.2.3.4',
+            forumUid: 677863, forumName: '楓落殘雪'),
+      ).token;
+      final d = c.devices.single;
+      expect([d.model, d.os, d.ip, d.forumUid, d.forumName],
+          ['iPhone 16 Pro', 'iOS 18.5', '1.2.3.4', 677863, '楓落殘雪']);
+
+      // 登出後查狀態（沒帶論壇帳號）：保留最後登入的那個，IP 換新
+      svc.status(platform: 'ios', token: t, report: const DeviceReport(ip: '5.6.7.8'));
+      expect(d.forumName, '楓落殘雪');
+      expect(d.model, 'iPhone 16 Pro');
+      expect(d.ip, '5.6.7.8');
+
+      // 換帳號
+      svc.status(platform: 'ios', token: t,
+          report: const DeviceReport(forumUid: 1, forumName: '別人'));
+      expect([d.forumUid, d.forumName], [1, '別人']);
     });
   });
 
@@ -266,6 +293,24 @@ void main() {
       expect(st['sourceUrl'], 'https://852111.xyz/api/app/source.json');
     });
 
+    test('狀態請求的標頭：中文暱稱要解碼、IP 取自 X-Forwarded-For', () async {
+      final c = svc.createCodes().single;
+      final ios = await call('POST', '/api/app/activate',
+          body: {'code': c.code, 'device': 'iphone-00001', 'platform': 'ios'});
+      final token = (await jsonOf(ios))['token'] as String;
+      await call('GET', '/api/app/status?platform=ios&build=78&version=1.29.0', headers: {
+        'x-gm-token': token,
+        'x-gm-model': Uri.encodeComponent('iPhone 16 Pro'),
+        'x-gm-os': Uri.encodeComponent('iOS 18.5'),
+        'x-gm-forum-uid': '677863',
+        'x-gm-forum-name': Uri.encodeComponent('楓落殘雪ü'),
+        'x-forwarded-for': '203.0.113.9, 10.0.0.2',
+      });
+      final d = c.devices.single;
+      expect([d.model, d.os, d.appVersion, d.forumUid, d.forumName, d.ip],
+          ['iPhone 16 Pro', 'iOS 18.5', '1.29.0', 677863, '楓落殘雪ü', '203.0.113.9']);
+    });
+
     test('猜碼限流：同一 IP 十次以上被擋', () async {
       Response? last;
       for (var i = 0; i < 11; i++) {
@@ -301,7 +346,8 @@ void main() {
       final s = ControlService(a, TokenSigner(utf8.encode('k' * 32)));
       a.settings.maintenance = true;
       final c = s.createCodes(note: '備註', maxDevices: 3, bypass: true).single;
-      s.activate(input: c.code, deviceId: 'device-0001', platform: 'ios');
+      s.activate(input: c.code, deviceId: 'device-0001',
+          report: const DeviceReport(platform: 'ios', forumUid: 7, forumName: '暱稱'));
       s.upsertRelease(version: '1.29.0', build: 78, notes: '一\n二');
       await a.save();
 
@@ -311,6 +357,7 @@ void main() {
       expect(b.codes.single.code, c.code);
       expect(b.codes.single.bypass, isTrue);
       expect(b.codes.single.devices.single.platform, 'ios');
+      expect(b.codes.single.devices.single.forumName, '暱稱');
       expect(b.releases.single.notes, '一\n二');
     });
   });

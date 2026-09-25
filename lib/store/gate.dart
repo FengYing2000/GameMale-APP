@@ -8,6 +8,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/device_label.dart';
+
 /// App 能不能用：測試碼、維護模式、強制更新。
 ///
 /// 規則全在 852111.xyz 的控制台（pwa/server/lib/control），這裡只負責問、
@@ -106,6 +108,11 @@ class GateStore extends ChangeNotifier {
   String deviceId = '';
   String? _token;
 
+  // 回報給後台的裝置資料與論壇帳號（只有綁了測試碼的裝置會被記下來）
+  DeviceLabel _label = const DeviceLabel();
+  int? _forumUid;
+  String _forumName = '';
+
   DateTime? _lastCheck;
   Future<void>? _inflight;
   Completer<void>? _opened;
@@ -134,6 +141,7 @@ class GateStore extends ChangeNotifier {
       await _write(_kDevice, deviceId);
     }
     _token = await _read(_kToken);
+    _label = await DeviceLabel.read();
 
     // 上次確認能用、而且還在寬限期內：先開門，背景再問
     final last = _cached();
@@ -160,6 +168,25 @@ class GateStore extends ChangeNotifier {
     return _inflight ??= _check().whenComplete(() => _inflight = null);
   }
 
+  /// 目前登入的論壇帳號。換帳號、登入、登出時呼叫；綁了測試碼的話
+  /// 馬上回報一次，後台才看得到「這台現在是誰在用」
+  void setForumUser(int? uid, String name) {
+    if (uid == _forumUid && name == _forumName) return;
+    _forumUid = uid;
+    _forumName = name;
+    if (hasCode) unawaited(check(force: true));
+  }
+
+  /// 放標頭而不是網址：伺服器的請求紀錄只記網址，暱稱不會出現在 log 裡。
+  /// 標頭只能是 ASCII，中文要先編碼
+  Map<String, String> _headers() => {
+        'x-gm-token': ?_token,
+        if (_label.model.isNotEmpty) 'x-gm-model': Uri.encodeComponent(_label.model),
+        if (_label.os.isNotEmpty) 'x-gm-os': Uri.encodeComponent(_label.os),
+        if (_forumUid != null) 'x-gm-forum-uid': '$_forumUid',
+        if (_forumUid != null) 'x-gm-forum-name': Uri.encodeComponent(_forumName),
+      };
+
   /// 網頁版的論壇轉發被擋時呼叫（一次載入會撞到好幾次，合併成一個）
   void onBlocked() {
     final last = _lastCheck;
@@ -173,7 +200,7 @@ class GateStore extends ChangeNotifier {
       final res = await _dio.get<Object>(
         '$origin/api/app/status',
         queryParameters: {'platform': platform, 'build': '$build', 'version': version},
-        options: Options(headers: {if (_token != null) 'x-gm-token': _token}),
+        options: Options(headers: _headers()),
       );
       final j = res.data;
       if (res.statusCode != 200 || j is! Map) throw StateError('HTTP ${res.statusCode}');
@@ -235,8 +262,11 @@ class GateStore extends ChangeNotifier {
           'code': code.trim(),
           'device': deviceId,
           'platform': platform,
-          'model': _model(),
+          'model': _label.model,
+          'os': _label.os,
           'version': version,
+          if (_forumUid != null) 'forumUid': _forumUid,
+          if (_forumUid != null) 'forumName': _forumName,
         },
       );
       final j = res.data;
@@ -293,8 +323,6 @@ class GateStore extends ChangeNotifier {
     if (ok == null) return false;
     return DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ok)) < _grace;
   }
-
-  String _model() => kIsWeb ? '瀏覽器' : defaultTargetPlatform.name;
 
   static String _newDeviceId() {
     final r = Random.secure();

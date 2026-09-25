@@ -13,6 +13,7 @@ import '../../services/page_reload_stub.dart'
     if (dart.library.js_interop) '../../services/page_reload_web.dart';
 import '../../store/gate.dart';
 import '../../theme.dart';
+import '../widgets/launch_splash.dart';
 
 /// 蓋在整個 App 上的「能不能用」判斷：測試碼、維護、強制更新、連不上。
 ///
@@ -21,9 +22,17 @@ import '../../theme.dart';
 ///   一路撞 403，原生版也沒必要先載一堆東西。
 /// * 用過之後才被蓋住的（維護臨時開啟）只是藏起來，結束後回到原本的頁面。
 class GateHost extends StatefulWidget {
-  const GateHost({super.key, required this.child, required this.navigatorKey});
+  const GateHost({
+    super.key,
+    required this.child,
+    required this.navigatorKey,
+    this.splash = true,
+  });
   final Widget? child;
   final GlobalKey<NavigatorState> navigatorKey;
+
+  /// 開機時蓋一層啟動動畫，等知道要顯示哪一頁才淡出（測試可以關掉）
+  final bool splash;
 
   @override
   State<GateHost> createState() => _GateHostState();
@@ -31,6 +40,7 @@ class GateHost extends StatefulWidget {
 
 class _GateHostState extends State<GateHost> {
   bool _everOpen = false;
+  bool _splashDone = false;
   int? _offered;
 
   @override
@@ -49,8 +59,27 @@ class _GateHostState extends State<GateHost> {
           ),
         if (!gate.isOpen)
           Positioned.fill(
-            // 這層在 Navigator 之上，沒有 Overlay——輸入框的選字工具列會找不到地方畫
-            child: Overlay(initialEntries: [OverlayEntry(builder: (_) => GateScreen(gate: gate))]),
+            // 這層在 Navigator 之上，沒有 Overlay——輸入框的選字工具列會找不到地方畫。
+            // Overlay 的 initialEntries 只在第一次建立時用，裡面的畫面**要自己聽
+            // 狀態變化**：不聽的話從「檢查中」變成「輸入測試碼」時畫面不會換，
+            // 會一直卡在檢查中
+            child: Overlay(initialEntries: [
+              OverlayEntry(
+                builder: (_) => ListenableBuilder(
+                  listenable: gate,
+                  builder: (_, _) => GateScreen(gate: gate),
+                ),
+              ),
+            ]),
+          ),
+        if (widget.splash && !_splashDone)
+          Positioned.fill(
+            child: LaunchSplash(
+              // 開機流程還在跑、或第一次開還在問伺服器
+              ready: gate.stage != GateStage.checking,
+              waitingLabel: tr('連線中…'),
+              onDone: () => setState(() => _splashDone = true),
+            ),
           ),
       ],
     );
@@ -387,6 +416,13 @@ class _CodeFormState extends State<_CodeForm> {
               : Text(tr('啟用')),
         ),
         const SizedBox(height: 18),
+        Text(
+          tr('啟用後，這台裝置的型號、系統版本、App 版本、IP，以及登入的論壇暱稱與 UID '
+              '會提供給測試管理者，用來管理測試資格。不會收集密碼或登入資料。'),
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, height: 1.55, color: faint(context)),
+        ),
+        const SizedBox(height: 8),
         Text(
           tr('裝置識別碼：${widget.gate.deviceId.length > 8 ? widget.gate.deviceId.substring(0, 8) : widget.gate.deviceId}'),
           textAlign: TextAlign.center,

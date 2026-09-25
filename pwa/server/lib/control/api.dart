@@ -72,11 +72,27 @@ class ControlApi {
 
   Response _status(Request r) {
     final q = r.url.queryParameters;
+    String h(String k) {
+      try {
+        return Uri.decodeComponent(r.headers[k] ?? '');
+      } catch (_) {
+        return '';
+      }
+    }
+
     final body = service.status(
       platform: q['platform'] ?? '',
       build: int.tryParse(q['build'] ?? '') ?? 0,
-      version: q['version'] ?? '',
       token: betaToken(r),
+      report: DeviceReport(
+        platform: q['platform'] ?? '',
+        version: q['version'] ?? '',
+        model: h('x-gm-model'),
+        os: h('x-gm-os'),
+        ip: clientIp(r),
+        forumUid: int.tryParse(r.headers['x-gm-forum-uid'] ?? ''),
+        forumName: h('x-gm-forum-name'),
+      ),
     );
     body['sourceUrl'] = '${_origin(r)}/api/app/source.json';
     return _json(200, body);
@@ -91,9 +107,15 @@ class ControlApi {
     final res = service.activate(
       input: '${j['code'] ?? ''}',
       deviceId: '${j['device'] ?? ''}',
-      platform: platform,
-      model: '${j['model'] ?? ''}',
-      version: '${j['version'] ?? ''}',
+      report: DeviceReport(
+        platform: platform,
+        model: '${j['model'] ?? ''}',
+        os: '${j['os'] ?? ''}',
+        version: '${j['version'] ?? ''}',
+        ip: clientIp(r),
+        forumUid: (j['forumUid'] as num?)?.toInt(),
+        forumName: '${j['forumName'] ?? ''}',
+      ),
     );
     if (!res.ok) return _json(400, {'ok': false, 'message': res.message});
 

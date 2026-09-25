@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.29.0+78
+version: 1.29.1+79
 
 environment:
   sdk: ^3.13.1
@@ -68,6 +68,7 @@ dependencies:
   webview_flutter: ^4.14.1
   flutter_svg: ^2.3.0
   lucide_icons_flutter: ^3.1.17
+  device_info_plus: ^13.2.0
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +96,8 @@ flutter:
   assets:
     - assets/s2t.json
     - assets/t2s.json
+    # 啟動動畫的圖層（tool/make_splash.dart 從 icon.png 拆出來的）
+    - assets/splash/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

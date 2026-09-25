@@ -1,6 +1,6 @@
 # GameMale 客戶端 — 交接文件
 
-> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.29.0+78**。
+> 給接手的新對話快速上手用。最後更新：2026-09-22，版本 **1.29.1+79**。
 > 這份是「整體狀態 + 怎麼繼續」；技術踩坑細節在 [DEVELOPING.md](DEVELOPING.md)，
 > 使用者面向說明在 [../README.md](../README.md)，長期記憶在 `~/.claude/.../memory/`
 > 的 `project_gamemale_ios` / `project_gamemale_pwa` / `reference_gamemale_cf_gate`。
@@ -122,6 +122,12 @@ VPS_PASS='...' PYTHONIOENCODING=utf-8 python tool/deploy_pwa.py
 - 自己的 cookie 一律 `gmx_` 開頭，`ForumProxy` 轉發時濾掉。後台 cookie Path=/api/admin、SameSite=Strict，
   改資料要帶 `X-GM-Admin: 1`（防跨站偽造）。
 - 「維護時可用」的碼（bypass）維護期間照樣能用，給自己測試。
+- 綁了碼的裝置每次查狀態會回報型號／系統（`device_info_plus`）、論壇暱稱＋UID（使用者選的，只有這兩項、
+  不含憑證），伺服器另記最後 IP。放**標頭**不放網址（shelf 的請求 log 只記網址）。後台同一組碼出現多個論壇帳號會標紅。
+- **啟動動畫**（1.29.1）：`lib/ui/widgets/launch_splash.dart`，圖層由 `tool/make_splash.dart` 從 `assets/icon.png`
+  拆出（換圖示要重跑並照印出的比例改常數）。原生啟動畫面與網頁 #boot 都只有底色 #0F1115、不放圖，動畫從空白長出來才不閃。
+- ⚠️ `GateHost` 的 Overlay 只在第一次用 initialEntries，裡面的 `GateScreen` 必須自己 `ListenableBuilder` 聽 GateStore，
+  否則從「檢查中」變成其他狀態時畫面不換（1.29.0 的 bug）。
 
 ### 發版流程
 1. `pubspec.yaml` 改版本、`CHANGELOG.md` 寫這版內容（給使用者看；App 內更新日誌、下載頁、SideStore 都讀它）→ commit → push

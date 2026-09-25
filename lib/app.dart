@@ -225,6 +225,8 @@ class _GameMaleAppState extends State<GameMaleApp> with WidgetsBindingObserver {
 
   /// 已回帖標記：開關來自設定，資料屬於某個帳號，兩邊都要跟著變
   void _applyReplied() {
+    // 綁了測試碼的裝置要回報現在登入的是哪個論壇帳號（後台看得到）
+    _gate.setForumUser(_session.uid, _session.name);
     _replied.setUser(_session.uid);
     _replied.setEnabled(_settings.markReplied && _session.loggedIn);
     // 收藏清單也是綁帳號的，換人就整份丟掉再抓

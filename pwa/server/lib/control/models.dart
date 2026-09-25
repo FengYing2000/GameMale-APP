@@ -49,15 +49,32 @@ class Device {
     required this.id,
     this.platform = '',
     this.model = '',
+    this.os = '',
     this.appVersion = '',
+    this.ip = '',
+    this.forumUid,
+    this.forumName = '',
     required this.firstSeen,
     required this.lastSeen,
   });
 
   final String id;
   String platform;
+
+  /// iPhone 16 Pro／Samsung SM-S9180／Safari（主畫面）
   String model;
+
+  /// iOS 18.5／Android 15
+  String os;
   String appVersion;
+
+  /// 最後一次連線的 IP：一組碼被好幾個地方同時用時看得出來
+  String ip;
+
+  /// 這台最後登入的論壇帳號（只有暱稱與 UID，沒有任何登入憑證）。
+  /// 登出時保留上一個，後台看的是「這台是誰在用」
+  int? forumUid;
+  String forumName;
   final DateTime firstSeen;
   DateTime lastSeen;
 
@@ -65,7 +82,11 @@ class Device {
         id: j['id'] as String,
         platform: (j['platform'] as String?) ?? '',
         model: (j['model'] as String?) ?? '',
+        os: (j['os'] as String?) ?? '',
         appVersion: (j['appVersion'] as String?) ?? '',
+        ip: (j['ip'] as String?) ?? '',
+        forumUid: (j['forumUid'] as num?)?.toInt(),
+        forumName: (j['forumName'] as String?) ?? '',
         firstSeen: _date(j['firstSeen']) ?? DateTime.now().toUtc(),
         lastSeen: _date(j['lastSeen']) ?? DateTime.now().toUtc(),
       );
@@ -74,7 +95,11 @@ class Device {
         'id': id,
         'platform': platform,
         'model': model,
+        'os': os,
         'appVersion': appVersion,
+        'ip': ip,
+        'forumUid': forumUid,
+        'forumName': forumName,
         'firstSeen': _iso(firstSeen),
         'lastSeen': _iso(lastSeen),
       };

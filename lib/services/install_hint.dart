@@ -8,3 +8,15 @@ import 'dart:js_interop';
 external JSBoolean _needed();
 
 bool get needsInstall => _needed().toDart;
+
+@JS('gmInstall.standalone')
+external JSBoolean _standalone();
+
+/// 以主畫面 App（沒有網址列）的方式開著
+bool get isStandalone {
+  try {
+    return _standalone().toDart;
+  } catch (_) {
+    return false;
+  }
+}

@@ -66,6 +66,11 @@
   // 只有這一件事需要問瀏覽器：現在是不是還在分頁裡看。
   // 加到主畫面之後沒有網址列、全螢幕、有自己的圖示。
   window.gmInstall = {
+    // 已經以主畫面 App 開啟（控制台的裝置資料用）
+    standalone: function () {
+      return window.navigator.standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+    },
     needed: function () {
       var standalone = window.navigator.standalone === true ||
         window.matchMedia('(display-mode: standalone)').matches;

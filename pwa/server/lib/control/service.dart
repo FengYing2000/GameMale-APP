@@ -43,6 +43,26 @@ class ActivateResult {
 }
 
 /// 擋下 `/gm` 轉發時要回什麼
+/// App 回報的裝置資料與論壇帳號（空的欄位＝這次沒回報，不覆蓋舊值）
+class DeviceReport {
+  const DeviceReport({
+    this.platform = '',
+    this.model = '',
+    this.os = '',
+    this.version = '',
+    this.ip = '',
+    this.forumUid,
+    this.forumName = '',
+  });
+  final String platform;
+  final String model;
+  final String os;
+  final String version;
+  final String ip;
+  final int? forumUid;
+  final String forumName;
+}
+
 class GateBlock {
   const GateBlock(this.status, this.body);
   final int status;
@@ -86,9 +106,7 @@ class ControlService {
   ActivateResult activate({
     required String input,
     required String deviceId,
-    String platform = '',
-    String model = '',
-    String version = '',
+    DeviceReport report = const DeviceReport(),
   }) {
     if (!_deviceId.hasMatch(deviceId)) return const ActivateResult.fail('裝置識別碼不正確');
     final code = store.codeByInput(input);
@@ -104,11 +122,7 @@ class ControlService {
       device = Device(id: deviceId, firstSeen: now, lastSeen: now);
       code.devices.add(device);
     }
-    device
-      ..platform = _clip(platform, 16)
-      ..model = _clip(model, 80)
-      ..appVersion = _clip(version, 32)
-      ..lastSeen = now;
+    _record(device, report);
     store.save();
     return ActivateResult.ok(
       signer.sign({'k': 'beta', 'c': code.id, 'd': deviceId, 't': now.millisecondsSinceEpoch ~/ 1000}),
@@ -129,16 +143,13 @@ class ControlService {
   Map<String, Object?> status({
     required String platform,
     int build = 0,
-    String version = '',
     String? token,
+    DeviceReport report = const DeviceReport(),
   }) {
     final s = settings;
     final beta = checkBeta(token);
     if (beta.ok) {
-      final d = beta.device!
-        ..lastSeen = now
-        ..platform = _clip(platform, 16);
-      if (version.isNotEmpty) d.appVersion = _clip(version, 32);
+      _record(beta.device!, report);
       store.markDirty();
     }
 
@@ -208,6 +219,20 @@ class ControlService {
       return const GateBlock(403, {'gate': 'beta'});
     }
     return null;
+  }
+
+  /// 把這次回報的資料記到裝置上。沒回報的欄位保留舊值
+  void _record(Device d, DeviceReport r) {
+    d.lastSeen = now;
+    if (r.platform.isNotEmpty) d.platform = _clip(r.platform, 16);
+    if (r.model.isNotEmpty) d.model = _clip(r.model, 80);
+    if (r.os.isNotEmpty) d.os = _clip(r.os, 40);
+    if (r.version.isNotEmpty) d.appVersion = _clip(r.version, 32);
+    if (r.ip.isNotEmpty) d.ip = _clip(r.ip, 64);
+    if (r.forumUid != null && r.forumUid! > 0) {
+      d.forumUid = r.forumUid;
+      d.forumName = _clip(r.forumName, 60);
+    }
   }
 
   // ── 後台 ─────────────────────────────────────────────

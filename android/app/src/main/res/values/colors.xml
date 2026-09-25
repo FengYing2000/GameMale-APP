@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 自適應圖示的底色（flutter_launcher_icons 產生的，mipmap-anydpi-v26/ic_launcher.xml 用） -->
     <color name="ic_launcher_background">#101216</color>
+    <!-- 啟動畫面底色：跟 Flutter 的啟動動畫、深色主題同一色，接起來才不會閃白 -->
+    <color name="splash_background">#0F1115</color>
 </resources>
