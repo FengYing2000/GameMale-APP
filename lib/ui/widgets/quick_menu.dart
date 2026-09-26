@@ -3,33 +3,27 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'package:gm_api/http.dart';
 import '../../i18n/ui.dart';
 import '../../store/session.dart';
 import '../../store/settings.dart';
 import '../../theme.dart';
 import 'avatar.dart';
-import 'external_link.dart';
 
-/// 論壇左側那排功能。這些是外掛頁面，沒有手機模板，
-/// 用內建瀏覽器開（帶得到登入狀態）。
-/// 論壇左側那排功能。全都是外掛頁面，只有桌面模板，
-/// 用內建瀏覽器開（帶得到登入狀態，網址也會補上 mobile=no）。
-/// 論壇左側那排功能。全都是外掛頁面，只有桌面模板，
-/// 用內建瀏覽器開（帶得到登入狀態，網址也會補上 mobile=no）。
+/// 論壇左側那排功能。原本全是只有桌面模板的外掛頁面，現在都做成原生頁；
+/// [path] 是 App 內的路由，各頁右上角還留著「在網頁開啟」可以退回論壇原頁。
 const forumTools = <({String id, String label, IconData icon, String path})>[
-  (id: 'medalshop', label: '勳章商城', icon: LucideIcons.medal, path: 'wodexunzhang-showxunzhang.html'),
-  (id: 'mymedal', label: '我的勳章', icon: LucideIcons.award, path: 'wodexunzhang-showxunzhang.html?action=my'),
-  (id: 'magic', label: '道具超市', icon: LucideIcons.wand, path: 'home.php?mod=magic'),
-  (id: 'blood', label: '血液祭獻', icon: LucideIcons.droplet, path: 'home.php?mod=spacecp&ac=credit&op=exchange'),
-  (id: 'card', label: '日常卡片', icon: LucideIcons.creditCard, path: 'it618_award-award.html'),
-  (id: 'buyname', label: '頭銜稱號', icon: LucideIcons.tag, path: 'tshuz_buyname-tshuz_buyname.html'),
-  (id: 'usercard', label: '多彩名片', icon: LucideIcons.idCard, path: 'k_usercard-style.html'),
-  (id: 'bgshop', label: '背景商店', icon: LucideIcons.image, path: 'tshuz_bgshop-tshuz_bgshop.html'),
-  (id: 'draw', label: '你畫我猜', icon: LucideIcons.pencil, path: 'plugin.php?id=viewui_draw'),
-  (id: 'task', label: '熱門任務', icon: LucideIcons.listChecks, path: 'home.php?mod=task'),
-  (id: 'posttask', label: '每週發帖獎勵', icon: LucideIcons.squarePen, path: 'home.php?mod=task&do=view&id=25'),
-  (id: 'replytask', label: '每月回帖獎勵', icon: LucideIcons.reply, path: 'reply_reward-reply_reward.html'),
+  (id: 'medalshop', label: '勳章商城', icon: LucideIcons.medal, path: '/tools/medal'),
+  (id: 'mymedal', label: '我的勳章', icon: LucideIcons.award, path: '/tools/medal?tab=mine'),
+  (id: 'magic', label: '道具超市', icon: LucideIcons.wand, path: '/tools/magic'),
+  (id: 'blood', label: '血液祭獻', icon: LucideIcons.droplet, path: '/tools/blood'),
+  (id: 'card', label: '日常卡片', icon: LucideIcons.creditCard, path: '/tools/card'),
+  (id: 'buyname', label: '頭銜稱號', icon: LucideIcons.tag, path: '/tools/title'),
+  (id: 'usercard', label: '多彩名片', icon: LucideIcons.idCard, path: '/tools/usercard'),
+  (id: 'bgshop', label: '背景商店', icon: LucideIcons.image, path: '/tools/bg'),
+  (id: 'draw', label: '你畫我猜', icon: LucideIcons.pencil, path: '/tools/draw'),
+  (id: 'task', label: '熱門任務', icon: LucideIcons.listChecks, path: '/tools/task'),
+  (id: 'posttask', label: '每週發帖獎勵', icon: LucideIcons.squarePen, path: '/tools/task/25?title=%E6%AF%8F%E9%80%B1%E7%99%BC%E5%B8%96%E7%8D%8E%E5%8B%B5'),
+  (id: 'replytask', label: '每月回帖獎勵', icon: LucideIcons.reply, path: '/tools/reply-reward'),
 ];
 
 /// 首頁的側邊欄
@@ -134,9 +128,10 @@ class QuickDrawer extends StatelessWidget {
               _tile(context,
                   icon: t.icon,
                   label: tr(t.label),
-                  onTap: () => openInApp(
-                      context, Api.desktopFullUrl(t.path),
-                      title: tr(t.label))),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push(t.path);
+                  }),
             const SizedBox(height: 20),
           ],
         ),

@@ -109,6 +109,21 @@ VPS_PASS='...' PYTHONIOENCODING=utf-8 python tool/deploy_pwa.py
   圖片來源是 852111.xyz 又被論壇**防盜連擋成 403**（實測：Referer 852111.xyz→403、本站或無→200）。
   一律用 `forumUrl()` 換回本站；代價是瀏覽器要另外登入論壇一次（使用者選的做法，沒走整站轉發）。
 
+- **論壇功能全部原生化**（1.30.0）：側邊欄 12 項（勳章商城／我的勳章／道具／血液祭獻／日常卡片／頭銜／名片／背景／
+  你畫我猜／熱門任務／每週發帖／每月回帖）改走 `/tools/*` 路由，不再 `openInApp` 開桌面網頁。
+  - 資料層在 `packages/gm_api/lib/`：`medal.dart`（wodexunzhang 八個分頁＋交易角＋組合＋排行）、`magic_shop.dart`、
+    `credit.dart`（積分兌換＝血液祭獻）、`lottery.dart`（it618_award）、`decor_shop.dart`（頭銜／名片／背景）、
+    `draw.dart`（viewui_draw）、`task.dart`（任務＋reply_reward）、`popup.dart`（論壇 showWindow 彈窗：表單原生呈現後原樣重送）。
+  - 介面零件在 `lib/ui/widgets/shop_kit.dart`（Loader、ToolTabs、ItemCard/ItemGrid、showItemSheet、runPopup、confirmDialog…），
+    頁面在 `lib/ui/pages/tools/`。
+  - ⚠ **GET 就扣款的網址**：抽獎 `ac=getwapaward`、頭銜 `tshuz_buyname&mod=buy`、背景 `tshuz_bgshop&mod=buy`、
+    名片 `k_usercard:misc&act=buy`（不確定，當成會扣）。App 一律先 `confirmDialog`；分析／抓樣本時絕對別打。
+    `it618_award ac=wapaward_get` 不帶 `ac1=myaward` 是全站紀錄 **9 MB**。
+  - 樣本：`tool/fetch_fixtures.dart` 會抓到 `test/fixtures/plugins/`（含帳號資料、gitignore）；`test/plugins_test.dart` 驗解析，
+    `test/tool_pages_test.dart` 把每頁每個分頁在手機尺寸實際畫出來（假的 `Api.browserFetch` 回樣本）。
+  - **我來畫（ac=draw）還沒原生化**：抓樣本那天創作次數已用完，看不到畫布頁與送出端點；目前右上角筆刷開論壇網頁。
+  - 會扣款的動作（買勳章、寄售、交易單、兌換、抽卡、買頭銜／名片／背景）**都還沒用真帳號送出過**，要請使用者拿便宜的東西實測。
+
 ---
 
 ## App 控制台：測試碼／維護／更新（1.29.0 起）
@@ -179,6 +194,7 @@ VPS_PASS='...' PYTHONIOENCODING=utf-8 python tool/deploy_pwa.py
 - **待使用者實測回報**：CODE. 板塊（de0bd7c 修完）、登出後切回帳號、拖動排序、懸賞顯示。
 - 貢獻者 `LaiYueJi` 曾殘留在 GitHub 網頁快取（git 歷史已 100% 乾淨），已用重命名分支觸發重建。
 - 從沒真的執行過：附件購買 submit、道具買/用 submit（會花真金幣）。
+- 論壇功能原生頁的扣款動作（1.30.0）待使用者實測；我來畫待原生化（見上）。
 
 ---
 

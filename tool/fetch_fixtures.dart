@@ -5,6 +5,7 @@
 //   dart run tool/fetch_fixtures.dart
 //
 // Cookie 只留在本機，test/fixtures/ 已經在 .gitignore 裡。
+import 'dart:convert';
 import 'dart:io';
 
 const origin = 'https://www.gamemale.com';
@@ -53,25 +54,73 @@ Future<void> main() async {
     'collection_mine.html': 'forum.php?mod=collection&action=view&ctid=656&fromop=my&mobile=no',
     // 打招呼的動作清單（14 種＋可選留言）
     'poke_form.xml': 'home.php?mod=spacecp&ac=poke&op=send&uid=610657&inajax=1&mobile=no',
+    // 論壇功能（外掛頁，只有桌面模板）。⚠ 只列唯讀頁：購買、抽獎（ac=getwapaward）
+    // 這類網址 GET 下去就會扣款，絕對不要加進來
+    'plugins/medalshop.html': 'plugin.php?id=wodexunzhang:showxunzhang&mobile=no',
+    'plugins/m_fid16.html': 'plugin.php?id=wodexunzhang:showxunzhang&fid=16&page=1&mobile=no',
+    'plugins/mymedal.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=my&mobile=no',
+    'plugins/m_rongyu.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=showRongyu&mobile=no',
+    'plugins/m_jiangli.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=showJiangli&mobile=no',
+    'plugins/m_jishou.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=showjishou&mobile=no',
+    'plugins/m_trade.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=trade&mobile=no',
+    'plugins/m_combo.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=combo&mobile=no',
+    'plugins/m_paihang.html': 'plugin.php?id=wodexunzhang:showxunzhang&action=paihang&mobile=no',
+    'plugins/magic.html': 'home.php?mod=magic&action=shop&mobile=no',
+    'plugins/mg_box.html': 'home.php?mod=magic&action=mybox&mobile=no',
+    'plugins/mg_log.html': 'home.php?mod=magic&action=log&operation=uselog&mobile=no',
+    'plugins/blood.html': 'home.php?mod=spacecp&ac=credit&op=exchange&mobile=no',
+    'plugins/credit_log.html': 'home.php?mod=spacecp&ac=credit&op=log&mobile=no',
+    'plugins/card_goods.html': 'plugin.php?id=it618_award:ajax&formhash={formhash}&ac=getwapgoods&mobile=no',
+    // 一定要帶 ac1=myaward：不帶的話是全站紀錄，一次 9 MB
+    'plugins/card_my.html':
+        'plugin.php?id=it618_award:ajax&page=1&ac1=myaward&formhash={formhash}&ac=wapaward_get&mobile=no',
+    'plugins/buyname.html': 'plugin.php?id=tshuz_buyname&mobile=no',
+    'plugins/bn_manage.html': 'plugin.php?id=tshuz_buyname&mod=manage&mobile=no',
+    'plugins/usercard.html': 'k_usercard-style.html?mobile=no',
+    'plugins/uc_my.html': 'k_usercard-style.html?mod=mycard&mobile=no',
+    'plugins/bgshop.html': 'plugin.php?id=tshuz_bgshop&pid=1&mobile=no',
+    'plugins/bg_pid2.html': 'plugin.php?id=tshuz_bgshop&pid=2&mobile=no',
+    'plugins/bg_my.html': 'plugin.php?id=tshuz_bgshop&mod=my&mobile=no',
+    'plugins/draw.html': 'plugin.php?id=viewui_draw&mod=list&mobile=no',
+    'plugins/dr_guess.html': 'plugin.php?id=viewui_draw&mod=list&ac=guess&drawid=125333&inajax=1&mobile=no',
+    'plugins/dr_log.html': 'plugin.php?id=viewui_draw&mod=log&mobile=no',
+    'plugins/dr_rank.html': 'plugin.php?id=viewui_draw&mod=rank&ac=guess&mobile=no',
+    'plugins/task.html': 'home.php?mod=task&item=new&mobile=no',
+    'plugins/t_done.html': 'home.php?mod=task&item=done&mobile=no',
+    'plugins/t_14.html': 'home.php?mod=task&do=view&id=14&mobile=no',
+    'plugins/posttask.html': 'home.php?mod=task&do=view&id=25&mobile=no',
+    'plugins/replytask.html': 'plugin.php?id=reply_reward&mobile=no',
+    'plugins/rr_hist.html': 'plugin.php?id=reply_reward&code=1&mobile=no',
+    'plugins/rr_rank.html': 'plugin.php?id=reply_reward&code=2&mobile=no',
   };
 
   final dir = Directory('test/fixtures')..createSync(recursive: true);
+  Directory('${dir.path}/plugins').createSync(recursive: true);
   final client = HttpClient();
 
-  for (final entry in pages.entries) {
-    final req = await client.getUrl(Uri.parse('$origin/${entry.value}'));
+  // 抽獎外掛的 ajax 端點要帶 formhash，先從首頁拿
+  Future<String> fetch(String path, {bool withCookie = true}) async {
+    final req = await client.getUrl(Uri.parse('$origin/$path'));
     req.headers
       ..set('User-Agent', ua)
       ..set('Referer', '$origin/forum.php?mobile=2')
-      // login.html 要的是「登出狀態」的表單，帶 cookie 會拿到歡迎頁
-      ..set('Cookie', entry.key == 'login.html' ? '' : cookie);
-
+      ..set('Cookie', withCookie ? cookie : '');
     final res = await req.close();
-    final body = await res.transform(const SystemEncoding().decoder).join();
+    // 論壇全站 UTF-8；SystemEncoding 在中文 Windows 上是 cp950，會把樣本變亂碼
+    return res.transform(utf8.decoder).join();
+  }
+
+  final formhash =
+      RegExp(r'formhash=([0-9a-f]{8})').firstMatch(await fetch('forum.php?mobile=no'))?.group(1) ?? '';
+
+  for (final entry in pages.entries) {
+    // login.html 要的是「登出狀態」的表單，帶 cookie 會拿到歡迎頁
+    final body = await fetch(entry.value.replaceAll('{formhash}', formhash),
+        withCookie: entry.key != 'login.html');
     File('${dir.path}/${entry.key}').writeAsStringSync(body);
 
     final kb = (body.length / 1024).round().toString().padLeft(4);
-    stdout.writeln('${res.statusCode}  $kb KB  ${entry.key}');
+    stdout.writeln('$kb KB  ${entry.key}');
     await Future<void>.delayed(const Duration(milliseconds: 700)); // 別打太快
   }
 

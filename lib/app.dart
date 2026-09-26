@@ -52,10 +52,18 @@ import 'ui/pages/reply_page.dart';
 import 'ui/pages/search_page.dart';
 import 'ui/pages/settings_page.dart';
 import 'ui/pages/tools_page.dart';
+import 'ui/pages/tools/credit_page.dart';
+import 'ui/pages/tools/decor_pages.dart';
+import 'ui/pages/tools/draw_page.dart';
+import 'ui/pages/tools/lottery_page.dart';
+import 'ui/pages/tools/magic_page.dart';
+import 'ui/pages/tools/medal_page.dart';
+import 'ui/pages/tools/task_page.dart';
 import 'ui/pages/space_page.dart';
 import 'ui/pages/sign_page.dart';
 import 'ui/pages/thread_page.dart';
 import 'ui/widgets/red_dot.dart';
+import 'package:gm_api/medal.dart' show MedalTab;
 
 class GameMaleApp extends StatefulWidget {
   const GameMaleApp({super.key});
@@ -428,6 +436,30 @@ GoRouter _buildRouter(SessionStore session, SettingsStore settings) {
             MyListPage(type: s.pathParameters['type'] ?? 'thread'),
       ),
       GoRoute(path: '/sign', builder: (c, s) => const SignPage()),
+      // 論壇功能（外掛頁面的原生版）
+      GoRoute(
+        path: '/tools/medal',
+        builder: (c, s) => MedalPage(
+          initial: MedalTab.values.asNameMap()[s.uri.queryParameters['tab']] ?? MedalTab.shop,
+        ),
+      ),
+      GoRoute(path: '/tools/magic', builder: (c, s) => const MagicPage()),
+      GoRoute(path: '/tools/blood', builder: (c, s) => const CreditPage()),
+      GoRoute(path: '/tools/card', builder: (c, s) => const LotteryPage()),
+      GoRoute(path: '/tools/title', builder: (c, s) => const TitleShopPage()),
+      GoRoute(path: '/tools/usercard', builder: (c, s) => const CardShopPage()),
+      GoRoute(path: '/tools/bg', builder: (c, s) => const BgShopPage()),
+      GoRoute(path: '/tools/draw', builder: (c, s) => const DrawPage()),
+      GoRoute(
+        path: '/tools/draw/:id',
+        builder: (c, s) => DrawDetailPage(id: _int(s, 'id')),
+      ),
+      GoRoute(path: '/tools/task', builder: (c, s) => const TaskPage()),
+      GoRoute(
+        path: '/tools/task/:id',
+        builder: (c, s) => TaskDetailPage(id: _int(s, 'id'), title: s.uri.queryParameters['title']),
+      ),
+      GoRoute(path: '/tools/reply-reward', builder: (c, s) => const ReplyRewardPage()),
       GoRoute(path: '/doing', builder: (c, s) => const DoingPageView()),
       GoRoute(path: '/settings', builder: (c, s) => const SettingsPage()),
       StatefulShellRoute.indexedStack(
