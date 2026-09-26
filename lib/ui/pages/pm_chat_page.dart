@@ -1,13 +1,20 @@
+import 'dart:convert' show HtmlEscape;
+
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'package:gm_api/discuz.dart' as api;
 import 'package:gm_api/models.dart';
+
+import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/composer_toolbar.dart';
 import '../widgets/post_body.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -25,11 +32,15 @@ class PmChatPage extends StatefulWidget {
 
 class _PmChatPageState extends State<PmChatPage> {
   final _ctrl = TextEditingController();
+  final _focus = FocusNode();
   final _scroll = ScrollController();
   PmChat? _chat;
   bool _loading = true;
   bool _busy = false;
   String? _err;
+
+  /// 剛送出的訊息：先畫出來，不用等論壇回應。重抓的對話裡出現同一則之後就拿掉
+  final _outgoing = <_Outgoing>[];
 
   @override
   void initState() {
@@ -40,31 +51,39 @@ class _PmChatPageState extends State<PmChatPage> {
   @override
   void dispose() {
     _ctrl.dispose();
+    _focus.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool toBottom = true}) async {
-    setState(() {
-      _loading = true;
-      _err = null;
-    });
+  /// [silent]：送出之後在背景重抓，不要把畫面換成轉圈
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _err = null;
+      });
+    }
     try {
       final c = await api.fetchPmChat(widget.touid);
       if (!mounted) return;
-      setState(() => _chat = c);
-      if (toBottom) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scroll.hasClients) {
-            _scroll.jumpTo(_scroll.position.maxScrollExtent);
-          }
-        });
-      }
+      setState(() {
+        _chat = c;
+        _outgoing.removeWhere((o) => o.sent && _serverHas(c, o.text));
+      });
     } on DiscuzException catch (e) {
-      if (mounted) setState(() => _err = e.message);
+      if (mounted && !silent) setState(() => _err = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// 論壇的對話最後幾則裡有沒有這段。比對時忽略空白：換行在網頁上會變成 <br>
+  static bool _serverHas(PmChat c, String text) {
+    String norm(String s) => s.replaceAll(RegExp(r'\s+'), '');
+    final want = norm(text);
+    final mine = c.messages.where((m) => m.mine).toList();
+    return mine.reversed.take(5).any((m) => norm(m.text) == want);
   }
 
   Future<void> _send() async {
@@ -73,7 +92,13 @@ class _PmChatPageState extends State<PmChatPage> {
     if (!await requireLogin(context, action: tr('傳送私訊'))) return;
     if (!mounted) return;
 
-    setState(() => _busy = true);
+    final out = _Outgoing(text);
+    setState(() {
+      _outgoing.add(out);
+      _ctrl.clear();
+      _busy = true;
+    });
+    _toLatest();
     try {
       final r = await api.sendPm(
         widget.touid,
@@ -82,28 +107,70 @@ class _PmChatPageState extends State<PmChatPage> {
         formhash: _chat?.formhash ?? '',
       );
       if (!mounted) return;
-      if (r.ok) {
-        _ctrl.clear();
-        await _load();
-      } else {
+      if (!r.ok) {
+        _undo(out, text);
         toast(context, r.message);
+        return;
       }
+      setState(() => out.sent = true);
+      await _load(silent: true);
     } on DiscuzException catch (e) {
-      if (mounted) toast(context, tr('傳送失敗：${e.message}'));
+      if (!mounted) return;
+      _undo(out, text);
+      toast(context, tr('傳送失敗：${e.message}'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 送不出去：氣泡拿掉、字放回輸入框，改一改能直接再送
+  void _undo(_Outgoing out, String text) {
+    setState(() {
+      _outgoing.remove(out);
+      if (_ctrl.text.isEmpty) _ctrl.text = text;
+    });
+  }
+
+  /// 列表是倒著排的（最新的在最下面＝捲動位置 0），回到 0 就是最新
+  void _toLatest() {
+    if (!_scroll.hasClients) return;
+    _scroll.animateTo(
+      0,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final chat = _chat;
     final msgs = chat?.messages ?? const <PmMessage>[];
+    final me = context.watch<SessionStore>().avatar;
+    // 倒著排：第 0 個是最新的。剛送出的比論壇回來的更新，排在前面
+    final items = <(PmMessage, _Outgoing?)>[
+      for (final o in _outgoing.reversed)
+        (
+          PmMessage(
+            html: const HtmlEscape().convert(o.text).replaceAll('\n', '<br>'),
+            text: o.text,
+            avatar: me,
+            time: o.sent ? tr('剛剛') : tr('傳送中…'),
+            mine: true,
+          ),
+          o,
+        ),
+      for (final m in msgs.reversed) (m, null),
+    ];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.name.isNotEmpty ? widget.name : tr('私人訊息')),
         actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.refreshCw),
+            tooltip: tr('重新整理'),
+            onPressed: _loading ? null : () => _load(),
+          ),
           IconButton(
             icon: const Icon(LucideIcons.circleUserRound),
             tooltip: tr('個人資料'),
@@ -114,35 +181,58 @@ class _PmChatPageState extends State<PmChatPage> {
       body: Column(
         children: [
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => _load(toBottom: false),
-              child: ListView(
-                controller: _scroll,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                children: [
-                  ?StateBox.maybe(
-                    loading: _loading,
-                    error: _err,
-                    empty: !_loading && _err == null && msgs.isEmpty,
-                    emptyText: tr('還沒有訊息'),
-                    onRetry: _load,
-                  ),
-                  for (final m in msgs)
-                    _Bubble(
-                      msg: m,
-                      onTapAvatar: m.mine
-                          ? null
-                          : () => context.push('/u/${widget.touid}'),
+            child: items.isEmpty
+                ? ListView(
+                    children: [
+                      ?StateBox.maybe(
+                        loading: _loading,
+                        error: _err,
+                        empty: !_loading && _err == null,
+                        emptyText: tr('還沒有訊息'),
+                        onRetry: _load,
+                      ),
+                    ],
+                  )
+                // 點一下訊息區收鍵盤；用滑的不收（往上看訊息時鍵盤還在）
+                : GestureDetector(
+                    onTap: _focus.unfocus,
+                    // 倒著排：鍵盤彈出、可視區變矮時，最新的訊息一樣貼在輸入框上方，
+                    // 不會被推到鍵盤後面。以前是從上往下排、載入後再「捲到最底」，
+                    // 那一下發生在訊息排版完成之前，停在新訊息上面一點，
+                    // 剛送出的訊息就躲在鍵盤後面，看起來像沒送出去
+                    child: ListView.builder(
+                      controller: _scroll,
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      itemCount: items.length,
+                      itemBuilder: (context, i) {
+                        final (m, out) = items[i];
+                        final bubble = _Bubble(
+                          msg: m,
+                          onTapAvatar: m.mine
+                              ? null
+                              : () => context.push('/u/${widget.touid}'),
+                        );
+                        return out != null && !out.sent
+                            ? Opacity(opacity: .6, child: bubble)
+                            : bubble;
+                      },
                     ),
-                ],
-              ),
-            ),
+                  ),
           ),
-          _Composer(ctrl: _ctrl, busy: _busy, onSend: _send),
+          _Composer(ctrl: _ctrl, focus: _focus, busy: _busy, onSend: _send),
         ],
       ),
     );
   }
+}
+
+class _Outgoing {
+  _Outgoing(this.text);
+  final String text;
+
+  /// 論壇回應成功了，等重抓的對話裡出現就換成正式的
+  bool sent = false;
 }
 
 class _Bubble extends StatelessWidget {
@@ -159,8 +249,9 @@ class _Bubble extends StatelessWidget {
 
     final bubble = Flexible(
       child: Column(
-        crossAxisAlignment:
-            msg.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: msg.mine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -181,8 +272,10 @@ class _Bubble extends StatelessWidget {
           if (msg.time.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
-              child: Text(msg.time,
-                  style: TextStyle(fontSize: 11, color: faint(context))),
+              child: Text(
+                msg.time,
+                style: TextStyle(fontSize: 11, color: faint(context)),
+              ),
             ),
         ],
       ),
@@ -191,8 +284,9 @@ class _Bubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
       child: Row(
-        mainAxisAlignment:
-            msg.mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: msg.mine
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: msg.mine
             ? [
@@ -213,8 +307,14 @@ class _Bubble extends StatelessWidget {
 }
 
 class _Composer extends StatelessWidget {
-  const _Composer({required this.ctrl, required this.busy, required this.onSend});
+  const _Composer({
+    required this.ctrl,
+    required this.focus,
+    required this.busy,
+    required this.onSend,
+  });
   final TextEditingController ctrl;
+  final FocusNode focus;
   final bool busy;
   final VoidCallback onSend;
 
@@ -226,40 +326,71 @@ class _Composer extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+          border: Border(
+            top: BorderSide(color: Theme.of(context).dividerColor),
+          ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: ctrl,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
-                minLines: 1,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: tr('輸入訊息…'),
-                  filled: true,
-                  fillColor:
-                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
+            // BBCode 與表情，跟網頁版私訊的編輯器一樣。只在打字時出現，看訊息時不佔位置
+            ListenableBuilder(
+              listenable: focus,
+              builder: (context, _) => focus.hasFocus
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: ComposerToolbar(
+                        controller: ctrl,
+                        focus: focus,
+                        pm: true,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: ctrl,
+                    focusNode: focus,
+                    // 鍵盤的 Return 是換行，送出用右邊的按鈕
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    // 網頁版預設「碰到輸入框外面就收鍵盤」，連滑動訊息都算
+                    onTapOutside: (_) {},
+                    minLines: 1,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      hintText: tr('輸入訊息…'),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.05),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: busy ? null : onSend,
-              icon: busy
-                  ? const SizedBox(
-                      width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(LucideIcons.send, size: 18),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: busy ? null : onSend,
+                  tooltip: tr('傳送'),
+                  icon: busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(LucideIcons.send, size: 18),
+                ),
+              ],
             ),
           ],
         ),

@@ -13,10 +13,14 @@ class ComposerToolbar extends StatelessWidget {
     super.key,
     required this.controller,
     required this.focus,
+    this.pm = false,
   });
 
   final TextEditingController controller;
   final FocusNode focus;
+
+  /// 私訊用：跟網頁版的私訊編輯器一樣，沒有 [hide]（私訊裡沒意義），多一個程式碼
+  final bool pm;
 
   static const _tools = [
     ('B', '[b]', '[/b]'),
@@ -26,6 +30,16 @@ class ComposerToolbar extends StatelessWidget {
     ('圖片', '[img]', '[/img]'),
     ('連結', '[url=]', '[/url]'),
     ('隱藏', '[hide]', '[/hide]'),
+  ];
+
+  static const _pmTools = [
+    ('B', '[b]', '[/b]'),
+    ('I', '[i]', '[/i]'),
+    ('U', '[u]', '[/u]'),
+    ('引用', '[quote]', '[/quote]'),
+    ('程式碼', '[code]', '[/code]'),
+    ('圖片', '[img]', '[/img]'),
+    ('連結', '[url=]', '[/url]'),
   ];
 
   /// 包 BBCode，並把選取範圍留在標籤中間
@@ -85,7 +99,7 @@ class ComposerToolbar extends StatelessWidget {
               onPressed: () => _pickSmiley(context),
             ),
           ),
-          for (final t in _tools)
+          for (final t in pm ? _pmTools : _tools)
             Padding(
               padding: const EdgeInsets.only(right: 8, top: 5, bottom: 5),
               child: ActionChip(

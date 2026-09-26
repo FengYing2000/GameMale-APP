@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
@@ -73,7 +74,10 @@ Future<void> confirmExternal(
 
   // 論壇自己的頁面用內建瀏覽器開，才帶得到登入狀態；
   // 站外連結交給系統瀏覽器
-  if (url.startsWith(kOrigin)) {
+  if (url.startsWith(kOrigin) && kIsWeb) {
+    // 網頁版沒有內建瀏覽器：直接開論壇本站（見 openInApp）
+    await launchUrl(Uri.parse(forumUrl(url)), webOnlyWindowName: '_blank');
+  } else if (url.startsWith(kOrigin)) {
     context.push(Uri(
       path: '/web',
       queryParameters: {'url': url, 'title': ?title},
@@ -85,6 +89,12 @@ Future<void> confirmExternal(
 
 /// 論壇自己的頁面，不必問，直接用內建瀏覽器開
 void openInApp(BuildContext context, String url, {String title = ''}) {
+  // 網頁版要在點擊的當下直接開新視窗：先換到中間頁、下一幀才開的話，
+  // iOS Safari 的彈出視窗阻擋會把它擋掉（換帳號後「論壇功能」點了沒反應）
+  if (kIsWeb) {
+    launchUrl(Uri.parse(forumUrl(url)), webOnlyWindowName: '_blank');
+    return;
+  }
   // 先把積分提示清掉，否則每開一頁都會再跳一次上次操作的變化
   unawaited(discuz.dismissCreditNotice());
   context.push(Uri(
