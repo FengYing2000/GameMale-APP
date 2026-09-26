@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -57,7 +58,9 @@ class ComposerToolbar extends StatelessWidget {
         extentOffset: start + open.length + inner.length,
       ),
     );
-    focus.requestFocus();
+    // 網頁版不要用程式把焦點拉回來：iPhone 的 Safari 不會為此叫出鍵盤，
+    // 只會變成「以為在輸入、鍵盤卻沒出來」，下一次點輸入框整個畫面跳掉
+    if (!kIsWeb) focus.requestFocus();
   }
 
   void _insert(String code) {
@@ -80,7 +83,7 @@ class ComposerToolbar extends StatelessWidget {
       showDragHandle: true,
       builder: (_) => _SmileySheet(onPick: _insert),
     );
-    focus.requestFocus();
+    if (!kIsWeb) focus.requestFocus();
   }
 
   @override

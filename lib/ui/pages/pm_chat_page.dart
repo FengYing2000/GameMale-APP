@@ -3,6 +3,7 @@ import 'dart:convert' show HtmlEscape;
 import '../../i18n/ui.dart';
 import '../widgets/require_login.dart';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +16,7 @@ import '../../store/session.dart';
 import '../../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/composer_toolbar.dart';
+import '../widgets/keyboard_tap_outside.dart';
 import '../widgets/post_body.dart';
 import '../widgets/state_box.dart';
 import '../widgets/toast.dart';
@@ -333,10 +335,11 @@ class _Composer extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // BBCode 與表情，跟網頁版私訊的編輯器一樣。只在打字時出現，看訊息時不佔位置
+            // BBCode 與表情，跟網頁版私訊的編輯器一樣。原生版只在打字時出現；網頁版一直顯示——
+                // 在網頁版點工具列鍵盤一定會被瀏覽器收掉，只在打字時出現的話點一下就不見了
             ListenableBuilder(
               listenable: focus,
-              builder: (context, _) => focus.hasFocus
+              builder: (context, _) => kIsWeb || focus.hasFocus
                   ? Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: ComposerToolbar(
@@ -357,8 +360,8 @@ class _Composer extends StatelessWidget {
                     // 鍵盤的 Return 是換行，送出用右邊的按鈕
                     keyboardType: TextInputType.multiline,
                     textInputAction: TextInputAction.newline,
-                    // 網頁版預設「碰到輸入框外面就收鍵盤」，連滑動訊息都算
-                    onTapOutside: (_) {},
+                    // 網頁版：點外面才放開、滑動不放開（見 keyboardTapOutside）
+                    onTapOutside: keyboardTapOutside(focus),
                     minLines: 1,
                     maxLines: 5,
                     decoration: InputDecoration(

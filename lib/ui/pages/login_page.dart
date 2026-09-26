@@ -1,4 +1,5 @@
 import '../../i18n/ui.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
@@ -286,6 +287,9 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error, fontSize: 13, height: 1.5)),
                   ),
+                // 記住密碼是給多帳號切換用的（存 Keychain／Keystore）；網頁版沒有
+                // 切換帳號、也沒有安全區可存，勾了也沒作用，乾脆不顯示
+                if (!kIsWeb)
                 CheckboxListTile(
                   value: _remember,
                   onChanged: (v) => setState(() => _remember = v ?? false),

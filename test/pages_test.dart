@@ -38,6 +38,7 @@ import 'package:gamemale/ui/pages/changelog_page.dart';
 import 'package:gamemale/ui/pages/gate_page.dart';
 import 'package:gamemale/store/gate.dart';
 import 'package:gamemale/ui/widgets/launch_splash.dart';
+import 'package:gamemale/ui/widgets/keyboard_tap_outside.dart';
 import 'package:gamemale/ui/pages/space_page.dart';
 import 'package:gamemale/ui/pages/sign_page.dart';
 import 'package:gamemale/ui/pages/thread_page.dart';
@@ -283,6 +284,38 @@ void main() {
       await _smoke(tester, const SettingsPage());
       expect(find.text('檢查更新'), findsOneWidget);
       expect(find.text('更新日誌'), findsOneWidget);
+    });
+  });
+
+  group('輸入框：點外面才放開、滑動不放開（網頁版）', () {
+    Future<FocusNode> pumpField(WidgetTester tester) async {
+      final focus = FocusNode();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Column(children: [
+            TextField(focusNode: focus, onTapOutside: tapToUnfocus(focus)),
+            const SizedBox(height: 400, width: 300, child: ColoredBox(color: Colors.black12)),
+          ]),
+        ),
+      ));
+      focus.requestFocus();
+      await tester.pump();
+      expect(focus.hasFocus, isTrue);
+      return focus;
+    }
+
+    testWidgets('點一下外面：放開（跟瀏覽器收鍵盤同步）', (tester) async {
+      final focus = await pumpField(tester);
+      await tester.tapAt(const Offset(150, 300));
+      await tester.pump();
+      expect(focus.hasFocus, isFalse);
+    });
+
+    testWidgets('在外面滑動：保持輸入中', (tester) async {
+      final focus = await pumpField(tester);
+      await tester.dragFrom(const Offset(150, 300), const Offset(0, -120));
+      await tester.pump();
+      expect(focus.hasFocus, isTrue);
     });
   });
 }
